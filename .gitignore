@@ -1,0 +1,8 @@
+# зависимости и кэши
+node_modules/
+.cache/
+__pycache__/
+.venv/
+# артефакты проверок
+*.png
+test-results/

@@ -1,0 +1,11 @@
+{
+  "name": "sim-energy",
+  "version": "0.9.0",
+  "private": true,
+  "description": "Виртуальная лаборатория «Энерджиквантум»: интерактивный стенд по электрическим цепям",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node src/test_engine.js"
+  },
+  "license": "MIT"
+}
