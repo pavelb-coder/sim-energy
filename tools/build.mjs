@@ -10,6 +10,11 @@ const outDir = path.join(root, 'dist');
 const outPath = path.join(outDir, 'lab.html');
 
 let out = fs.readFileSync(appPath, 'utf8');
+// внешние скрипты встраиваются в единый файл
+out = out.replace(/<script src="([^"]+)"><\/script>/g, (m, file) => {
+  const code = fs.readFileSync(path.join(root, 'src', path.basename(file)), 'utf8');
+  return '<script>\n' + code.replace(/<\/script/gi, '<\\/script') + '\n</script>';
+});
 for (const [marker, file] of [
   ['/*__ENGINE__*/', 'src/engine.js'],
   ['/*__RENEW__*/', 'src/renewables.js'],

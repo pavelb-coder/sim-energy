@@ -18,7 +18,7 @@
 
   /* ---------- стили (добавляем один раз) ---------- */
   var css = document.createElement('style');
-  css.textContent = `
+  UI.text(css, `
   .renew main{display:grid;grid-template-columns:236px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
   .rctl{display:flex;flex-direction:column;min-height:0;overflow:auto}
   .rctl .grp{padding:9px 11px;border-bottom:1px solid var(--line)}
@@ -50,13 +50,13 @@
   .mtable th:first-child,.mtable td:first-child{text-align:left}
   @media (max-width:1180px){.renew main{grid-template-columns:210px minmax(360px,1fr) 290px}}
   @media (max-width:980px){.renew main{grid-template-columns:1fr}.rstage{min-height:420px}}
-  `;
+  `);
   document.head.appendChild(css);
 
   /* ---------- разметка стенда ---------- */
   var main = document.querySelector('#benchRenew');
   main.className = 'renew';
-  main.innerHTML = `
+  UI.html(main, `
     <aside class="panel rctl" id="rctl">
       <h2>Условия опыта</h2>
       <div class="grp">
@@ -245,7 +245,7 @@
           <span>Расход: <b id="rDayUse">—</b></span>
         </div>
       </div>
-    </aside>`;
+    </aside>`);
 
   /* ---------- инициализация управления ---------- */
   function pct(v, d) { return v.toFixed(d === undefined ? 1 : d).replace('.', ','); }
@@ -261,13 +261,13 @@
     });
   }
   function renderControls() {
-    $('vHour').textContent = timeText(st.hour);
-    $('vDate').textContent = dateText(st.day);
-    $('vCloud').textContent = st.cloud < 0.08 ? 'ясно' : (st.cloud < 0.45 ? 'переменная' : (st.cloud < 0.8 ? 'облачно' : 'пасмурно'));
-    $('vWind').textContent = pct(st.wind, 1) + ' м/с';
-    $('vTilt').textContent = st.tilt + '°';
-    $('vAz').textContent = (st.azimuth > 0 ? '+' : (st.azimuth < 0 ? '−' : '')) + Math.abs(st.azimuth) + '°';
-    $('vCap').textContent = st.capacity + ' Вт·ч';
+    UI.text($('vHour'), timeText(st.hour));
+    UI.text($('vDate'), dateText(st.day));
+    UI.text($('vCloud'), st.cloud < 0.08 ? 'ясно' : (st.cloud < 0.45 ? 'переменная' : (st.cloud < 0.8 ? 'облачно' : 'пасмурно')));
+    UI.text($('vWind'), pct(st.wind, 1) + ' м/с');
+    UI.text($('vTilt'), st.tilt + '°');
+    UI.text($('vAz'), (st.azimuth > 0 ? '+' : (st.azimuth < 0 ? '−' : '')) + Math.abs(st.azimuth) + '°');
+    UI.text($('vCap'), st.capacity + ' Вт·ч');
     [].forEach.call($('segBlades').children, function (b) { b.classList.toggle('active', +b.dataset.blades === st.blades); });
     [].forEach.call($('segCtrl').children, function (b) { b.classList.toggle('active', b.dataset.ctrl === st.controller); });
     $('loadLamp').checked = st.loads.lamp;
@@ -313,7 +313,7 @@
   });
   $('rPlay').onclick = function () {
     run.playing = !run.playing;
-    this.textContent = run.playing ? '⏸' : '▶';
+    UI.text(this, run.playing ? '⏸' : '▶');
   };
   [].forEach.call(document.querySelectorAll('[data-rspeed]'), function (b) {
     b.onclick = function () {
@@ -334,11 +334,11 @@
   }
   function renderJournal() {
     var box = $('rJournal');
-    if (!st.log.length) { box.innerHTML = '<div class="empty-note">Меняйте условия опыта слева — действия будут записываться сюда.</div>'; return; }
-    box.innerHTML = st.log.slice(-90).map(function (r) {
+    if (!st.log.length) { UI.html(box, '<div class="empty-note">Меняйте условия опыта слева — действия будут записываться сюда.</div>'); return; }
+    UI.html(box, st.log.slice(-90).map(function (r) {
       return '<div class="jrow ' + r.kind + '"><span class="tm">' + timeText(r.hour !== undefined ? r.hour : (r.t % 24)) + '</span><span class="dot"></span>' +
         '<span class="tx">' + String(r.text).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</span></div>';
-    }).join('');
+    }).join(''));
     box.parentElement.scrollTop = box.parentElement.scrollHeight;
   }
 
@@ -375,10 +375,10 @@
 
   function renderMeasurements() {
     var box = $('rTabMeas');
-    $('rMeasCount').textContent = st.measures.length || '';
+    UI.text($('rMeasCount'), st.measures.length || '');
     var rows = st.measures.filter(function (m) { return m.kind !== 'wind'; }).slice(-60).reverse();
-    if (!rows.length) { box.innerHTML = '<div class="empty-note">Пока нет данных. Нажмите «Снять показания» или «Прогнать сутки».</div>'; return; }
-    box.innerHTML = '<table class="mtable"><thead><tr><th>Что</th><th>Условия</th><th>G, Вт/м²</th><th>PV, Вт</th>' +
+    if (!rows.length) { UI.html(box, '<div class="empty-note">Пока нет данных. Нажмите «Снять показания» или «Прогнать сутки».</div>'); return; }
+    UI.html(box, '<table class="mtable"><thead><tr><th>Что</th><th>Условия</th><th>G, Вт/м²</th><th>PV, Вт</th>' +
       '<th>Ветер, м/с</th><th>WT, Вт</th><th>Нагрузка, Вт</th><th>АКБ, %</th></tr></thead><tbody>' +
       rows.map(function (m) {
         if (m.kind === 'day') {
@@ -390,7 +390,7 @@
         return '<tr><td>Точка</td><td style="text-align:left">' + timeText(m.hour) + ' · ' + dateText(m.day) + '</td><td>' +
           Math.round(m.G) + '</td><td>' + fmtW(m.pv) + '</td><td>' + pct(m.v, 1) + '</td><td>' + fmtW(m.wt) + '</td><td>' +
           fmtW(m.load) + '</td><td>' + Math.round(m.soc * 100) + '</td></tr>';
-      }).join('') + '</tbody></table>';
+      }).join('') + '</tbody></table>');
   }
 
   function exportCsv() {
@@ -423,20 +423,19 @@
   function renderTask() {
     var tk = R.TASKS[taskIndex];
     var done = solved[taskIndex];
-    $('rTaskId').textContent = (taskIndex + 1) + ' / ' + R.TASKS.length;
-    $('rTaskBody').innerHTML =
-      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+    UI.text($('rTaskId'), (taskIndex + 1) + ' / ' + R.TASKS.length);
+    UI.html($('rTaskBody'), '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
       '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
       (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, done) + '</span><br>' + tk.why + '</div>' : '') +
       '<div class="hints">' + (tk._hints || []).map(function (h, i) { return '<div class="hint">Подсказка ' + (i + 1) + ': ' + h + '</div>'; }).join('') + '</div>' +
       '<div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">' +
       '<button class="btn" id="rHint">Подсказка</button>' +
       '<button class="btn primary" id="rCheck">Проверить</button></div>' +
-      '<div id="rCheckOut"></div>';
-    $('rTaskList').innerHTML = R.TASKS.map(function (t, i) {
+      '<div id="rCheckOut"></div>');
+    UI.html($('rTaskList'), R.TASKS.map(function (t, i) {
       return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
         '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
-    }).join('');
+    }).join(''));
     [].forEach.call($('rTaskList').children, function (b) {
       b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); };
     });
@@ -451,13 +450,13 @@
       if (!ok) {
         var out = $('rCheckOut');
         var f = facts();
-        out.innerHTML = '<div class="result bad">Пока не выполнено. ' +
+        UI.html(out, '<div class="result bad">Пока не выполнено. ' +
           (R.TASKS[taskIndex].t.indexOf('Навести') === 0 ? 'Сейчас ' + Math.round(f.pvRatio * 100) + ' % от максимума (нужно ≥ 90 %).'
             : R.TASKS[taskIndex].t.indexOf('Солнце и облака') === 0 ? 'Точек с разной облачностью: ' + distinctClouds(f) + ' из 3.'
             : R.TASKS[taskIndex].t.indexOf('Куб') === 0 ? 'Измерений ветра: ' + f.windMeasure.length + ' из 3, отношение P(высок.)/P(низк.) = ' + pct(f.windRatio, 1) + ' (нужно 6…10).'
             : R.TASKS[taskIndex].t.indexOf('MPPT') === 0 ? 'Прогонов суток: ' + f.dayRuns.length + ' (нужно минимум по одному с PWM и MPPT).'
             : R.TASKS[taskIndex].t.indexOf('Автономные') === 0 ? 'Нагрузка ' + f.load + ' Вт, минимум АКБ ' + Math.round(f.sim.socMin * 100) + ' % (нужно ≥ 20 %), выработка ' + Math.round(f.day.gen) + ' / расход ' + Math.round(f.day.use) + ' Вт·ч.'
-            : 'Прогонов суток: ' + f.seasonRuns.length + ' (нужны и летние, и зимние).') + '</div>';
+            : 'Прогонов суток: ' + f.seasonRuns.length + ' (нужны и летние, и зимние).') + '</div>');
       }
     };
   }
@@ -503,38 +502,43 @@
       grid += '<text x="' + x(hh) + '" y="' + (H - 6) + '" font-size="8" fill="#9aabb8" text-anchor="middle" font-family="sans-serif">' + hh + '</text>';
     }
     var now = x(st.hour);
-    $('rChart').innerHTML =
-      grid +
+    UI.html($('rChart'), grid +
       '<path d="' + area + '" fill="#fdf0dc" opacity=".75"/>' +
       '<path d="' + line('pv') + '" fill="none" stroke="#f2a93b" stroke-width="1.6"/>' +
       '<path d="' + line('wt') + '" fill="none" stroke="#3aa0c9" stroke-width="1.6" stroke-dasharray="3 2"/>' +
       '<path d="' + line('load') + '" fill="none" stroke="#8f6bd0" stroke-width="1.4"/>' +
       '<line x1="' + now + '" y1="6" x2="' + now + '" y2="' + y(0) + '" stroke="#0b6e99" stroke-width="1.2" opacity=".8"/>' +
-      '<circle cx="' + now + '" cy="8" r="2.6" fill="#0b6e99"/>';
+      '<circle cx="' + now + '" cy="8" r="2.6" fill="#0b6e99"/>');
     var d = R.dayEnergy(st);
-    $('rDayGen').textContent = Math.round(d.gen) + ' Вт·ч';
-    $('rDayUse').textContent = Math.round(d.use) + ' Вт·ч';
+    UI.text($('rDayGen'), Math.round(d.gen) + ' Вт·ч');
+    UI.text($('rDayUse'), Math.round(d.use) + ' Вт·ч');
   }
 
   /* ---------- сцена ---------- */
   var rotorAngle = 0;
-  function renderScene(f) {
+  var flowTick = 0, lastWarn = '', meterTick = 0, slowTick = 0, bladeTick = 0, chartTick = 0;
+  function renderScene(f, dt) {
     var elev = f.elevDeg, day = elev > 0;
     // небо
     var sky = $('sky');
     var night = elev < -6;
     var t = Math.max(0, Math.min(1, (elev + 6) / 20));
-    sky.setAttribute('fill', night ? 'url(#skyNight)' : 'url(#skyDay)');
-    sky.setAttribute('opacity', night ? 1 : 0.15 + 0.85 * t);
-    // солнце: путь по небу
-    var x = 105 + (st.hour / 24) * 590;
-    var ySun = 300 - Math.max(0, elev) * 3.6;
-    ['sunDisc', 'sunGlowC'].forEach(function (id) {
-      var el = $(id);
-      el.setAttribute('cx', x); el.setAttribute('cy', ySun);
-      el.setAttribute('opacity', elev > 0 ? (id === 'sunDisc' ? Math.min(1, 0.35 + elev / 40) : 0.9) : 0);
-    });
-    $('sunGlowC').setAttribute('r', 50 + Math.max(0, elev) * 0.6);
+    UI.attr(sky, 'fill', night ? 'url(#skyNight)' : 'url(#skyDay)');;
+    UI.attr(sky, 'opacity', night ? 1 : 0.15 + 0.85 * t);;
+    // солнце: путь по небу (обновляем 4 раза в секунду)
+    slowTick += (dt || 0);
+    if (slowTick > 0.25) {
+      slowTick = 0;
+      var x = Math.round(105 + (st.hour / 24) * 590);
+      var ySun = Math.round(300 - Math.max(0, elev) * 3.6);
+      var glowR = Math.round(50 + Math.max(0, elev) * 0.6);
+      ['sunDisc', 'sunGlowC'].forEach(function (id) {
+        var el = $(id);
+        UI.attr(el, 'cx', x); UI.attr(el, 'cy', ySun);
+        UI.attr(el, 'opacity', elev > 0 ? (id === 'sunDisc' ? Math.min(1, 0.35 + elev / 40) : 0.9) : 0);
+      });
+      UI.attr($('sunGlowC'), 'r', glowR);
+    }
     // облака
     var cl = $('clouds');
     if (cl.dataset.level !== String(st.cloud.toFixed(2))) {
@@ -546,63 +550,72 @@
         out += '<g opacity="' + (0.35 + 0.4 * st.cloud) + '"><ellipse cx="' + cx + '" cy="' + cy + '" rx="46" ry="17" fill="#fff"/>' +
           '<ellipse cx="' + (cx + 30) + '" cy="' + (cy + 6) + '" rx="34" ry="13" fill="#f2f7fb"/></g>';
       }
-      cl.innerHTML = out;
+      UI.html(cl, out);
     }
     // панель: наклон (сжатие по вертикали) и азимут (сжатие по горизонтали)
     var beta = st.tilt * Math.PI / 180;
     var sx = 1 - 0.45 * Math.abs(Math.sin(st.azimuth * Math.PI / 180));
     var sy = 0.12 + 0.88 * Math.sin(beta);   // tilt=0 — плашмя (видна с ребра), tilt=90 — анфас
-    $('panelTilt').setAttribute('transform', 'scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')');
+    UI.attr($('panelTilt'), 'transform', 'scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')');;
     // лопасти
     var p = f.wt;
     var speed = p > 0.5 ? Math.min(9, 1.2 + p / 18) : 0;
-    rotorAngle = (rotorAngle + speed) % 360;
-    $('blades').setAttribute('transform', 'rotate(' + rotorAngle.toFixed(1) + ')');
+    bladeTick += (dt || 0);
+    if (bladeTick > 0.05) {
+      rotorAngle = (rotorAngle + speed * bladeTick * 12) % 360;
+      bladeTick = 0;
+      UI.attr($('blades'), 'transform', 'rotate(' + Math.round(rotorAngle / 2) * 2 + ')');
+    };
     // дом и лампа
     var lampOn = st.loads.lamp;
-    $('lampGlow').setAttribute('opacity', lampOn ? 0.55 : 0);
-    $('win').setAttribute('fill', lampOn ? '#ffe9a8' : '#cfe3ee');
+    UI.attr($('lampGlow'), 'opacity', lampOn ? 0.55 : 0);;
+    UI.attr($('win'), 'fill', lampOn ? '#ffe9a8' : '#cfe3ee');;
     // батарея
     var battW = 60 * st.soc;
-    $('battFill').setAttribute('width', Math.max(0, battW));
-    $('battFill').setAttribute('fill', st.soc < 0.2 ? '#e8850c' : (st.soc > 0.8 ? '#1f9d6b' : 'url(#battFill)'));
-    $('battTxt').textContent = 'АКБ ' + Math.round(st.soc * 100) + ' %';
+    UI.attr($('battFill'), 'width', Math.round(Math.max(0, battW)));
+    UI.attr($('battFill'), 'fill', st.soc < 0.2 ? '#e8850c' : (st.soc > 0.8 ? '#1f9d6b' : 'url(#battFill)'));;
+    UI.text($('battTxt'), 'АКБ ' + Math.round(st.soc * 100) + ' %');
     // потоки энергии
-    var fPV = f.pv > 1 ? Math.min(1, 0.35 + f.pv / 100) : 0;
-    var fWT = f.wt > 1 ? Math.min(1, 0.35 + f.wt / 100) : 0;
-    var fL = f.load > 0 ? 0.7 : 0;
-    $('flowPV').setAttribute('opacity', fPV);
-    $('flowWT').setAttribute('opacity', fWT);
-    $('flowLoad').setAttribute('opacity', fL);
+    flowTick += (dt || 0);
+    if (flowTick > 0.25) {
+      var slow = true;
+      flowTick = 0;
+      var fPV = f.pv > 1 ? Math.min(1, 0.35 + f.pv / 100).toFixed(2) : 0;
+      var fWT = f.wt > 1 ? Math.min(1, 0.35 + f.wt / 100).toFixed(2) : 0;
+      var fL = f.load > 0 ? 0.7 : 0;
+      UI.attr($('flowPV'), 'opacity', fPV);
+      UI.attr($('flowWT'), 'opacity', fWT);
+      UI.attr($('flowLoad'), 'opacity', fL);
+    }
     // предупреждение
     var warn = '', show = false;
     if (st.wind > 16) { warn = 'шторм: ветрогенератор остановлен'; show = true; }
     else if (st.soc < 0.06 && f.load > 0) { warn = 'аккумулятор разряжен'; show = true; }
     else if (f.pv < 1 && f.wt < 1 && f.load > 0 && st.hour > 20 || f.pv < 1 && f.wt < 1 && f.load > 0 && st.hour < 5) { warn = 'нет выработки — работаем от АКБ'; show = true; }
-    $('warnText').setAttribute('opacity', show ? 1 : 0);
-    $('warnLabel').textContent = warn;
+    UI.attr($('warnText'), 'opacity', show ? 1 : 0);;
+    UI.text($('warnLabel'), warn);
   }
 
   /* ---------- приборы ---------- */
   function renderMeters(f) {
-    $('rPV').innerHTML = fmtW(f.pv) + ' <small>Вт</small>';
-    $('rWT').innerHTML = fmtW(f.wt) + ' <small>Вт</small>';
-    $('rLoad').innerHTML = fmtW(f.load) + ' <small>Вт</small>';
+    UI.html($('rPV'), fmtW(f.pv) + ' <small>Вт</small>');
+    UI.html($('rWT'), fmtW(f.wt) + ' <small>Вт</small>');
+    UI.html($('rLoad'), fmtW(f.load) + ' <small>Вт</small>');
     var net = f.pv + f.wt * 1 - f.load;
     var netCtrl = Math.round((f.pv + f.wt) * R.controllerEff(st) - f.load);
-    $('rNet').innerHTML = (netCtrl >= 0 ? '+' : '−') + Math.abs(netCtrl) + ' <small>Вт</small>';
+    UI.html($('rNet'), (netCtrl >= 0 ? '+' : '−') + Math.abs(netCtrl) + ' <small>Вт</small>');
     $('rNet').style.color = netCtrl >= 0 ? '#1f9d6b' : '#d64545';
-    $('rSoc').innerHTML = Math.round(st.soc * 100) + ' <small>%</small>';
+    UI.html($('rSoc'), Math.round(st.soc * 100) + ' <small>%</small>');
     $('rSocBar').style.width = Math.round(st.soc * 100) + '%';
     $('rSocBar').style.background = st.soc < 0.2 ? '#d64545' : (st.soc > 0.8 ? '#1f9d6b' : 'linear-gradient(90deg,#ffd08a,#f28c28)');
-    $('rSocState').textContent = st.soc < 0.2 ? 'низкий' : (st.soc > 0.9 ? 'полный' : 'заряд');
-    $('rG').textContent = Math.round(f.G) + ' Вт/м²';
-    $('rElev').textContent = pct(Math.max(0, f.elevDeg), 1) + '°';
-    $('rGen').textContent = Math.round(st.energyGen) + ' Вт·ч';
-    $('rUse').textContent = Math.round(st.energyUsed) + ' Вт·ч';
-    $('rClock').textContent = timeText(st.hour);
+    UI.text($('rSocState'), st.soc < 0.2 ? 'низкий' : (st.soc > 0.9 ? 'полный' : 'заряд'));
+    UI.text($('rG'), Math.round(f.G) + ' Вт/м²');
+    UI.text($('rElev'), pct(Math.max(0, f.elevDeg), 1) + '°');
+    UI.text($('rGen'), Math.round(st.energyGen) + ' Вт·ч');
+    UI.text($('rUse'), Math.round(st.energyUsed) + ' Вт·ч');
+    UI.text($('rClock'), timeText(st.hour));
     $('sHour').value = st.hour;
-    $('vHour').textContent = timeText(st.hour);
+    UI.text($('vHour'), timeText(st.hour));
   }
 
   /* ---------- цикл ---------- */
@@ -613,12 +626,11 @@
       if (run.playing && dt > 0) R.step(st, dt, run.speed);
       else R.step(st, 0, 0);
       lastFacts = R.facts(st);
-      renderScene(lastFacts);
-      renderMeters(lastFacts);
-      if (Math.abs(st.hour - (lastFacts._chartHour || -1)) > 0.25) {
-        lastFacts._chartHour = st.hour;
-        renderChart();
-      }
+      renderScene(lastFacts, dt);
+      meterTick += dt;
+      if (meterTick > 0.1) { meterTick = 0; renderMeters(lastFacts); }
+      chartTick += dt;
+      if (chartTick > 2) { chartTick = 0; renderChart(); }
       taskTick += dt;
       if (taskTick > 0.4) { taskTick = 0; checkTask(false); }
     }
@@ -629,7 +641,7 @@
   function toast(text) {
     var t = document.getElementById('toast');
     if (!t) return;
-    t.textContent = text; t.classList.add('show');
+    UI.text(t, text); t.classList.add('show');
     clearTimeout(toast._t);
     toast._t = setTimeout(function () { t.classList.remove('show'); }, 2400);
   }

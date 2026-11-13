@@ -10,10 +10,10 @@
   var $ = function (id) { return document.getElementById(id); };
   var st = E.createState();
   var solved = {}, taskIndex = 0, lastFacts = null, lastTick = 0, taskTick = 0;
-  var playing = true;
+  var playing = true, meterTick = 0;
 
   var css = document.createElement('style');
-  css.textContent = `
+  UI.text(css, `
   .eff main{display:grid;grid-template-columns:246px minmax(420px,1fr) 330px;gap:10px;padding:10px;min-height:0}
   .eff .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px;flex-wrap:wrap}
   .eff .seg button{flex:1;padding:4px 2px;font-size:11px;border-radius:5px;color:var(--muted)}
@@ -34,12 +34,12 @@
   .ok-lux{color:#146c4b;font-weight:600}
   .bad-lux{color:#a02020;font-weight:600}
   @media (max-width:980px){.eff main{grid-template-columns:1fr}.estage{min-height:360px}}
-  `;
+  `);
   document.head.appendChild(css);
 
   var main = $('benchEfficiency');
   main.className = 'eff';
-  main.innerHTML = `
+  UI.html(main, `
     <aside class="panel rctl">
       <h2>Настройка кабинета</h2>
       <div class="grp">
@@ -114,7 +114,7 @@
             <g id="applIcons"></g>
           </g>
           <!-- счётчик -->
-          <g id="gMeter" transform="translate(742,364)">
+          <g id="gMeter" transform="translate(690,394)">
             <rect x="-52" y="-16" width="104" height="34" rx="7" fill="#1f2a36"/>
             <text id="meterW" x="0" y="7" text-anchor="middle" font-size="14" font-weight="700" fill="#8fe0b8" font-family="sans-serif">0 Вт</text>
           </g>
@@ -172,7 +172,7 @@
           <table class="efftable" id="efLuxTable"></table>
         </div>
       </div>
-    </aside>`;
+    </aside>`);
 
   function pct(v, d) { return v.toFixed(d === undefined ? 1 : d).replace('.', ','); }
 
@@ -184,11 +184,11 @@
   }
   function renderJournal() {
     var box = $('efJournal');
-    if (!st.log.length) { box.innerHTML = '<div class="empty-note">Меняйте настройки слева — всё попадёт в журнал.</div>'; return; }
-    box.innerHTML = st.log.slice(-80).map(function (r) {
+    if (!st.log.length) { UI.html(box, '<div class="empty-note">Меняйте настройки слева — всё попадёт в журнал.</div>'); return; }
+    UI.html(box, st.log.slice(-80).map(function (r) {
       return '<div class="jrow ' + r.kind + '"><span class="tm">' + timeText(r.hour) + '</span><span class="dot"></span><span class="tx">' +
         String(r.text).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</span></div>';
-    }).join('');
+    }).join(''));
     box.parentElement.scrollTop = box.parentElement.scrollHeight;
   }
   function timeText(h) {
@@ -228,7 +228,7 @@
       checkTask(false);
     });
   });
-  $('efPlay').onclick = function () { playing = !playing; this.textContent = playing ? '⏸' : '▶'; };
+  $('efPlay').onclick = function () { playing = !playing; UI.text(this, playing ? '⏸' : '▶'); };
   var speed = 1;
   [].forEach.call(document.querySelectorAll('[data-efspeed]'), function (b) {
     b.onclick = function () {
@@ -268,9 +268,9 @@
   }
   function renderMeasurements() {
     var box = $('efTabMeas');
-    $('efMeasCount').textContent = st.measures.length || '';
-    if (!st.measures.length) { box.innerHTML = '<div class="empty-note">Нажмите «Снять точку» или «Прогнать сутки».</div>'; return; }
-    box.innerHTML = '<table class="mtable"><thead><tr><th>Что</th><th>Лампы</th><th>Свет, кВт·ч</th><th>Всего, кВт·ч</th>' +
+    UI.text($('efMeasCount'), st.measures.length || '');
+    if (!st.measures.length) { UI.html(box, '<div class="empty-note">Нажмите «Снять точку» или «Прогнать сутки».</div>'); return; }
+    UI.html(box, '<table class="mtable"><thead><tr><th>Что</th><th>Лампы</th><th>Свет, кВт·ч</th><th>Всего, кВт·ч</th>' +
       '<th>Экономия, %</th><th>Ожидание, кВт·ч</th><th>лк (каб./кор./лаб.)</th></tr></thead><tbody>' +
       st.measures.slice(-50).reverse().map(function (m) {
         return '<tr><td>' + (m.kind === 'day' ? 'сутки' : m.kind === 'smart' ? 'автоматика' : 'точка') +
@@ -278,7 +278,7 @@
           pct(m.lightKwh || 0, 2) + '</td><td>' + pct(m.kind === 'day' ? m.kwh : (m.totalKwh || 0), 2) + '</td><td>' +
           Math.round((m.percent || 0) * 100) + '</td><td>' + pct(m.standbyKwh || 0, 2) + '</td><td style="text-align:left">' +
           (m.lux ? m.lux.join(' / ') : '—') + '</td></tr>';
-      }).join('') + '</tbody></table>';
+      }).join('') + '</tbody></table>');
   }
   function exportCsv() {
     if (!st.measures.length) { toast('Протокол пуст'); return; }
@@ -306,18 +306,17 @@
   function facts() { return lastFacts || E.facts(st); }
   function renderTask() {
     var tk = E.TASKS[taskIndex], done = solved[taskIndex];
-    $('efTaskId').textContent = (taskIndex + 1) + ' / ' + E.TASKS.length;
-    $('efTaskBody').innerHTML =
-      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+    UI.text($('efTaskId'), (taskIndex + 1) + ' / ' + E.TASKS.length);
+    UI.html($('efTaskBody'), '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
       '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
       (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, done) + '</span><br>' + tk.why + '</div>' : '') +
       '<div class="hints">' + (tk._hints || []).map(function (h, i) { return '<div class="hint">Подсказка ' + (i + 1) + ': ' + h + '</div>'; }).join('') + '</div>' +
       '<div style="display:flex;gap:6px;margin-top:9px"><button class="btn" id="efHint">Подсказка</button>' +
-      '<button class="btn primary" id="efCheck">Проверить</button></div><div id="efCheckOut"></div>';
-    $('efTaskList').innerHTML = E.TASKS.map(function (t, i) {
+      '<button class="btn primary" id="efCheck">Проверить</button></div><div id="efCheckOut"></div>');
+    UI.html($('efTaskList'), E.TASKS.map(function (t, i) {
       return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
         '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
-    }).join('');
+    }).join(''));
     [].forEach.call($('efTaskList').children, function (b) { b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); }; });
     $('efHint').onclick = function () {
       var t2 = E.TASKS[taskIndex]; t2._hints = t2._hints || [];
@@ -326,8 +325,8 @@
     $('efCheck').onclick = function () {
       if (!checkTask(true)) {
         var f = facts();
-        $('efCheckOut').innerHTML = '<div class="result bad">Пока не выполнено: экономия ' + Math.round(f.percent * 100) +
-          ' %, нормы ' + (f.allNorm ? 'соблюдены' : 'НАРУШЕНЫ') + ', точек в протоколе ' + f.measures.length + '.</div>';
+        UI.html($('efCheckOut'), '<div class="result bad">Пока не выполнено: экономия ' + Math.round(f.percent * 100) +
+          ' %, нормы ' + (f.allNorm ? 'соблюдены' : 'НАРУШЕНЫ') + ', точек в протоколе ' + f.measures.length + '.</div>');
       }
     };
   }
@@ -347,45 +346,59 @@
 
   /* ---------- сцена ---------- */
   function drawLamps(container, count, room) {
+    // сетка иконок подбирается под ширину комнаты, чтобы лампы не выходили за стены
+    // координаты абсолютные в системе сцены: комнаты стоят в ряд, поэтому у каждой свой x0
+    var g = room === 'hall' ? { x0: 424, dx: 62, y0: 112, dy: 62, cols: 2 }
+          : room === 'lab' ? { x0: 592, dx: 54, y0: 112, dy: 62, cols: 3 }
+          : { x0: 52, dx: 90, y0: 96, dy: 60, cols: 3 };
     var s = '';
     for (var i = 0; i < count; i++) {
-      var x = 52 + (i % 3) * 90, y = 96 + Math.floor(i / 3) * 60;
+      var x = g.x0 + (i % g.cols) * g.dx, y = g.y0 + Math.floor(i / g.cols) * g.dy;
       var on = st.totalW > 0;
       s += '<g transform="translate(' + x + ',' + y + ')">' +
         '<circle r="13" fill="' + (on ? '#ffe9a8' : '#eef3f7') + '" stroke="#cbd9e4" stroke-width="1.6"/>' +
         '<path d="M-6 -1 L-2 -1 L-4 5 L2 5 L-1 -5 L-5 -5 Z" fill="' + (on ? '#e8a93a' : '#b9c7d2') + '"/></g>';
     }
-    container.innerHTML = s;
+    UI.html(container, s);
   }
+  var lastApplSig = '', lastLampSig = '';
   function drawScene(f) {
-    drawLamps($('lampsClass'), 6);
-    drawLamps($('lampsHall'), 3);
-    drawLamps($('lampsLab'), 6);
+    // иконки ламп перерисовываем только когда меняется тип ламп или их состояние
+    var lampSig = st.lampType + ':' + (st.totalW > 0 ? 1 : 0);
+    if (lampSig !== lastLampSig) {
+      lastLampSig = lampSig;
+      drawLamps($('lampsClass'), 6, 'class');
+      drawLamps($('lampsHall'), 3, 'hall');
+      drawLamps($('lampsLab'), 6, 'lab');
+    }
     // «горит» только та комната, где сейчас есть люди/свет
     var litNow = (st.hour >= 7 && st.hour <= 9) || (st.hour >= 17 && st.hour <= 22);
     [['lampsClass', 'roomClass'], ['lampsHall', 'roomHall'], ['lampsLab', 'roomLab']].forEach(function (pair) {
-      $(pair[0]).parentElement.setAttribute('opacity', litNow || !st.sensors.motion ? 1 : 0.45);
+      UI.attr($(pair[0]).parentElement, 'opacity', litNow || !st.sensors.motion ? 1 : 0.45);
     });
-    $('luxClass').textContent = Math.round(f.lux[0].lux) + ' лк' + (f.lux[0].ok ? '' : ' · ниже нормы');
-    $('luxHall').textContent = Math.round(f.lux[1].lux) + ' лк';
-    $('luxLab').textContent = Math.round(f.lux[2].lux) + ' лк';
-    $('luxClass').setAttribute('fill', f.lux[0].ok ? '#146c4b' : '#a02020');
-    $('luxHall').setAttribute('fill', f.lux[1].ok ? '#146c4b' : '#a02020');
-    $('luxLab').setAttribute('fill', f.lux[2].ok ? '#146c4b' : '#a02020');
+    UI.text($('luxClass'), Math.round(f.lux[0].lux) + ' лк' + (f.lux[0].ok ? '' : ' · ниже нормы'));
+    UI.text($('luxHall'), Math.round(f.lux[1].lux) + ' лк');
+    UI.text($('luxLab'), Math.round(f.lux[2].lux) + ' лк');
+    UI.attr($('luxClass'), 'fill', f.lux[0].ok ? '#146c4b' : '#a02020');;
+    UI.attr($('luxHall'), 'fill', f.lux[1].ok ? '#146c4b' : '#a02020');;
+    UI.attr($('luxLab'), 'fill', f.lux[2].ok ? '#146c4b' : '#a02020');;
     // иконки приборов
     var keys = Object.keys(E.APPLIANCES);
-    $('applIcons').innerHTML = keys.map(function (k, i) {
+    var applSig = keys.map(function (k) { return k + (st.appliances[k] ? 1 : 0); }).join('');
+    if (applSig === lastApplSig) return;
+    lastApplSig = applSig;
+    UI.html($('applIcons'), keys.map(function (k, i) {
       var a = E.APPLIANCES[k], on = st.appliances[k];
       var x = 14 + i * 132;
       return '<g transform="translate(' + x + ',26)">' +
         '<rect width="118" height="36" rx="7" fill="' + (on ? '#eaf7f1' : '#f4f7fa') + '" stroke="' + (on ? '#b8e2ce' : '#e0e8ef') + '"/>' +
         '<text x="8" y="15" font-size="10" fill="#1f2a36" font-family="sans-serif">' + a.name + '</text>' +
         '<text x="8" y="29" font-size="9.5" fill="#7a8a97" font-family="sans-serif">' + (on ? a.power + ' Вт' : 'выключен') + '</text></g>';
-    }).join('');
-    $('meterW').textContent = Math.round(st.totalW) + ' Вт';
+    }).join(''));
+    UI.text($('meterW'), Math.round(st.totalW) + ' Вт');
     // солнце / время суток
     var night = st.hour < 6 || st.hour > 20;
-    $('gDay').innerHTML = '<circle cx="0" cy="0" r="16" fill="' + (night ? '#2f4a63' : '#ffd166') + '"/>';
+    UI.html($('gDay'), '<circle cx="0" cy="0" r="16" fill="' + (night ? '#2f4a63' : '#ffd166') + '"/>');
   }
 
   function renderChart() {
@@ -402,28 +415,28 @@
     var area = prof.map(function (p, i) { return (i ? 'L' : 'M') + x(p.h).toFixed(1) + ',' + y(p.w).toFixed(1); }).join(' ') +
       ' L' + x(24).toFixed(1) + ',' + y(0).toFixed(1) + ' L' + x(0).toFixed(1) + ',' + y(0).toFixed(1) + ' Z';
     var nowX = x(st.hour);
-    $('efChart').innerHTML = grid +
+    UI.html($('efChart'), grid +
       '<path d="' + area + '" fill="#e6f2f8" stroke="#0b6e99" stroke-width="1.6"/>' +
-      '<line x1="' + nowX + '" y1="6" x2="' + nowX + '" y2="' + y(0) + '" stroke="#f28c28" stroke-width="1.4"/>';
-    $('efPeak').textContent = 'пик ' + Math.round(maxV) + ' Вт';
+      '<line x1="' + nowX + '" y1="6" x2="' + nowX + '" y2="' + y(0) + '" stroke="#f28c28" stroke-width="1.4"/>');
+    UI.text($('efPeak'), 'пик ' + Math.round(maxV) + ' Вт');
   }
 
   function renderMeters(f) {
     var s = E.savings(st);
-    $('efKwh').innerHTML = pct(s.now.total, 2) + ' <small>кВт·ч</small>';
-    $('efRub').innerHTML = pct(s.now.cost, 1) + ' <small>₽</small>';
-    $('efSave').innerHTML = Math.round(s.percent * 100) + ' <small>%</small>';
-    $('efStandby').innerHTML = pct(s.now.standby, 2) + ' <small>кВт·ч</small>';
-    $('efBase').textContent = pct(s.base.total, 2) + ' кВт·ч · ' + pct(s.base.cost, 1) + ' ₽';
-    $('efSavedRub').textContent = pct(s.savedRub, 1) + ' ₽/сутки';
-    $('efPayback').textContent = f.retrofit.paybackMonths === Infinity ? '—' :
-      pct(f.retrofit.paybackMonths, 1) + ' мес';
-    $('efClock').textContent = timeText(st.hour);
-    $('efLuxTable').innerHTML = '<thead><tr><th>Помещение</th><th>Сейчас, лк</th><th>Норма, лк</th><th></th></tr></thead><tbody>' +
+    UI.html($('efKwh'), pct(s.now.total, 2) + ' <small>кВт·ч</small>');
+    UI.html($('efRub'), pct(s.now.cost, 1) + ' <small>₽</small>');
+    UI.html($('efSave'), Math.round(s.percent * 100) + ' <small>%</small>');
+    UI.html($('efStandby'), pct(s.now.standby, 2) + ' <small>кВт·ч</small>');
+    UI.text($('efBase'), pct(s.base.total, 2) + ' кВт·ч · ' + pct(s.base.cost, 1) + ' ₽');
+    UI.text($('efSavedRub'), pct(s.savedRub, 1) + ' ₽/сутки');
+    UI.text($('efPayback'), f.retrofit.paybackMonths === Infinity ? '—' :
+      pct(f.retrofit.paybackMonths, 1) + ' мес');
+    UI.text($('efClock'), timeText(st.hour));
+    UI.html($('efLuxTable'), '<thead><tr><th>Помещение</th><th>Сейчас, лк</th><th>Норма, лк</th><th></th></tr></thead><tbody>' +
       f.lux.map(function (r) {
         return '<tr><td>' + r.name + '</td><td>' + Math.round(r.lux) + '</td><td>' + r.norm + '</td><td class="' +
           (r.ok ? 'ok-lux' : 'bad-lux') + '">' + (r.ok ? '✓' : '✕') + '</td></tr>';
-      }).join('') + '</tbody>';
+      }).join('') + '</tbody>');
   }
 
   function frame(now) {
@@ -433,7 +446,8 @@
       if (playing && dt > 0) E.step(st, dt, speed);
       lastFacts = E.facts(st);
       drawScene(lastFacts);
-      renderMeters(lastFacts);
+      meterTick += dt;
+      if (meterTick > 0.1) { meterTick = 0; renderMeters(lastFacts); }
       if (Math.abs(st.hour - (frame._lastHour || -1)) > 0.5) { frame._lastHour = st.hour; renderChart(); }
       taskTick += dt;
       if (taskTick > 0.5) { taskTick = 0; checkTask(false); }
@@ -442,7 +456,7 @@
   }
   function toast(text) {
     var t = document.getElementById('toast'); if (!t) return;
-    t.textContent = text; t.classList.add('show');
+    UI.text(t, text); t.classList.add('show');
     clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2400);
   }
 

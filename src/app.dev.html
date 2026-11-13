@@ -247,6 +247,49 @@
 </style>
 </head>
 <body>
+<svg id="iconSprite" width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="ic-source" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="14" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="62" y2="28"/>
+      <rect x="24" y="14" width="28" height="28" rx="4" fill="#fff"/>
+      <line x1="31" y1="21" x2="31" y2="35"/><line x1="45" y1="24" x2="45" y2="32" stroke-width="4"/></g></symbol>
+    <symbol id="ic-resistor" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="28" x2="22" y2="28"/><line x1="54" y1="28" x2="64" y2="28"/>
+      <path d="M22 28 L27 18 L33 38 L39 18 L45 38 L51 18 L54 28" fill="#fff"/></g></symbol>
+    <symbol id="ic-lamp" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>
+      <circle cx="38" cy="28" r="13" fill="#fff"/><path d="M31 21 L45 35 M45 21 L31 35" stroke-width="2"/></g></symbol>
+    <symbol id="ic-led" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>
+      <path d="M26 16 L26 40 L46 28 Z" fill="#fff"/><line x1="46" y1="16" x2="46" y2="40"/>
+      <path d="M50 16 L58 8 M54 20 L62 12" stroke-width="1.8"/></g></symbol>
+    <symbol id="ic-rheostat" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="10" y1="28" x2="20" y2="28"/><line x1="56" y1="28" x2="66" y2="28"/>
+      <rect x="20" y="18" width="36" height="20" rx="3" fill="#fff"/>
+      <path d="M28 14 L44 20 L36 30 L48 38 L32 42" stroke-width="1.8"/>
+      <line x1="44" y1="10" x2="44" y2="18" stroke-width="3"/></g></symbol>
+    <symbol id="ic-key" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>
+      <circle cx="26" cy="28" r="3" fill="#33475a"/><circle cx="50" cy="28" r="3" fill="#33475a"/>
+      <line x1="26" y1="28" x2="48" y2="14" stroke-width="3"/></g></symbol>
+    <symbol id="ic-fuse" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="28" x2="22" y2="28"/><line x1="54" y1="28" x2="64" y2="28"/>
+      <rect x="22" y="18" width="32" height="20" rx="4" fill="#fff"/><line x1="28" y1="28" x2="48" y2="28"/></g></symbol>
+    <symbol id="ic-ammeter" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>
+      <circle cx="38" cy="28" r="14" fill="#fff"/>
+      <text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">A</text></g></symbol>
+    <symbol id="ic-voltmeter" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>
+      <circle cx="38" cy="28" r="14" fill="#fff"/>
+      <text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">V</text></g></symbol>
+    <symbol id="ic-wattmeter" viewBox="0 0 76 56"><g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>
+      <circle cx="38" cy="28" r="14" fill="#fff"/>
+      <text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">W</text></g></symbol>
+    <radialGradient id="lampGlow"><stop offset="0%" stop-color="#ffd479" stop-opacity=".95"/><stop offset="100%" stop-color="#ffb347" stop-opacity="0"/></radialGradient>
+  </defs>
+</svg>
 <div class="app">
   <header>
     <div class="brand">
@@ -430,6 +473,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="ui.js"></script>
 <script>/*__ENGINE__*/</script>
 <script>/*__RENEW__*/</script>
 <script>/*__RENEW_UI__*/</script>
@@ -454,7 +498,7 @@
   var taskHintShown = 0;
   var hist = { I: [], U: [], P: [] };
   var lastTick = performance.now();
-  var acc = 0, taskTick = 0;
+  var acc = 0, taskTick = 0, meterTick = 0;
 
   var $ = function (id) { return document.getElementById(id); };
   var stage = $('stage'), wires = $('wires');
@@ -469,7 +513,7 @@
 
   function toast(text) {
     var t = $('toast');
-    t.textContent = text;
+    UI.text(t, text);
     t.classList.add('show');
     clearTimeout(toast._t);
     toast._t = setTimeout(function () { t.classList.remove('show'); }, 2200);
@@ -492,65 +536,13 @@
   var ORDER = ['source', 'resistor', 'lamp', 'led', 'rheostat', 'key', 'fuse', 'ammeter', 'voltmeter', 'wattmeter'];
   var filterCat = 'all', filterText = '';
 
-  function iconSVG(type, w) {
-    w = w || 30;
-    var s = '<svg viewBox="0 0 76 56" aria-hidden="true">';
-    s += '<g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">';
-    switch (type) {
-      case 'source':
-        s += '<line x1="14" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="62" y2="28"/>' +
-             '<rect x="24" y="14" width="28" height="28" rx="4" fill="#fff"/>' +
-             '<line x1="31" y1="21" x2="31" y2="35"/><line x1="45" y1="24" x2="45" y2="32" stroke-width="4"/>';
-        break;
-      case 'resistor':
-        s += '<line x1="12" y1="28" x2="22" y2="28"/><line x1="54" y1="28" x2="64" y2="28"/>' +
-             '<path d="M22 28 L27 18 L33 38 L39 18 L45 38 L51 18 L54 28" fill="#fff"/>';
-        break;
-      case 'lamp':
-        s += '<line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>' +
-             '<circle cx="38" cy="28" r="13" fill="#fff"/>' +
-             '<path d="M31 21 L45 35 M45 21 L31 35" stroke-width="2"/>';
-        break;
-      case 'led':
-        s += '<line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>' +
-             '<path d="M26 16 L26 40 L46 28 Z" fill="#fff"/><line x1="46" y1="16" x2="46" y2="40"/>' +
-             '<path d="M50 16 L58 8 M54 20 L62 12" stroke-width="1.8"/>';
-        break;
-      case 'rheostat':
-        s += '<line x1="10" y1="28" x2="20" y2="28"/><line x1="56" y1="28" x2="66" y2="28"/>' +
-             '<rect x="20" y="18" width="36" height="20" rx="3" fill="#fff"/>' +
-             '<path d="M28 14 L44 20 L36 30 L48 38 L32 42" stroke-width="1.8"/>' +
-             '<line x1="44" y1="10" x2="44" y2="18" stroke-width="3"/>';
-        break;
-      case 'key':
-        s += '<line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>' +
-             '<circle cx="26" cy="28" r="3" fill="#33475a"/><circle cx="50" cy="28" r="3" fill="#33475a"/>' +
-             '<line x1="26" y1="28" x2="48" y2="14" stroke-width="3"/>';
-        break;
-      case 'fuse':
-        s += '<line x1="12" y1="28" x2="22" y2="28"/><line x1="54" y1="28" x2="64" y2="28"/>' +
-             '<rect x="22" y="18" width="32" height="20" rx="4" fill="#fff"/><line x1="28" y1="28" x2="48" y2="28"/>';
-        break;
-      case 'ammeter':
-        s += '<line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>' +
-             '<circle cx="38" cy="28" r="14" fill="#fff"/><text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">A</text>';
-        break;
-      case 'voltmeter':
-        s += '<line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>' +
-             '<circle cx="38" cy="28" r="14" fill="#fff"/><text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">V</text>';
-        break;
-      case 'wattmeter':
-        s += '<line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>' +
-             '<circle cx="38" cy="28" r="14" fill="#fff"/><text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">W</text>';
-        break;
-    }
-    s += '</g></svg>';
-    return s;
+  function iconSVG(type) {
+    return '<svg viewBox="0 0 76 56" aria-hidden="true"><use href="#ic-' + type + '"/></svg>';
   }
 
   function renderPalette() {
     var box = $('parts');
-    box.innerHTML = '';
+    UI.html(box, '');
     ORDER.forEach(function (type) {
       var def = Lab.PART_DEFS[type];
       if (filterCat !== 'all' && def.cat !== filterCat) return;
@@ -558,9 +550,9 @@
       if (filterText && nm.indexOf(filterText) < 0) return;
       var b = document.createElement('button');
       b.className = 'partitem';
-      b.setAttribute('draggable', 'false');
-      b.innerHTML = '<span class="mini">' + iconSVG(type) + '</span>' +
-        '<span class="nm">' + def.name + '<i>' + DESCR[type] + '</i></span>';
+      UI.attr(b, 'draggable', 'false');;
+      UI.html(b, '<span class="mini">' + iconSVG(type) + '</span>' +
+        '<span class="nm">' + def.name + '<i>' + DESCR[type] + '</i></span>');
       b.addEventListener('pointerdown', function (e) {
         e.preventDefault();
         startPaletteDrag(type, e);
@@ -568,7 +560,7 @@
       b.addEventListener('click', function () { addAtFreeSpot(type); });
       box.appendChild(b);
     });
-    if (!box.children.length) box.innerHTML = '<div class="empty-note">Ничего не найдено</div>';
+    if (!box.children.length) UI.html(box, '<div class="empty-note">Ничего не найдено</div>');
   }
 
   $('chips').addEventListener('click', function (e) {
@@ -622,7 +614,7 @@
         ghost.className = 'part dragging';
         ghost.style.pointerEvents = 'none';
         ghost.style.opacity = '0.85';
-        ghost.innerHTML = iconSVG(type);
+        UI.html(ghost, iconSVG(type));
         document.body.appendChild(ghost);
       }
       ghost.style.position = 'fixed';
@@ -660,8 +652,8 @@
       el.style.left = p.x + 'px';
       el.style.top = p.y + 'px';
       el.tabIndex = 0;
-      el.setAttribute('role', 'button');
-      el.setAttribute('aria-label', Lab.PART_DEFS[p.type].name);
+      UI.attr(el, 'role', 'button');;
+      UI.attr(el, 'aria-label', Lab.PART_DEFS[p.type].name);;
 
       var bright = p.type === 'lamp' ? Lab.lampBrightness(p) : 0;
       var glow = '';
@@ -675,29 +667,26 @@
       }
       if (p.type === 'led' && p.state.burned) extra = '<path d="M30 20 L46 36 M46 20 L30 36" stroke="#d64545" stroke-width="2.2"/>';
 
-      el.innerHTML =
-        '<svg viewBox="0 0 76 56">' +
-        '<defs><radialGradient id="lampGlow"><stop offset="0%" stop-color="#ffd479" stop-opacity=".95"/>' +
-        '<stop offset="100%" stop-color="#ffb347" stop-opacity="0"/></radialGradient></defs>' +
-        glow + '<g class="body">' + iconSVG(p.type).replace(/^<svg[^>]*>|<\/svg>$/g, '') + '</g>' + extra +
+      UI.html(el, '<svg viewBox="0 0 76 56">' +
+        glow + '<g class="body"><use href="#ic-' + p.type + '"/></g>' + extra +
         '</svg>' +
-        '<span class="lbl">' + labelText(p) + '</span>';
+        '<span class="lbl">' + labelText(p) + '</span>');
 
       // бейджи состояний
       if (p.type === 'fuse' && p.props.blown) {
-        var bf = document.createElement('span'); bf.className = 'badge-flag err'; bf.textContent = 'сработал';
+        var bf = document.createElement('span'); bf.className = 'badge-flag err'; UI.text(bf, 'сработал');
         el.appendChild(bf);
       }
       if ((p.type === 'resistor' || p.type === 'rheostat') && p.state.overHeat > 0.35 && !p.state.burned) {
-        var bw = document.createElement('span'); bw.className = 'badge-flag warn'; bw.textContent = 'нагрев';
+        var bw = document.createElement('span'); bw.className = 'badge-flag warn'; UI.text(bw, 'нагрев');
         el.appendChild(bw);
       }
       if (p.state.burned) {
-        var be = document.createElement('span'); be.className = 'badge-flag err'; be.textContent = 'сгорел';
+        var be = document.createElement('span'); be.className = 'badge-flag err'; UI.text(be, 'сгорел');
         el.appendChild(be);
       }
       if (p.type === 'source' && world.sourceTripped) {
-        var bt = document.createElement('span'); bt.className = 'badge-flag err'; bt.textContent = 'защита';
+        var bt = document.createElement('span'); bt.className = 'badge-flag err'; UI.text(bt, 'защита');
         el.appendChild(bt);
       }
 
@@ -712,7 +701,7 @@
         var tp = termPos(p, i);
         t.style.left = tp.x + 'px';
         t.style.top = tp.y + 'px';
-        t.setAttribute('aria-label', Lab.PART_DEFS[p.type].name + ', клемма ' + tn);
+        UI.attr(t, 'aria-label', Lab.PART_DEFS[p.type].name + ', клемма ' + tn);;
         t.title = Lab.PART_DEFS[p.type].name + ': клемма ' + tn;
         t.addEventListener('pointerdown', onTermDown);
         t.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -856,7 +845,14 @@
 
   function termDir(idx) { return idx === 0 ? -1 : 1; }
 
-  function renderWires() {
+  var wireSig = '', wireRaf = 0;
+  function renderWires(force) {
+    var sig = world.wires.map(function (w) {
+      return w.id + ':' + (w._I > 0.02 ? 1 : 0) + ':' + Math.round(w._I * 100);
+    }).join('|') + '#' + world.wires.map(function (w) { return w.a + w.b; }).join(',') +
+      '#' + (pendingTerm ? pendingTerm.partId + pendingTerm.idx : '') + '#' + (rubber ? rubber.length : 0);
+    if (!force && sig === wireSig) return;
+    wireSig = sig;
     var svg = '';
     world.wires.forEach(function (w, wi) {
       var pa = parseTerm(w.a), pb = parseTerm(w.b);
@@ -879,7 +875,7 @@
       }
     });
     if (pendingTerm && rubber) svg += rubber;
-    wires.innerHTML = svg;
+    UI.html(wires, svg);
   }
 
   function parseTerm(t) {
@@ -963,7 +959,7 @@
     var box = $('inspBody');
     var p = selected ? Lab.getPart(world, selected) : null;
     if (!p) {
-      box.innerHTML = '<div class="muted" style="font-size:12px">Нажмите на деталь на столе, чтобы изменить её параметры.</div>';
+      UI.html(box, '<div class="muted" style="font-size:12px">Нажмите на деталь на столе, чтобы изменить её параметры.</div>');
       return;
     }
     var h = '';
@@ -1041,14 +1037,14 @@
       h += '<div class="aux" style="padding:0;gap:8px;flex-direction:column"><span>Показание: <b data-live="meter">—</b></span>' +
         '<span class="tiny muted">' + (p.type === 'voltmeter' ? 'Включается параллельно участку' : 'Включается последовательно') + '</span></div>';
     }
-    box.innerHTML = h;
+    UI.html(box, h);
 
     var del = $('btnDel'); if (del) del.onclick = function () { deleteSelected(); };
     [].forEach.call(box.querySelectorAll('input[type=range]'), function (s2) {
       s2.oninput = function () {
         p.props[s2.dataset.prop] = parseFloat(s2.value);
         var top = s2.parentElement.querySelector('.top b');
-        if (top) top.textContent = fmt(parseFloat(s2.value), s2.dataset.prop === 'r' ? 1 : (s2.dataset.prop === 'pMax' ? 3 : 0)) + (s2.dataset.prop === 'r' ? ' Ом' : (s2.dataset.prop === 'pMax' ? ' Вт' : ' Ом'));
+        if (top) UI.text(top, fmt(parseFloat(s2.value), s2.dataset.prop === 'r' ? 1 : (s2.dataset.prop === 'pMax' ? 3 : 0)) + (s2.dataset.prop === 'r' ? ' Ом' : (s2.dataset.prop === 'pMax' ? ' Вт' : ' Ом')));
         renderParts();
       };
     });
@@ -1078,7 +1074,7 @@
     if (!p) return;
     function set(k, v) {
       var el = box.querySelector('[data-live="' + k + '"]');
-      if (el) el.textContent = v;
+      if (el) UI.text(el, v);
     }
     if (p.type === 'source') {
       set('srcU', fmt(Math.abs(p._U || 0), 2) + ' В');
@@ -1130,11 +1126,11 @@
   function renderJournal() {
     var box = $('journal');
     var rows = (world.journal || []).slice(-120);
-    if (!rows.length) { box.innerHTML = '<div class="empty-note">Здесь появятся ваши действия: добавленные детали, соединения, включения.</div>'; return; }
-    box.innerHTML = rows.map(function (r) {
+    if (!rows.length) { UI.html(box, '<div class="empty-note">Здесь появятся ваши действия: добавленные детали, соединения, включения.</div>'); return; }
+    UI.html(box, rows.map(function (r) {
       return '<div class="jrow ' + r.kind + '"><span class="tm">' + fmt(r.t, 1) + ' с</span>' +
         '<span class="dot"></span><span class="tx">' + esc(r.text) + '</span></div>';
-    }).join('');
+    }).join(''));
     box.parentElement.scrollTop = box.parentElement.scrollHeight;
   }
   function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
@@ -1168,9 +1164,9 @@
 
   function renderMeasurements() {
     var box = $('tabMeas');
-    $('measCount').textContent = world.measurements.length || '';
+    UI.text($('measCount'), world.measurements.length || '');
     if (!world.measurements.length) {
-      box.innerHTML = '<div class="empty-note">Пока нет точек. Нажмите «Снять показания», когда цепь работает.</div>';
+      UI.html(box, '<div class="empty-note">Пока нет точек. Нажмите «Снять показания», когда цепь работает.</div>');
       return;
     }
     var rows = world.measurements.slice().reverse().map(function (m, i) {
@@ -1178,9 +1174,9 @@
         m.label + '</td><td>' + fmt(m.U, 2) + '</td><td>' + fmt(m.I, 3) + '</td><td>' +
         (m.R > 0 ? fmt(m.R, 1) : '—') + '</td><td>' + fmt(m.P, 2) + '</td></tr>';
     }).join('');
-    box.innerHTML = '<table class="meas"><thead><tr><th>№</th><th>t, с</th><th>Элемент</th><th>U, В</th><th>I, А</th><th>R, Ом</th><th>P, Вт</th></tr></thead><tbody>' +
-      rows + '</tbody></table>';
-    $('projCount').textContent = world.measurements.length;
+    UI.html(box, '<table class="meas"><thead><tr><th>№</th><th>t, с</th><th>Элемент</th><th>U, В</th><th>I, А</th><th>R, Ом</th><th>P, Вт</th></tr></thead><tbody>' +
+      rows + '</tbody></table>');
+    UI.text($('projCount'), world.measurements.length);
   }
 
   function exportCsv() {
@@ -1287,7 +1283,7 @@
     $('taskCard').hidden = (m !== 'task');
     $('projectCard').hidden = (m !== 'project');
     if (m === 'task') { taskHintShown = 0; renderTask(); }
-    if (m === 'project') { $('projCount').textContent = world.measurements.length; }
+    if (m === 'project') { UI.text($('projCount'), world.measurements.length); }
   }
   [].forEach.call(document.querySelectorAll('.modes button'), function (b) {
     b.onclick = function () { setMode(b.dataset.mode); };
@@ -1298,9 +1294,8 @@
     var f = currentFacts();
     var done = solved[taskIndex];
     var stars = done ? (tk._stars || 1) : 0;
-    $('taskId').textContent = (taskIndex + 1) + ' / ' + TASKS.length;
-    $('taskBody').innerHTML =
-      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+    UI.text($('taskId'), (taskIndex + 1) + ' / ' + TASKS.length);
+    UI.html($('taskBody'), '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
       '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
       (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, stars) + '</span><br>' + tk.why + '</div>' : '') +
       '<div class="hints">' + (tk._hints || []).map(function (hh, i) {
@@ -1321,12 +1316,12 @@
       '<div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">' +
       '<button class="btn" id="btnHint">Подсказка</button>' +
       '<button class="btn primary" id="btnCheck">Проверить</button></div>' +
-      '<div id="checkOut"></div>';
+      '<div id="checkOut"></div>');
 
-    $('taskList').innerHTML = TASKS.map(function (t, i) {
+    UI.html($('taskList'), TASKS.map(function (t, i) {
       return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
         '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
-    }).join('');
+    }).join(''));
     [].forEach.call($('taskList').children, function (b) {
       b.onclick = function () { taskIndex = +b.dataset.i; taskHintShown = 0; TASKS[taskIndex]._hints = []; renderTask(); };
     });
@@ -1341,7 +1336,7 @@
       var tk3 = TASKS[taskIndex];
       var inp = $('guessInput');
       var v = parseFloat(String(inp.value).replace(',', '.'));
-      if (!isFinite(v)) { $('guessOut').textContent = 'Введите число'; return; }
+      if (!isFinite(v)) { UI.text($('guessOut'), 'Введите число'); return; }
       var act = tk3.guess.actual(currentFacts());
       var diff = Math.abs(v - act) / Math.max(Math.abs(act), 1e-6);
       var ok = diff <= 0.15;
@@ -1350,7 +1345,7 @@
         'вы указали ' + fmt(v, 2) + ' ' + tk3.guess.unit + ', в модели ' + fmt(act, 2) + ' ' + tk3.guess.unit +
         ' (расхождение ' + Math.round(diff * 100) + ' %).';
       log(ok ? 'ok' : 'warn', 'Прогноз: ' + fmt(v, 2) + ' ' + tk3.guess.unit + ', модель: ' + fmt(act, 2) + ' ' + tk3.guess.unit);
-      $('guessOut').textContent = tk3._guessMsg;
+      UI.text($('guessOut'), tk3._guessMsg);
       checkTask(false);
       renderTask();
     };
@@ -1373,7 +1368,7 @@
       if (showResult) renderTask();
     } else if (showResult) {
       var out = $('checkOut');
-      if (out) out.innerHTML = '<div class="result bad">Пока не выполнено. ' + missingText(tk, f) + '</div>';
+      if (out) UI.html(out, '<div class="result bad">Пока не выполнено. ' + missingText(tk, f) + '</div>');
     }
     if (!showResult && ok && !wasSolved) renderTask();
     return ok;
@@ -1439,10 +1434,14 @@
     });
 
     paint();
-    updateMeters(f, sol);
-    pushSpark(f);
-    drawSparks();
-    $('clock').textContent = fmt(world.t, 1);
+    meterTick += dtReal;
+    if (meterTick > 0.1) {
+      meterTick = 0;
+      updateMeters(f, sol);
+      pushSpark(f);
+      drawSparks();
+      UI.text($('clock'), fmt(world.t, 1));
+    }
     renderWires();
     if (mode === 'task') {
       taskTick = (taskTick || 0) + dtReal;
@@ -1478,18 +1477,18 @@
     var I = lamp ? Math.abs(lamp._I || 0) : Math.abs(f.loadCurrent || 0);
     var P = lamp ? Math.abs(lamp._P || 0) : loadP;
 
-    $('mI').innerHTML = fmt(I, I < 1 ? 3 : 2) + ' <small>А</small>';
-    $('mU').innerHTML = fmt(U, 2) + ' <small>В</small>';
-    $('mP').innerHTML = fmt(P, 2) + ' <small>Вт</small>';
-    $('mE').innerHTML = fmt(world.energyLoadWh, world.energyLoadWh < 1 ? 3 : 2) + ' <small>Вт·ч</small>';
+    UI.html($('mI'), fmt(I, I < 1 ? 3 : 2) + ' <small>А</small>');
+    UI.html($('mU'), fmt(U, 2) + ' <small>В</small>');
+    UI.html($('mP'), fmt(P, 2) + ' <small>Вт</small>');
+    UI.html($('mE'), fmt(world.energyLoadWh, world.energyLoadWh < 1 ? 3 : 2) + ' <small>Вт·ч</small>');
 
     var bright = lamp ? Lab.lampBrightness(lamp) : 0;
-    $('mB').innerHTML = Math.round(Math.min(1, bright) * 100) + ' <small>%</small>';
+    UI.html($('mB'), Math.round(Math.min(1, bright) * 100) + ' <small>%</small>');
     $('brightBar').style.width = Math.round(Math.min(1, bright) * 100) + '%';
     $('mLamp').classList.toggle('hot', Math.abs(I) > 0.5);
     var T = lamp ? Math.round((lamp.state.T || Lab.AMB) - 273.15) : 20;
-    $('mT').textContent = (lamp ? T : '—') + (lamp ? ' °C' : '');
-    $('mStateT').textContent = lamp ? (lamp.state.burned ? 'перегорела' : 'нить') : '—';
+    UI.text($('mT'), (lamp ? T : '—') + (lamp ? ' °C' : ''));
+    UI.text($('mStateT'), lamp ? (lamp.state.burned ? 'перегорела' : 'нить') : '—');
 
     var modeTxt = 'нет тока';
     if (f.shortCircuit > 0 && Math.abs(f.sourceCurrent) > 3 && Math.abs(f.loadR || 0) < 2) {
@@ -1501,7 +1500,7 @@
       if (Math.abs(f.sourceCurrent) > 3) modeTxt = 'перегрузка';
     } else if (world.sourceTripped) modeTxt = 'защита источника';
     else if (world.parts.some(function (p) { return p.state.burned; })) modeTxt = 'обрыв (сгорел элемент)';
-    $('mMode').textContent = modeTxt;
+    UI.text($('mMode'), modeTxt);
     updateLive();
     updateInspectorLive();
   }
@@ -1511,7 +1510,7 @@
       var el = stage.querySelector('.part[data-id="' + p.id + '"]');
       if (!el) return;
       var lbl = el.querySelector('.lbl');
-      if (lbl) lbl.textContent = labelText(p);
+      if (lbl) UI.text(lbl, labelText(p));
       var svg = el.querySelector('svg');
       if (!svg) return;
       // динамические состояния — лампа и светодиод
@@ -1520,24 +1519,24 @@
       if (p.type === 'lamp') {
         if (!g) {
           g = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          g.setAttribute('class', 'glow'); g.setAttribute('cx', 38); g.setAttribute('cy', 28);
-          g.setAttribute('fill', 'url(#lampGlow)');
+          UI.attr(g, 'class', 'glow');; UI.attr(g, 'cx', 38);; UI.attr(g, 'cy', 28);;
+          UI.attr(g, 'fill', 'url(#lampGlow)');;
           svg.insertBefore(g, svg.firstChild);
         }
-        g.setAttribute('r', 16 + bright * 12);
-        g.setAttribute('opacity', Math.min(0.9, bright));
+        UI.attr(g, 'r', 16 + bright * 12);;
+        UI.attr(g, 'opacity', Math.min(0.9, bright));;
       }
       if (p.type === 'led') {
         var ledGlow = svg.querySelector('.ledglow');
         if (!ledGlow) {
           ledGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-          ledGlow.setAttribute('class', 'ledglow'); ledGlow.setAttribute('cx', 38); ledGlow.setAttribute('cy', 28);
-          ledGlow.setAttribute('fill', '#ff5a5a');
+          UI.attr(ledGlow, 'class', 'ledglow');; UI.attr(ledGlow, 'cx', 38);; UI.attr(ledGlow, 'cy', 28);;
+          UI.attr(ledGlow, 'fill', '#ff5a5a');;
           svg.insertBefore(ledGlow, svg.firstChild);
         }
         var on = !p.state.burned && Math.abs(p._I || 0) > 0.001;
-        ledGlow.setAttribute('r', on ? 24 : 0);
-        ledGlow.setAttribute('opacity', on ? Math.min(0.6, Math.abs(p._I || 0) * 16) : 0);
+        UI.attr(ledGlow, 'r', on ? 24 : 0);;
+        UI.attr(ledGlow, 'opacity', on ? Math.min(0.6, Math.abs(p._I || 0) * 16) : 0);;
       }
     });
   }
@@ -1564,20 +1563,20 @@
     ['I', 'U', 'P'].forEach(function (k) {
       var arr = sparkBuf[k];
       var svg = $('s' + k);
-      if (!arr.length) { svg.innerHTML = ''; return; }
+      if (!arr.length) { UI.html(svg, ''); return; }
       var max = Math.max.apply(null, arr) || 1;
       var pts = arr.map(function (v, i) {
         return (i / (arr.length - 1 || 1) * 100).toFixed(1) + ',' + (16 - (v / max) * 14).toFixed(1);
       }).join(' ');
       var col = k === 'I' ? '#0b6e99' : k === 'U' ? '#1f9d6b' : '#f28c28';
-      svg.innerHTML = '<polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="1.4" opacity=".9"/>';
+      UI.html(svg, '<polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="1.4" opacity=".9"/>');
     });
   }
 
   /* ================= сервисные кнопки ================= */
   $('btnPlay').onclick = function () {
     running = !running;
-    this.textContent = running ? '⏸' : '▶';
+    UI.text(this, running ? '⏸' : '▶');
     log('ok', running ? 'Модель запущена' : 'Пауза');
   };
   [].forEach.call(document.querySelectorAll('[data-speed]'), function (b) {

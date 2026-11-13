@@ -11,10 +11,10 @@
   var st = S.createState();
   var run = { playing: true, speed: 1 };
   var solved = {}, taskIndex = 0, lastFacts = null, lastTick = 0, taskTick = 0;
-  var waveT = 0;
+  var waveT = 0, scopeTick = 0, meterTick = 0;
 
   var css = document.createElement('style');
-  css.textContent = `
+  UI.text(css, `
   .stor main{display:grid;grid-template-columns:238px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
   .stor .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
   .stor .seg button{flex:1;padding:4px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
@@ -31,12 +31,12 @@
   .scope canvas{width:100%;height:104px;display:block;background:#f7fafc;border:1px solid var(--line);border-radius:8px}
   .warnchip{display:inline-block;background:#fdecec;border:1px solid #f3bcbc;color:#a02020;border-radius:6px;padding:1px 6px;font-size:10.5px;margin:2px 3px 0 0}
   @media (max-width:980px){.stor main{grid-template-columns:1fr}.sstage{min-height:380px}}
-  `;
+  `);
   document.head.appendChild(css);
 
   var main = $('benchStorage');
   main.className = 'stor';
-  main.innerHTML = `
+  UI.html(main, `
     <aside class="panel rctl">
       <h2>Накопитель</h2>
       <div class="grp">
@@ -200,7 +200,8 @@
         <div class="aux"><span>КПД: <b id="stEff">—</b></span><span>Автономия: <b id="stAuto">—</b></span></div>
         <div class="aux" style="padding-top:0"><span>Энергия: <b id="stEnergy">0 Вт·ч</b></span><span id="stWarnChip"></span></div>
       </div>
-    </aside>`;
+    </aside>`);
+  if (UI.reset) { UI.reset($('benchStorage')); UI.reset($('benchRenew')); UI.reset($('benchEfficiency')); }
 
   /* ---------- управление ---------- */
   function pct(v, d) { return v.toFixed(d === undefined ? 1 : d).replace('.', ','); }
@@ -211,19 +212,19 @@
   }
   function renderJournal() {
     var box = $('stJournal');
-    if (!st.log.length) { box.innerHTML = '<div class="empty-note">Действия появятся здесь.</div>'; return; }
-    box.innerHTML = st.log.slice(-80).map(function (r) {
+    if (!st.log.length) { UI.html(box, '<div class="empty-note">Действия появятся здесь.</div>'); return; }
+    UI.html(box, st.log.slice(-80).map(function (r) {
       return '<div class="jrow ' + r.kind + '"><span class="tm">' + pct(r.t / 60, 1) + ' мин</span><span class="dot"></span><span class="tx">' +
         String(r.text).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</span></div>';
-    }).join('');
+    }).join(''));
     box.parentElement.scrollTop = box.parentElement.scrollHeight;
   }
 
   function renderControls() {
-    $('vSoc').textContent = Math.round(st.soc * 100) + ' %';
+    UI.text($('vSoc'), Math.round(st.soc * 100) + ' %');
     $('socBar').style.width = Math.round(st.soc * 100) + '%';
-    $('vChargeC').textContent = pct(st.chargeC, 1) + 'C';
-    $('vDuty').textContent = pct(st.duty, 2);
+    UI.text($('vChargeC'), pct(st.chargeC, 1) + 'C');
+    UI.text($('vDuty'), pct(st.duty, 2));
     $('chargeOn').checked = st.chargeOn;
     $('loadOn').checked = st.loadOn;
     $('invOn').checked = st.inverterOn;
@@ -255,11 +256,11 @@
   });
   $('sChargeC').addEventListener('input', function (e) {
     st.chargeC = parseFloat(e.target.value);
-    $('vChargeC').textContent = pct(st.chargeC, 1) + 'C';
+    UI.text($('vChargeC'), pct(st.chargeC, 1) + 'C');
   });
   $('sDuty').addEventListener('input', function (e) {
     st.duty = parseFloat(e.target.value);
-    $('vDuty').textContent = pct(st.duty, 2);
+    UI.text($('vDuty'), pct(st.duty, 2));
   });
   $('chargeOn').addEventListener('change', function (e) {
     st.chargeOn = e.target.checked;
@@ -274,7 +275,7 @@
     log(e.target.checked ? 'ok' : 'warn', 'Инвертор ' + (e.target.checked ? 'включён' : 'выключен'));
   });
   $('btnFull').onclick = function () { st.soc = 1; st.temp = 25; log('ok', 'Накопитель заряжен до 100 %'); renderControls(); };
-  $('stPlay').onclick = function () { run.playing = !run.playing; this.textContent = run.playing ? '⏸' : '▶'; };
+  $('stPlay').onclick = function () { run.playing = !run.playing; UI.text(this, run.playing ? '⏸' : '▶'); };
   [].forEach.call(document.querySelectorAll('[data-sspeed]'), function (b) {
     b.onclick = function () {
       run.speed = +b.dataset.sspeed;
@@ -323,9 +324,9 @@
   }
   function renderMeasurements() {
     var box = $('stTabMeas');
-    $('stMeasCount').textContent = st.measures.length || '';
-    if (!st.measures.length) { box.innerHTML = '<div class="empty-note">Нажмите «Снять точку» — запись попадёт в протокол.</div>'; return; }
-    box.innerHTML = '<table class="mtable"><thead><tr><th>Тип</th><th>Накопитель</th><th>Нагрузка</th><th>U, В</th>' +
+    UI.text($('stMeasCount'), st.measures.length || '');
+    if (!st.measures.length) { UI.html(box, '<div class="empty-note">Нажмите «Снять точку» — запись попадёт в протокол.</div>'); return; }
+    UI.html(box, '<table class="mtable"><thead><tr><th>Тип</th><th>Накопитель</th><th>Нагрузка</th><th>U, В</th>' +
       '<th>I, А</th><th>SoC, %</th><th>T, °C</th><th>КПД</th><th>Отдано, Вт·ч</th></tr></thead><tbody>' +
       st.measures.slice(-60).reverse().map(function (m) {
         return '<tr><td>' + (m.kind === 'eff' ? 'КПД' : m.kind === 'cap' ? 'ионистор' : m.kind === 'autonomy' ? 'автономия' : m.kind === 'charge' ? 'заряд' : 'разряд') +
@@ -333,7 +334,7 @@
           '</td><td style="text-align:left">' + (S.LOADS[m.load] || {}).name + '</td><td>' + pct(m.volt || 0, 2) +
           '</td><td>' + pct(m.current || 0, 2) + '</td><td>' + Math.round((m.soc || 0) * 100) + '</td><td>' +
           Math.round(m.temp || 0) + '</td><td>' + Math.round((m.eff || 0) * 100) + ' %</td><td>' + pct(m.wh || 0, 2) + '</td></tr>';
-      }).join('') + '</tbody></table>';
+      }).join('') + '</tbody></table>');
   }
   function exportCsv() {
     if (!st.measures.length) { toast('Протокол пуст'); return; }
@@ -362,18 +363,17 @@
   function facts() { return lastFacts || S.facts(st); }
   function renderTask() {
     var tk = S.TASKS[taskIndex], done = solved[taskIndex];
-    $('stTaskId').textContent = (taskIndex + 1) + ' / ' + S.TASKS.length;
-    $('stTaskBody').innerHTML =
-      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+    UI.text($('stTaskId'), (taskIndex + 1) + ' / ' + S.TASKS.length);
+    UI.html($('stTaskBody'), '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
       '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
       (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, done) + '</span><br>' + tk.why + '</div>' : '') +
       '<div class="hints">' + (tk._hints || []).map(function (h, i) { return '<div class="hint">Подсказка ' + (i + 1) + ': ' + h + '</div>'; }).join('') + '</div>' +
       '<div style="display:flex;gap:6px;margin-top:9px"><button class="btn" id="stHint">Подсказка</button>' +
-      '<button class="btn primary" id="stCheck">Проверить</button></div><div id="stCheckOut"></div>';
-    $('stTaskList').innerHTML = S.TASKS.map(function (t, i) {
+      '<button class="btn primary" id="stCheck">Проверить</button></div><div id="stCheckOut"></div>');
+    UI.html($('stTaskList'), S.TASKS.map(function (t, i) {
       return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
         '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
-    }).join('');
+    }).join(''));
     [].forEach.call($('stTaskList').children, function (b) { b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); }; });
     $('stHint').onclick = function () {
       var t2 = S.TASKS[taskIndex]; t2._hints = t2._hints || [];
@@ -382,9 +382,9 @@
     $('stCheck').onclick = function () {
       if (!checkTask(true)) {
         var f = facts();
-        $('stCheckOut').innerHTML = '<div class="result bad">Пока не выполнено: SoC ' +
+        UI.html($('stCheckOut'), '<div class="result bad">Пока не выполнено: SoC ' +
           Math.round(f.soc * 100) + ' %, максимум температуры ' + Math.round(f.maxTemp) + ' °C, точек в протоколе ' +
-          f.measures.length + ', предупреждений ' + f.warnings.length + '.</div>';
+          f.measures.length + ', предупреждений ' + f.warnings.length + '.</div>');
       }
     };
   }
@@ -410,35 +410,35 @@
     // заливка ячейки
     var hMax = 176, h = Math.max(0, Math.min(1, socPct)) * hMax;
     var fill = $('cellFill');
-    fill.setAttribute('height', h.toFixed(1));
-    fill.setAttribute('y', (90 - h).toFixed(1));
-    fill.setAttribute('fill', st.storage === 'cap' ? 'url(#cellWarm)' : (st.soc < 0.2 ? 'url(#cellWarm)' : 'url(#cellFill)'));
-    $('cellPct').textContent = Math.round(socPct * 100) + ' %';
-    $('cellType').textContent = st.storage === 'cap' ? 'Ионистор 10 Ф' : T.name;
-    $('cellTemp').textContent = Math.round(st.temp) + ' °C' + (st.temp > T.tempMax ? ' · перегрев' : '');
-    $('cellBolt').setAttribute('opacity', st.chargeOn && st.soc < 1 ? 1 : 0);
+    UI.attr(fill, 'height', h.toFixed(1));;
+    UI.attr(fill, 'y', (90 - h).toFixed(1));;
+    UI.attr(fill, 'fill', st.storage === 'cap' ? 'url(#cellWarm)' : (st.soc < 0.2 ? 'url(#cellWarm)' : 'url(#cellFill)'));;
+    UI.text($('cellPct'), Math.round(socPct * 100) + ' %');
+    UI.text($('cellType'), st.storage === 'cap' ? 'Ионистор 10 Ф' : T.name);
+    UI.text($('cellTemp'), Math.round(st.temp) + ' °C' + (st.temp > T.tempMax ? ' · перегрев' : ''));
+    UI.attr($('cellBolt'), 'opacity', st.chargeOn && st.soc < 1 ? 1 : 0);;
     // преобразователь
     var convName = st.converter === 'none' ? 'без DC-DC' : (st.converter === 'buck' ? 'buck (понижающий)' : 'boost (повышающий)');
-    $('convName').textContent = convName;
+    UI.text($('convName'), convName);
     var out = st.converter === 'buck' ? f.buckV : (st.converter === 'boost' ? f.volt / Math.max(0.1, (1 - st.duty)) : f.volt);
-    $('convOut').textContent = pct(out, 2) + ' В';
-    $('convEff').textContent = 'КПД ' + Math.round(f.eff * 100) + ' %';
-    $('convD').textContent = st.converter === 'none' ? '' : 'D = ' + pct(st.duty, 2);
+    UI.text($('convOut'), pct(out, 2) + ' В');
+    UI.text($('convEff'), 'КПД ' + Math.round(f.eff * 100) + ' %');
+    UI.text($('convD'), st.converter === 'none' ? '' : 'D = ' + pct(st.duty, 2));
     // нагрузка
-    $('loadName').textContent = S.LOADS[st.load].name;
-    $('loadP').textContent = pct(f.loadP, 0) + ' Вт';
+    UI.text($('loadName'), S.LOADS[st.load].name);
+    UI.text($('loadP'), pct(f.loadP, 0) + ' Вт');
     var lit = f.loadP > 0 && st.loadOn;
-    $('loadBulb').setAttribute('fill', lit ? '#ffe9a8' : '#e9eff4');
-    $('loadBulb').setAttribute('r', lit ? 15 + Math.min(6, f.loadP / 12) : 15);
-    $('gInv').setAttribute('opacity', st.inverterOn ? 1 : 0.35);
+    UI.attr($('loadBulb'), 'fill', lit ? '#ffe9a8' : '#e9eff4');;
+    UI.attr($('loadBulb'), 'r', lit ? 15 + Math.min(6, f.loadP / 12) : 15);;
+    UI.attr($('gInv'), 'opacity', st.inverterOn ? 1 : 0.35);;
     // поток
-    $('stFlow').setAttribute('opacity', (st.chargeOn || lit) ? 0.9 : 0);
+    UI.attr($('stFlow'), 'opacity', (st.chargeOn || lit) ? 0.9 : 0);;
     // предупреждения
     var w = (f.warnings || []).join(' · ');
-    $('stWarn').setAttribute('opacity', w ? 1 : 0);
-    $('stWarnText').textContent = w;
-    $('scopeLabel').textContent = st.load === 'inverter' && st.inverterOn ? 'Синусоида 50 Гц на выходе инвертора' :
-      (st.converter === 'none' ? 'Постоянное напряжение' : 'ШИМ (скважность ' + pct(st.duty, 2) + ')');
+    UI.attr($('stWarn'), 'opacity', w ? 1 : 0);;
+    UI.text($('stWarnText'), w);
+    UI.text($('scopeLabel'), st.load === 'inverter' && st.inverterOn ? 'Синусоида 50 Гц на выходе инвертора' :
+      (st.converter === 'none' ? 'Постоянное напряжение' : 'ШИМ (скважность ' + pct(st.duty, 2) + ')'));
   }
 
   function drawScope() {
@@ -465,21 +465,21 @@
 
   /* ---------- приборы ---------- */
   function renderMeters(f) {
-    $('stU').innerHTML = pct(f.volt, 2) + ' <small>В</small>';
-    $('stI').innerHTML = pct(f.current, 2) + ' <small>А</small>';
-    $('stP').innerHTML = pct(f.power, 1) + ' <small>Вт</small>';
-    $('stT').innerHTML = Math.round(st.temp) + ' <small>°C</small>';
+    UI.html($('stU'), pct(f.volt, 2) + ' <small>В</small>');
+    UI.html($('stI'), pct(f.current, 2) + ' <small>А</small>');
+    UI.html($('stP'), pct(f.power, 1) + ' <small>Вт</small>');
+    UI.html($('stT'), Math.round(st.temp) + ' <small>°C</small>');
     $('stTempBox').classList.toggle('hot', st.temp > S.TYPES[st.type].tempMax);
     var socPct = st.storage === 'cap' ? st.capVoltage / 12 : st.soc;
-    $('stSoc').innerHTML = Math.round(socPct * 100) + ' <small>%</small>';
+    UI.html($('stSoc'), Math.round(socPct * 100) + ' <small>%</small>');
     $('stSocBar').style.width = Math.round(socPct * 100) + '%';
-    $('stSocState').textContent = st.chargeOn ? 'заряд' : (f.loadP > 0 ? 'разряд' : 'покой');
-    $('stEff').textContent = Math.round(f.eff * 100) + ' %';
-    $('stAuto').textContent = f.autonomyH > 0 ? pct(f.autonomyH, 1) + ' ч' : '—';
-    $('stEnergy').textContent = pct(st.energyOut, 2) + ' Вт·ч';
-    $('stWarnChip').innerHTML = (f.warnings || []).map(function (w) { return '<span class="warnchip">' + w + '</span>'; }).join('');
-    $('stClock').textContent = Math.round(st.t / 60) + ' мин';
-    $('vSoc').textContent = Math.round(st.soc * 100) + ' %';
+    UI.text($('stSocState'), st.chargeOn ? 'заряд' : (f.loadP > 0 ? 'разряд' : 'покой'));
+    UI.text($('stEff'), Math.round(f.eff * 100) + ' %');
+    UI.text($('stAuto'), f.autonomyH > 0 ? pct(f.autonomyH, 1) + ' ч' : '—');
+    UI.text($('stEnergy'), pct(st.energyOut, 2) + ' Вт·ч');
+    UI.html($('stWarnChip'), (f.warnings || []).map(function (w) { return '<span class="warnchip">' + w + '</span>'; }).join(''));
+    UI.text($('stClock'), Math.round(st.t / 60) + ' мин');
+    UI.text($('vSoc'), Math.round(st.soc * 100) + ' %');
     $('socBar').style.width = Math.round(st.soc * 100) + '%';
   }
 
@@ -491,8 +491,10 @@
       if (run.playing && dt > 0) S.step(st, dt, run.speed);
       lastFacts = S.facts(st);
       drawScene();
-      renderMeters(lastFacts);
-      drawScope();
+      meterTick += dt;
+      if (meterTick > 0.1) { meterTick = 0; renderMeters(lastFacts); }
+      scopeTick += dt;
+      if (scopeTick > 0.1) { scopeTick = 0; drawScope(); }
       taskTick += dt;
       if (taskTick > 0.4) { taskTick = 0; checkTask(false); }
     }
@@ -502,7 +504,7 @@
   function toast(text) {
     var t = document.getElementById('toast');
     if (!t) return;
-    t.textContent = text; t.classList.add('show');
+    UI.text(t, text); t.classList.add('show');
     clearTimeout(toast._t);
     toast._t = setTimeout(function () { t.classList.remove('show'); }, 2400);
   }
