@@ -12,6 +12,11 @@ cd "$(dirname "$0")"
 REPO="pavelb-coder/sim-energy"
 TOKEN_FILE="${HOME}/.gh_token"
 
+# самовосстановление remote (на случай чистого клона окружения)
+if ! git remote get-url origin >/dev/null 2>&1; then
+  git remote add origin "https://github.com/pavelb-coder/sim-energy.git"
+fi
+
 token() {
   if [ -n "${GH_TOKEN:-}" ]; then printf '%s' "$GH_TOKEN"; return; fi
   if [ -f "$TOKEN_FILE" ]; then tr -d '\r\n' < "$TOKEN_FILE"; return; fi
