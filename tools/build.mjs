@@ -9,13 +9,18 @@ const engPath = path.join(root, 'src/engine.js');
 const outDir = path.join(root, 'dist');
 const outPath = path.join(outDir, 'lab.html');
 
-const app = fs.readFileSync(appPath, 'utf8');
-const eng = fs.readFileSync(engPath, 'utf8');
-if (!app.includes('/*__ENGINE__*/')) {
-  console.error('Нет метки /*__ENGINE__*/ в src/app.dev.html');
-  process.exit(1);
+let out = fs.readFileSync(appPath, 'utf8');
+for (const [marker, file] of [
+  ['/*__ENGINE__*/', 'src/engine.js'],
+  ['/*__RENEW__*/', 'src/renewables.js'],
+  ['/*__RENEW_UI__*/', 'src/renew.ui.js'],
+]) {
+  if (!out.includes(marker)) {
+    console.error(`Нет метки ${marker} в src/app.dev.html`);
+    process.exit(1);
+  }
+  out = out.replace(marker, fs.readFileSync(path.join(root, file), 'utf8'));
 }
-const out = app.replace('/*__ENGINE__*/', eng);
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(outPath, out);
 console.log(`${path.relative(root, outPath)} — ${(Buffer.byteLength(out) / 1024).toFixed(0)} КБ`);

@@ -8,7 +8,7 @@ async def main():
         errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append('console:'+m.text) if m.type=='error' else None)
-        await pg.goto('file:///home/user/virtuallab.html')
+        await pg.goto('file:///home/user/sim-energy/dist/lab.html')
         await pg.wait_for_timeout(500)
 
         # 1) перетаскивание клемм мышью — собираем цепь руками

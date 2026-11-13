@@ -253,8 +253,8 @@
       <div>Энерджиквантум<br><span class="sub">виртуальная лаборатория</span></div>
     </div>
     <nav class="benchnav" aria-label="Стенды">
-      <button class="active">Электрические цепи</button>
-      <button disabled title="Стенд следующей версии">Возобновляемая энергетика <em>v2</em></button>
+      <button class="active" data-bench="circuits">Электрические цепи</button>
+      <button data-bench="renew">Возобновляемая энергетика</button>
       <button disabled title="Стенд следующей версии">Накопители <em>v3</em></button>
       <button disabled title="Стенд следующей версии">Эффективность <em>v3</em></button>
     </nav>
@@ -267,6 +267,7 @@
     <button class="iconbtn" id="btnHelp" title="Справка и техника безопасности" aria-label="Справка">?</button>
   </header>
 
+  <div id="benchCircuits">
   <main>
     <!-- палитра -->
     <aside class="palette panel">
@@ -373,6 +374,9 @@
       </div>
     </aside>
   </main>
+  </div>
+
+  <main id="benchRenew" hidden></main>
 </div>
 
 <div class="modal" id="help">
@@ -424,6 +428,8 @@
 <div class="toast" id="toast"></div>
 
 <script>/*__ENGINE__*/</script>
+<script>/*__RENEW__*/</script>
+<script>/*__RENEW_UI__*/</script>
 <script>
 (function () {
   'use strict';
@@ -1649,6 +1655,36 @@
   });
 
   window.addEventListener('resize', function () { syncTerms(); renderWires(); });
+
+  /* ================= переключение стендов ================= */
+  var bench = 'circuits';
+  window.__bench = 'circuits';
+  function setBench(name) {
+    bench = name;
+    window.__bench = name;
+    document.body.classList.toggle('renew', name === 'renew');
+    $('benchCircuits').hidden = name !== 'circuits';
+    $('benchRenew').hidden = name !== 'renew';
+    [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
+      b.classList.toggle('active', b.dataset.bench === name);
+    });
+    if (name === 'renew' && !window.__renewReady) {
+      window.__renewReady = true;
+      if (typeof window.__renInit === 'function') window.__renInit();
+    }
+    if (name === 'renew') {
+      // синхронизация размеров сцены после показа
+      window.dispatchEvent(new Event('resize'));
+    }
+  }
+  [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
+    b.onclick = function () {
+      if (b.disabled) return;
+      setBench(b.dataset.bench);
+      if (mode === 'task' && b.dataset.bench === 'renew') setMode('free');
+    };
+  });
+  window.__setBench = setBench;
 
   /* ================= старт ================= */
   renderPalette();

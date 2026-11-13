@@ -6,3 +6,6 @@ __pycache__/
 # артефакты проверок
 *.png
 test-results/
+
+# CI-файл добавляется через веб-интерфейс GitHub или токеном со scope workflow
+.github/

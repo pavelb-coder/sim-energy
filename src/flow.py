@@ -8,7 +8,7 @@ async def main():
         pg = await ctx.new_page()
         errs=[]
         pg.on('pageerror', lambda e: errs.append(str(e)))
-        await pg.goto('file:///home/user/virtuallab.html')
+        await pg.goto('file:///home/user/sim-energy/dist/lab.html')
         await pg.wait_for_timeout(400)
 
         # --- режим «Проект»: демо-цепь, замыкание, 3 точки с реостатом ---
