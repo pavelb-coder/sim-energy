@@ -9,7 +9,7 @@ const path = require('path');
 const zlib = require('zlib');
 
 const PORT = Number(process.env.PORT) || 8082;
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.HOST || '0.0.0.0';  // слушаем все интерфейсы: доступно и в локальной сети
 const ROOT = __dirname;
 
 const MIME = {

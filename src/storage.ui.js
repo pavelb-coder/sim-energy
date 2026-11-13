@@ -31,6 +31,10 @@
   .scope canvas{width:100%;height:104px;display:block;background:#f7fafc;border:1px solid var(--line);border-radius:8px}
   .warnchip{display:inline-block;background:#fdecec;border:1px solid #f3bcbc;color:#a02020;border-radius:6px;padding:1px 6px;font-size:10.5px;margin:2px 3px 0 0}
   @media (max-width:980px){.stor main{grid-template-columns:1fr}.sstage{min-height:380px}}
+  @media (max-height:820px){
+    .stor main{min-height:0}
+    .sstage{min-height:240px;max-height:46vh}
+  }
   `);
   document.head.appendChild(css);
 

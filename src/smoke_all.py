@@ -74,6 +74,26 @@ async def main():
         print('индикатор АКБ ВИЭ:', batt)
         if dups or not batt['hue']:
             errs.append('АКБ/иконки: индикатор не обновляется или есть дубли id')
+        # --- сцены не обрезаются на невысоких окнах (ноутбук 1366x600 и т.п.) ---
+        for vw, vh in [(1366, 600), (1280, 720), (1024, 768), (1600, 760)]:
+            await pg.set_viewport_size({'width': vw, 'height': vh})
+            for bench, key in [('renew', 'gBatt'), ('storage', 'gCell'), ('efficiency', 'roomLab')]:
+                await pg.click(f'.benchnav button[data-bench="{bench}"]')
+                await pg.wait_for_timeout(450)
+                r = await pg.evaluate("""([bench,key])=>{
+                  const root=document.getElementById('bench'+bench[0].toUpperCase()+bench.slice(1));
+                  const svg=root.querySelector('svg'), b=svg.getBoundingClientRect();
+                  const g=document.getElementById(key).getBoundingClientRect();
+                  return {insideBot: g.bottom<=b.bottom+2, insideTop: g.top>=b.top-2,
+                          inView: g.top>=0 && g.bottom<=innerHeight+2, h:Math.round(b.height)};
+                }""", [bench, key])
+                if not (r['insideBot'] and r['insideTop']):
+                    errs.append(f'{bench}: сцена обрезает {key} при {vw}x{vh} (h={r["h"]})')
+                    print(f'  ! {bench} {key} обрезан при {vw}x{vh}', r)
+                if not r['inView']:
+                    errs.append(f'{bench}: {key} вне экрана при {vw}x{vh}')
+        print('проверка обрезки сцен на 4 размерах окна: пройдена' if not errs else 'есть проблемы с обрезкой')
+        await pg.set_viewport_size({'width': 1440, 'height': 900})
         print('ОШИБКИ:', errs[:8])
         if errs:
             raise SystemExit(1)

@@ -32,4 +32,15 @@ for (const [marker, file] of [
 }
 fs.mkdirSync(outDir, { recursive: true });
 fs.writeFileSync(outPath, out);
+
+// index.html в корне — это опубликованная версия (GitHub Pages и локальный server.js
+// отдают именно её), поэтому обновляем её при каждой сборке: иначе правки в src/
+// не доезжают до страницы, и в браузере остаётся старая сборка.
+const indexFiles = [path.join(root, 'index.html')];
+const parentIndex = path.join(path.dirname(root), 'virtuallab.html');
+if (fs.existsSync(path.dirname(parentIndex)) && fs.existsSync(parentIndex)) indexFiles.push(parentIndex);
+for (const f of indexFiles) {
+  fs.writeFileSync(f, out);
+  console.log(`${path.relative(root, f)} — ${(Buffer.byteLength(out) / 1024).toFixed(0)} КБ (обновлён)`);
+}
 console.log(`${path.relative(root, outPath)} — ${(Buffer.byteLength(out) / 1024).toFixed(0)} КБ`);

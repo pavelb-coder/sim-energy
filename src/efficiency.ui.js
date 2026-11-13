@@ -34,6 +34,7 @@
   .ok-lux{color:#146c4b;font-weight:600}
   .bad-lux{color:#a02020;font-weight:600}
   @media (max-width:980px){.eff main{grid-template-columns:1fr}.estage{min-height:360px}}
+  @media (max-height:820px){.eff main{min-height:0}.estage{min-height:260px;max-height:46vh}}
   `);
   document.head.appendChild(css);
 

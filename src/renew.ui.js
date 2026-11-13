@@ -50,6 +50,12 @@
   .mtable th:first-child,.mtable td:first-child{text-align:left}
   @media (max-width:1180px){.renew main{grid-template-columns:210px minmax(360px,1fr) 290px}}
   @media (max-width:980px){.renew main{grid-template-columns:1fr}.rstage{min-height:420px}}
+  @media (max-height:820px){
+    /* низкое окно: страница прокручивается, но сцена не растягивается на весь экран —
+       оборудование и аккумулятор остаются в кадре */
+    .renew main{min-height:0}
+    .rstage{min-height:300px;max-height:58vh}
+  }
   `);
   document.head.appendChild(css);
 
@@ -111,7 +117,7 @@
       </div>
 
       <div class="rstage" id="rStage">
-        <svg id="rScene" viewBox="0 0 800 460" preserveAspectRatio="xMidYMid slice">
+        <svg id="rScene" viewBox="0 -60 800 560" preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#8fc6ea"/><stop offset="100%" stop-color="#e7f3fb"/>
@@ -128,7 +134,8 @@
               <stop offset="0%" stop-color="#7ed0a8"/><stop offset="100%" stop-color="#1f9d6b"/>
             </linearGradient>
           </defs>
-          <rect id="sky" x="0" y="0" width="800" height="460" fill="url(#skyDay)"/>
+          <rect id="sky" x="-400" y="-300" width="1600" height="900" fill="url(#skyDay)"/>
+          <rect x="-400" y="360" width="1600" height="420" fill="#eef6fb" opacity="0.55"/>
           <g id="clouds"></g>
           <circle id="sunGlowC" cx="0" cy="0" r="70" fill="url(#sunGlow)" opacity="0"/>
           <circle id="sunDisc" cx="0" cy="0" r="22" fill="#ffd166" opacity="0"/>
@@ -169,7 +176,7 @@
             <text x="0" y="56" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">потребители</text>
           </g>
 
-          <g id="gBatt" transform="translate(560,406)">
+          <g id="gBatt" transform="translate(560,392)">
             <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#7a8fa0" stroke-width="2"/>
             <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#7a8fa0"/>
             <rect id="battFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#battFillG)"/>

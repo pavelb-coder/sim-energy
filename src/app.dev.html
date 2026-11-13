@@ -232,6 +232,12 @@
   @media (max-width:1180px){
     main{grid-template-columns:160px minmax(360px,1fr) 280px}
   }
+  /* низкое окно (ноутбук с масштабом 125–150 %, маленький монитор):
+     страница прокручивается, иначе низ сцен и панель показаний обрезаются */
+  @media (max-height:820px){
+    body{overflow:auto}
+    .app{height:auto;min-height:100vh}
+  }
   @media (max-width:980px){
     body{overflow:auto}
     .app{height:auto;min-height:100vh}
