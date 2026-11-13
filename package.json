@@ -2,11 +2,17 @@
   "name": "sim-energy",
   "version": "1.0.0",
   "private": true,
-  "description": "Виртуальная лаборатория «Энерджиквантум»: интерактивный стенд по электрическим цепям",
+  "description": "Виртуальная лаборатория «Энерджиквантум»: четыре интерактивных стенда — цепи, ВИЭ, накопители, энергоэффективность (локальный сервер на порту 8082)",
   "scripts": {
+    "start": "node server.js",
+    "serve": "node server.js",
     "build": "node tools/build.mjs",
     "test": "node src/test_engine.js && node src/test_renew.js && node src/test_storage.js && node src/test_efficiency.js",
     "test:renew": "node src/test_renew.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
