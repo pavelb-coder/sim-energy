@@ -1,0 +1,3216 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Энерджиквантум · Виртуальная лаборатория</title>
+<style>
+  :root{
+    --bg:#eaeff4; --panel:#ffffff; --ink:#1f2a36; --muted:#5a6772; --line:#d3dce5;
+    --accent:#0b6e99; --accent-soft:#e6f2f8; --accent2:#f28c28; --ok:#1f9d6b;
+    --warn:#e8850c; --err:#d64545; --grid:#c9d6e2;
+    --shadow:0 1px 2px rgba(16,32,48,.06),0 6px 18px rgba(16,32,48,.07);
+    --r:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.35 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;overflow:hidden;
+  }
+  button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+  button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .app{display:flex;flex-direction:column;height:100vh;min-height:600px}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;align-items:center;gap:14px;padding:8px 14px;background:var(--panel);
+    border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(16,32,48,.03);z-index:20;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.2px;white-space:nowrap}
+  .brand .bolt{
+    width:26px;height:26px;border-radius:8px;background:linear-gradient(150deg,var(--accent),#1291c4);
+    display:grid;place-items:center;color:#fff;font-size:15px;box-shadow:0 2px 6px rgba(11,110,153,.35)
+  }
+  .brand span.sub{font-weight:500;color:var(--muted);font-size:11.5px;letter-spacing:0}
+  .benchnav{display:flex;gap:4px;background:#f2f6f9;padding:3px;border-radius:10px;border:1px solid var(--line);flex-wrap:wrap}
+  .benchnav button{
+    padding:6px 11px;border-radius:8px;font-size:12.5px;color:var(--muted);white-space:nowrap;
+    display:flex;align-items:center;gap:6px
+  }
+  .benchnav button.active{background:var(--panel);color:var(--accent);font-weight:600;box-shadow:var(--shadow)}
+  .benchnav button[disabled]{opacity:.55;cursor:not-allowed}
+  .benchnav em{font-style:normal;font-size:10px;background:var(--accent-soft);color:var(--accent);
+    padding:1px 5px;border-radius:5px;font-weight:600}
+  .grow{flex:1}
+  .modes{display:flex;gap:2px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .modes button{padding:7px 12px;font-size:12.5px;color:var(--muted);background:#fff}
+  .modes button.active{background:var(--accent);color:#fff;font-weight:600}
+  .iconbtn{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--muted);font-size:15px}
+  .iconbtn:hover{background:#f1f5f8;color:var(--ink)}
+
+  /* ---------- layout ---------- */
+  main{flex:1;display:grid;grid-template-columns:186px minmax(420px,1fr) 306px;gap:10px;padding:10px;min-height:0}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+  .panel h2{margin:0;padding:9px 11px;font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
+  .panel h2 .badge{background:var(--accent-soft);color:var(--accent);border-radius:5px;padding:1px 6px;
+    font-size:10px;letter-spacing:.3px}
+
+  /* ---------- palette ---------- */
+  .palette{display:flex;flex-direction:column;min-height:0}
+  .search{padding:8px 9px;border-bottom:1px solid var(--line)}
+  .search input{
+    width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px;
+    background:#fafcfe;color:var(--ink)
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:4px;padding:7px 8px;border-bottom:1px solid var(--line)}
+  .chips button{font-size:11px;padding:3px 7px;border-radius:20px;background:#f2f6f9;color:var(--muted);border:1px solid transparent}
+  .chips button.active{background:var(--accent-soft);color:var(--accent);border-color:#b9dcec;font-weight:600}
+  .parts{overflow:auto;padding:6px;display:flex;flex-direction:column;gap:3px;flex:1;min-height:0}
+  .partitem{
+    display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:8px;border:1px solid transparent;
+    text-align:left;font-size:12.5px;user-select:none;touch-action:none
+  }
+  .partitem:hover{background:#f4f8fb;border-color:var(--line)}
+  .partitem .mini{width:34px;height:26px;flex:0 0 34px;display:grid;place-items:center;background:#fff;border-radius:6px;border:1px solid var(--line)}
+  .partitem .mini svg{width:30px;height:22px}
+  .partitem .nm{line-height:1.15}
+  .partitem .nm i{display:block;font-style:normal;font-size:10.5px;color:var(--muted)}
+  .hintline{padding:8px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.3}
+
+  /* ---------- stage ---------- */
+  .stagewrap{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
+  .timebar{display:flex;align-items:center;gap:8px;padding:6px 9px;flex-wrap:wrap}
+  .timebar .grp{display:flex;align-items:center;gap:2px;background:#f2f6f9;border-radius:8px;padding:2px}
+  .timebar .grp button{padding:4px 9px;border-radius:6px;font-size:12px;color:var(--muted)}
+  .timebar .grp button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .clock{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted);
+    background:#f2f6f9;padding:4px 9px;border-radius:7px;min-width:74px;text-align:center}
+  .clock b{color:var(--ink);font-weight:600}
+  .btn{padding:5px 10px;border-radius:7px;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .btn:hover{border-color:#b9c9d6;background:#fafcfe}
+  .btn.ghost{background:#f2f6f9;border-color:transparent;color:var(--muted)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .btn.primary:hover{background:#0a5f85}
+  .btn.warn{background:#fff;border-color:#f0c48a;color:#a35c00}
+
+  .stage{
+    position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);
+    background-color:#fbfdfe;overflow:hidden;touch-action:none;
+    background-image:radial-gradient(var(--grid) 1px,transparent 1px);background-size:22px 22px;
+    box-shadow:inset 0 0 60px rgba(11,110,153,.035)
+  }
+  .stage.empty::after{
+    content:"Перетащите детали сюда слева  ·  затем соедините клеммы проводом";
+    position:absolute;inset:0;display:grid;place-items:center;color:#9aabb8;font-size:13px;pointer-events:none
+  }
+  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .part{position:absolute;width:76px;height:56px;user-select:none;touch-action:none;cursor:grab}
+  .part.dragging{cursor:grabbing;z-index:5}
+  .part svg{width:76px;height:56px;display:block;overflow:visible}
+  .part .lbl{
+    position:absolute;left:50%;transform:translateX(-50%);bottom:-15px;font-size:10px;color:var(--muted);
+    white-space:nowrap;pointer-events:none
+  }
+  .part.selected svg .body{stroke:var(--accent);stroke-width:2.2}
+  .term{
+    position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #8fa3b3;
+    transform:translate(-50%,-50%);cursor:crosshair;z-index:6;transition:transform .08s,border-color .1s
+  }
+  .term::after{content:"";position:absolute;inset:-10px;border-radius:50%}
+  .term::before{content:"";position:absolute;inset:0;border-radius:50%;background:#fff}
+  .term:hover,.term.armed{border-color:var(--accent2);transform:translate(-50%,-50%) scale(1.3);box-shadow:0 0 0 6px rgba(242,140,40,.16)}
+  .term.armed{box-shadow:0 0 0 5px rgba(242,140,40,.18)}
+  .term .tip{position:absolute;left:50%;top:-19px;transform:translateX(-50%);font-size:10px;color:var(--muted);white-space:nowrap}
+  .badge-flag{
+    position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;
+    padding:1px 5px;border-radius:5px;white-space:nowrap
+  }
+  .badge-flag.err{background:#fdecec;color:var(--err);border:1px solid #f3bcbc}
+  .badge-flag.warn{background:#fff4e5;color:#a35c00;border:1px solid #f2cf9e}
+  .aw {font-size:11px;color:var(--muted)}
+  .stage .tbbanner{
+    position:absolute;left:10px;top:10px;display:flex;gap:6px;align-items:center;font-size:11px;color:#8a5a00;
+    background:#fff8ec;border:1px solid #f3dcb4;border-radius:8px;padding:4px 9px;pointer-events:none
+  }
+  .stagetools{position:absolute;right:10px;top:10px;display:flex;gap:6px}
+  .stagetools .btn{background:rgba(255,255,255,.92);backdrop-filter:blur(2px)}
+
+  /* ---------- bottom ---------- */
+  .bottombar{height:158px;display:flex;flex-direction:column;min-height:0}
+  .tabs{display:flex;gap:2px;padding:0 6px;border-bottom:1px solid var(--line);align-items:center}
+  .tabs button{padding:8px 10px;font-size:12px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs button.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+  .tabs .grow{flex:1}
+  .tabbody{flex:1;overflow:auto;min-height:0;font-size:12px}
+  .journal{padding:4px 0}
+  .jrow{display:flex;gap:8px;padding:3px 12px;align-items:baseline}
+  .jrow:hover{background:#f8fbfd}
+  .jrow .tm{font-variant-numeric:tabular-nums;color:#9aabb8;font-size:11px;min-width:44px}
+  .jrow .tx{color:var(--ink)}
+  .jrow.err .tx{color:var(--err)}
+  .jrow.warn .tx{color:#a35c00}
+  .jrow.ok .tx{color:var(--ok)}
+  .jrow .dot{width:5px;height:5px;border-radius:50%;background:#c3d0db;flex:0 0 5px;margin-top:5px}
+  .jrow.err .dot{background:var(--err)} .jrow.warn .dot{background:var(--warn)} .jrow.ok .dot{background:var(--ok)}
+  table.meas{width:100%;border-collapse:collapse;font-size:11.5px}
+  table.meas th,table.meas td{padding:4px 10px;text-align:right;border-bottom:1px solid #eef2f6}
+  table.meas th{color:var(--muted);font-weight:600;text-align:right;position:sticky;top:0;background:#fff}
+  table.meas th:first-child,table.meas td:first-child{text-align:left}
+  .empty-note{padding:14px;color:#9aabb8;font-size:12px}
+
+  /* ---------- right column ---------- */
+  .right{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+  .card h2{margin:0;padding:9px 11px;font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
+  .card .body{padding:9px 11px}
+  .meters{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:9px}
+  .meter{background:#fbfdfe;border:1px solid var(--line);border-radius:9px;padding:6px 8px;position:relative;overflow:hidden}
+  .meter .k{font-size:10px;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between}
+  .meter .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px;margin-top:1px}
+  .meter .v small{font-size:11px;font-weight:600;color:var(--muted);margin-left:2px}
+  .meter .spark{position:absolute;right:0;bottom:0;left:0;height:16px;opacity:.5}
+  .meter.hot .v{color:var(--err)}
+  .meter.accent .v{color:var(--accent)}
+  .meter.wide{grid-column:span 2}
+  .aux{display:flex;justify-content:space-between;gap:8px;padding:0 9px 9px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+  .aux b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .bar{height:6px;border-radius:4px;background:#e9eff4;overflow:hidden;margin-top:5px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffd08a,var(--accent2));width:0;transition:width .12s}
+
+  .task .goal{font-size:12.5px;line-height:1.4;color:var(--ink)}
+  .task ol{margin:7px 0 0;padding-left:18px;font-size:12px;color:var(--muted)}
+  .task ol li{margin-bottom:3px}
+  .hints{margin-top:8px;display:flex;flex-direction:column;gap:5px}
+  .hint{background:#fff8ec;border:1px solid #f5e0bf;border-radius:8px;padding:6px 8px;font-size:11.5px;color:#7a4a00}
+  .stars{font-size:18px;letter-spacing:3px;color:#e2b34a}
+  .result{border-radius:9px;padding:8px 10px;font-size:12px;margin-top:8px}
+  .result.ok{background:#eaf7f1;border:1px solid #b8e2ce;color:#146c4b}
+  .result.bad{background:#fff8ec;border:1px solid #f5e0bf;color:#8a5a00}
+  .tasklist{display:flex;flex-direction:column;gap:3px;padding:6px}
+  .tasklist button{text-align:left;padding:6px 8px;border-radius:8px;font-size:12px;display:flex;gap:7px;align-items:flex-start}
+  .tasklist button:hover{background:#f4f8fb}
+  .tasklist button.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .tasklist .num{width:16px;flex:0 0 16px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+  .tasklist button.done .num{color:var(--ok)}
+
+  .inspector .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+  .inspector label{color:var(--muted);flex:0 0 auto}
+  .inspector input[type=range]{width:100%}
+  .inspector .field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+  .inspector .field .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+  .inspector .field b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .seg button{flex:1;padding:3px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
+  .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .muted{color:var(--muted)}
+  .tiny{font-size:11px}
+
+  /* ---------- modal ---------- */
+  .modal{position:fixed;inset:0;background:rgba(20,34,48,.42);display:none;place-items:center;z-index:50;padding:20px}
+  .modal.open{display:grid}
+  .modal .sheet{background:#fff;border-radius:14px;max-width:620px;width:100%;max-height:88vh;overflow:auto;
+    box-shadow:0 20px 60px rgba(9,25,40,.3)}
+  .modal .sheet header{border-bottom:1px solid var(--line);padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+  .modal .sheet .inner{padding:14px 18px 20px;font-size:13px;line-height:1.5}
+  .modal h3{margin:14px 0 6px;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
+  .modal ul{margin:0;padding-left:18px}
+  .modal li{margin-bottom:4px}
+  kbd{background:#f2f6f9;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px;font-family:inherit}
+  .tbbox{background:#fff8ec;border:1px solid #f5e0bf;border-radius:9px;padding:9px 11px;color:#7a4a00;font-size:12.5px}
+
+  .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#1f2a36;color:#fff;
+    padding:9px 15px;border-radius:9px;font-size:12.5px;opacity:0;transition:.2s;pointer-events:none;z-index:60;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);max-width:80vw;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:1180px){
+    main{grid-template-columns:160px minmax(360px,1fr) 280px}
+  }
+  @media (max-width:980px){
+    body{overflow:auto}
+    .app{height:auto;min-height:100vh}
+    main{grid-template-columns:1fr;grid-auto-rows:auto}
+    .stagewrap{min-height:440px}
+    .right{overflow:visible}
+    .bottombar{height:180px}
+  }
+  @media print{
+    body{overflow:visible;background:#fff}
+    header,.palette,.stagewrap,.right .card:not(.protocol-card),.toast,.stagetools{display:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="bolt">⚡</div>
+      <div>Энерджиквантум<br><span class="sub">виртуальная лаборатория</span></div>
+    </div>
+    <nav class="benchnav" aria-label="Стенды">
+      <button class="active" data-bench="circuits">Электрические цепи</button>
+      <button data-bench="renew">Возобновляемая энергетика</button>
+      <button disabled title="Стенд следующей версии">Накопители <em>v3</em></button>
+      <button disabled title="Стенд следующей версии">Эффективность <em>v3</em></button>
+    </nav>
+    <div class="grow"></div>
+    <div class="modes" role="tablist" aria-label="Режим работы">
+      <button data-mode="free" class="active">Свободный</button>
+      <button data-mode="task">Задание</button>
+      <button data-mode="project">Проект</button>
+    </div>
+    <button class="iconbtn" id="btnHelp" title="Справка и техника безопасности" aria-label="Справка">?</button>
+  </header>
+
+  <div id="benchCircuits">
+  <main>
+    <!-- палитра -->
+    <aside class="palette panel">
+      <h2>Оборудование</h2>
+      <div class="search"><input id="q" type="search" placeholder="Поиск: лампа, резистор…" aria-label="Поиск оборудования"></div>
+      <div class="chips" id="chips">
+        <button class="active" data-cat="all">Всё</button>
+        <button data-cat="src">Источники</button>
+        <button data-cat="load">Потребители</button>
+        <button data-cat="sw">Коммутация</button>
+        <button data-cat="inst">Приборы</button>
+      </div>
+      <div class="parts" id="parts"></div>
+      <div class="hintline">Перетащите деталь на стол или просто щёлкните по ней. Соединяйте клеммы: нажмите на одну, затем на другую.</div>
+    </aside>
+
+    <!-- сцена -->
+    <section class="stagewrap">
+      <div class="timebar panel">
+        <div class="grp" role="group" aria-label="Время">
+          <button id="btnPlay" title="Пауза / пуск">⏸</button>
+          <button data-speed="1" class="active">×1</button>
+          <button data-speed="2">×2</button>
+          <button data-speed="4">×4</button>
+        </div>
+        <div class="clock" title="Модельное время">t = <b id="clock">0,0</b> с</div>
+        <button class="btn ghost" id="btnDemo" title="Собрать простую цепь автоматически">Демо-цепь</button>
+        <button class="btn ghost" id="btnClear" title="Убрать всё со стола">Очистить</button>
+        <div class="grow"></div>
+        <button class="btn primary" id="btnMeasure" title="Занести показания в протокол">＋ Снять показания</button>
+      </div>
+
+      <div class="stage empty" id="stage">
+        <svg id="wires" aria-hidden="true"></svg>
+        <div class="stagetools">
+          <button class="btn" id="btnZoomOut" title="Уменьшить">−</button>
+          <button class="btn" id="btnZoomIn" title="Увеличить">＋</button>
+        </div>
+      </div>
+
+      <div class="bottombar panel">
+        <div class="tabs">
+          <button class="active" data-tab="journal">Журнал</button>
+          <button data-tab="meas">Протокол измерений <span id="measCount" class="badge"></span></button>
+          <div class="grow"></div>
+          <button class="btn ghost tiny" id="btnCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+        </div>
+        <div class="tabbody" id="tabJournal"><div class="journal" id="journal"></div></div>
+        <div class="tabbody" id="tabMeas" hidden></div>
+      </div>
+    </section>
+
+    <!-- правая колонка -->
+    <aside class="right">
+      <!-- задание -->
+      <div class="card task" id="taskCard" hidden>
+        <h2>Задание <span class="badge" id="taskId">1 / 6</span></h2>
+        <div class="body" id="taskBody"></div>
+        <div class="tasklist" id="taskList"></div>
+      </div>
+
+      <!-- протокол (режим «Проект») -->
+      <div class="card protocol-card" id="projectCard" hidden>
+        <h2>Протокол эксперимента</h2>
+        <div class="body">
+          <div class="field"><span class="top">Название опыта</span>
+            <input id="projName" style="width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px" value="Исследование электрической цепи"></div>
+          <div class="field"><span class="top">Цель</span>
+            <textarea id="projGoal" rows="2" style="width:100%;border:1px solid var(--line);border-radius:7px;padding:5px 7px;font:inherit;font-size:12.5px;resize:vertical">Измерить зависимость тока от сопротивления и оценить внутреннее сопротивление источника.</textarea></div>
+          <div class="aux" style="padding:0 0 8px">Точек в протоколе: <b id="projCount">0</b></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn primary" id="btnMeasure2">＋ Снять точку</button>
+            <button class="btn" id="btnPrint">Печать протокола</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- приборы -->
+      <div class="card">
+        <h2>Показания приборов</h2>
+        <div class="meters">
+          <div class="meter accent"><div class="k"><span>Ток</span><span>I</span></div>
+            <div class="v" id="mI">0,000 <small>А</small></div><svg class="spark" id="sI" viewBox="0 0 100 16" preserveAspectRatio="none"></svg></div>
+          <div class="meter"><div class="k"><span>Напряжение</span><span>U</span></div>
+            <div class="v" id="mU">0,00 <small>В</small></div><svg class="spark" id="sU" viewBox="0 0 100 16" preserveAspectRatio="none"></svg></div>
+          <div class="meter"><div class="k"><span>Мощность</span><span>P</span></div>
+            <div class="v" id="mP">0,00 <small>Вт</small></div><svg class="spark" id="sP" viewBox="0 0 100 16" preserveAspectRatio="none"></svg></div>
+          <div class="meter"><div class="k"><span>Энергия</span><span>E</span></div>
+            <div class="v" id="mE">0,000 <small>Вт·ч</small></div></div>
+          <div class="meter wide" id="mLamp"><div class="k"><span>Накал лампы</span><span id="mStateT">—</span></div>
+            <div class="v" id="mB">0 <small>%</small></div>
+            <div class="bar"><i id="brightBar"></i></div></div>
+        </div>
+        <div class="aux">
+          <span>Режим: <b id="mMode">нет тока</b></span>
+          <span>Температура нити: <b id="mT">20 °C</b></span>
+        </div>
+      </div>
+
+      <!-- инспектор -->
+      <div class="card inspector" id="inspector">
+        <h2>Выбранный объект</h2>
+        <div class="body" id="inspBody"><div class="muted" style="font-size:12px">Нажмите на деталь на столе, чтобы изменить её параметры.</div></div>
+      </div>
+    </aside>
+  </main>
+  </div>
+
+  <main id="benchRenew" hidden></main>
+</div>
+
+<div class="modal" id="help">
+  <div class="sheet">
+    <header><b>Как работать в лаборатории</b><button class="iconbtn" id="btnCloseHelp" aria-label="Закрыть">✕</button></header>
+    <div class="inner">
+      <div class="tbbox"><b>Техника безопасности (виртуальная и настоящая)</b><br>
+        Не соединяйте клеммы источника напрямую — это короткое замыкание: сработает предохранитель или защита источника.
+        Светодиод без токоограничивающего резистора сгорит. В реальной лаборатории работайте в очках и не трогайте
+        нагретые элементы.</div>
+
+      <h3>Собрать цепь</h3>
+      <ul>
+        <li>Перетащите деталь из левой колонки на стол (или щёлкните по ней).</li>
+        <li>Нажмите на круглую клемму, затем на другую клемму — между ними появится провод.</li>
+        <li>Чтобы убрать провод, нажмите на него. Чтобы убрать деталь — выберите её и нажмите <kbd>Delete</kbd>.</li>
+        <li>Ключ замыкается двойным щелчком по детали или кнопкой в инспекторе справа.</li>
+      </ul>
+
+      <h3>Измерения</h3>
+      <ul>
+        <li>Кнопка «Снять показания» записывает текущие U, I, R, P в протокол.</li>
+        <li>Меняйте сопротивление реостата, напряжение источника или набор лампы — и снимайте новые точки.</li>
+        <li>«Экспорт CSV» выгружает протокол в файл, который открывается в Excel (разделитель «;», десятичная запятая).</li>
+      </ul>
+
+      <h3>Время</h3>
+      <ul>
+        <li>Множители ×1 / ×2 / ×4 ускоряют процесс: нагрев нити лампы, перегорание резистора, срабатывание предохранителя.</li>
+      </ul>
+
+      <h3>Горячие клавиши</h3>
+      <ul>
+        <li><kbd>Пробел</kbd> — пуск/пауза, <kbd>Delete</kbd> — удалить выбранное, <kbd>Esc</kbd> — снять выбор, <kbd>M</kbd> — снять показания.</li>
+        <li><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> — переход по объектам стола.</li>
+      </ul>
+
+      <h3>О модели</h3>
+      <ul>
+        <li>Цепь считается узловым анализом: I = ε/(R + r), U = ε − I·r, P = U·I.</li>
+        <li>Нить лампы нелинейна: R(T) = R₂₀·(1 + α·ΔT), температура — из баланса мощности и теплоотдачи.</li>
+        <li>Модель упрощённая и предназначена для обучения, а не для инженерных расчётов.</li>
+      </ul>
+      <p class="tiny muted" style="margin-top:14px">Прототип v0.9 · стенд «Электрические цепи». Остальные стенды — по дорожной карте ТЗ.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>/* ============================================================
+   Энерджиквантум · Виртуальная лаборатория
+   engine.js — физическая модель виртуального стенда «Электрические цепи»
+   Не зависит от DOM: тестируется в Node, используется в браузере.
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  const AMB = 293.15;          // температура среды, К
+  const R_WIRE = 1e-3;         // сопротивление идеального ключа/амперметра, Ом
+  const R_OPEN = 1e9;          // сопротивление разомкнутого ключа, Ом
+  const R_VOLTMETER = 1e7;     // входное сопротивление вольтметра, Ом
+  const G_LEAK = 1e-12;        // утечка в узел земли (регуляризация матрицы)
+
+  const PART_DEFS = {
+    source:   { cat: 'src',  name: 'Батарея',          terms: ['−', '+'], def: { emf: 9, r: 0.5 } },
+    resistor: { cat: 'load', name: 'Резистор',         terms: ['1', '2'], def: { R: 10, pMax: 2 } },
+    lamp:     { cat: 'load', name: 'Лампа',            terms: ['1', '2'], def: { ratedU: 9, ratedP: 2 } },
+    led:      { cat: 'load', name: 'Светодиод',        terms: ['A', 'K'], def: { Uf: 2, Rd: 10, iMax: 0.025 } },
+    rheostat: { cat: 'load', name: 'Реостат',          terms: ['1', '2'], def: { R: 20 } },
+    key:      { cat: 'sw',   name: 'Ключ',             terms: ['1', '2'], def: { closed: false } },
+    fuse:     { cat: 'sw',   name: 'Предохранитель',   terms: ['1', '2'], def: { iRated: 2, blown: false } },
+    ammeter:  { cat: 'inst', name: 'Амперметр',        terms: ['+', '−'], def: {} },
+    voltmeter:{ cat: 'inst', name: 'Вольтметр',        terms: ['+', '−'], def: {} },
+    wattmeter:{ cat: 'inst', name: 'Ваттметр',         terms: ['+', '−'], def: {} }
+  };
+
+  /* ---------- утилиты ---------- */
+
+  function lampResistance(part) {
+    const ratedU = part.props.ratedU, ratedP = part.props.ratedP;
+    const rHot = (ratedU * ratedU) / ratedP;
+    const rCold = rHot / 10;               // R_гор / R_хол ≈ 10 для вольфрама
+    const alpha = (rHot - rCold) / (rCold * (2500 - AMB));
+    const T = part.state.T || AMB;
+    return { r: rCold * (1 + alpha * (T - AMB)), rHot, rCold };
+  }
+
+  function lampBrightness(part) {
+    const T = part.state.T || AMB;
+    let b = (T - AMB) / (2500 - AMB);
+    if (b < 0) b = 0;
+    return Math.pow(Math.min(b, 1.35), 1.4);
+  }
+
+  /* ---------- создание мира ---------- */
+
+  function createWorld() {
+    return {
+      t: 0,
+      nextId: 1,
+      parts: [],
+      wires: [],
+      events: [],
+      measurements: [],
+      energySourceWh: 0,
+      energyLoadWh: 0,
+      sourceTripped: false,
+      counters: { shortCircuit: 0, fuseBlown: 0, burned: 0, tripped: 0 }
+    };
+  }
+
+  function addPart(world, type, x, y, props) {
+    const def = PART_DEFS[type];
+    if (!def) throw new Error('unknown part ' + type);
+    const p = {
+      id: 'p' + (world.nextId++),
+      type: type,
+      x: x, y: y,
+      props: Object.assign({}, def.def, props || {}),
+      state: { T: AMB, burned: false, over: 0, overHeat: 0, ledOn: false }
+    };
+    world.parts.push(p);
+    return p;
+  }
+
+  function getPart(world, id) { return world.parts.find(function (p) { return p.id === id; }); }
+
+  function removePart(world, id) {
+    const w = world.wires.filter(function (x) { return x.a.indexOf(id + ':') === 0 || x.b.indexOf(id + ':') === 0; });
+    world.wires = world.wires.filter(function (x) { return w.indexOf(x) < 0; });
+    world.parts = world.parts.filter(function (p) { return p.id !== id; });
+  }
+
+  function addWire(world, a, b) {
+    if (a === b) return null;
+    // уже есть такая связь?
+    const dup = world.wires.some(function (w) {
+      return (w.a === a && w.b === b) || (w.a === b && w.b === a);
+    });
+    if (dup) return null;
+    const w = { id: 'w' + (world.nextId++), a: a, b: b };
+    world.wires.push(w);
+    return w;
+  }
+
+  function removeWire(world, id) {
+    world.wires = world.wires.filter(function (w) { return w.id !== id; });
+  }
+
+  /* ---------- объединение клемм в узлы ---------- */
+
+  function buildNets(world) {
+    const parent = {};
+    function find(x) {
+      if (parent[x] === undefined) parent[x] = x;
+      while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+      return x;
+    }
+    function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+
+    world.parts.forEach(function (p) {
+      const n = PART_DEFS[p.type].terms.length;
+      for (let i = 0; i < n; i++) find(p.id + ':' + i);
+    });
+    world.wires.forEach(function (w) { union(w.a, w.b); });
+
+    const index = {}, nets = [];
+    Object.keys(parent).forEach(function (k) {
+      const r = find(k);
+      if (index[r] === undefined) { index[r] = nets.length; nets.push([]); }
+      index[k] = index[r];
+      nets[index[r]].push(k);
+    });
+    return { netOf: index, nets: nets, count: nets.length };
+  }
+
+  /* ---------- решение схемы (узловой анализ) ---------- */
+
+  function g_inv(g) { return 1 / Math.max(g, 1e-12); }
+
+  function solveLinear(A, b) {
+    const n = b.length;
+    const M = A.map(function (row, i) { return row.concat([b[i]]); });
+    for (let c = 0; c < n; c++) {
+      let piv = c;
+      for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+      if (Math.abs(M[piv][c]) < 1e-14) continue;
+      const tmp = M[c]; M[c] = M[piv]; M[piv] = tmp;
+      const d = M[c][c];
+      for (let k = c; k <= n; k++) M[c][k] /= d;
+      for (let r = 0; r < n; r++) {
+        if (r === c) continue;
+        const f = M[r][c];
+        if (f === 0) continue;
+        for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+      }
+    }
+    return M.map(function (row) { return row[n] || 0; });
+  }
+
+  // Возвращает { V: {net: вольт}, partInfo: {id: {I, V, P}} }
+  function analyze(world, netInfo) {
+    const ni = netInfo || buildNets(world);
+    const N = ni.count;
+    if (N === 0) return { V: {}, parts: {} };
+
+    // светодиод решаем как кусочно-линейный элемент:
+    // «открыт» — источник Uf последовательно с Rd, «закрыт» — утечка 1e-9 См
+    let V = new Array(N).fill(0);
+
+    function conductanceOf(p) {
+      const pr = p.props;
+      switch (p.type) {
+        case 'key': return pr.closed ? 1 / R_WIRE : 0;
+        case 'fuse': return pr.blown ? 0 : 1 / R_WIRE;
+        case 'ammeter':
+        case 'wattmeter': return 1 / R_WIRE;
+        case 'voltmeter': return 1 / R_VOLTMETER;
+        case 'resistor':
+        case 'rheostat': return p.state.burned ? 0 : 1 / Math.max(pr.R, 1e-6);
+        case 'lamp': return p.state.burned ? 0 : 1 / Math.max(lampResistance(p).r, 1e-6);
+        case 'led': return (p.state.ledOn && !p.state.burned) ? 1 / Math.max(pr.Rd, 1e-6) : 1e-9;
+        default: return 0;   // источник обрабатывается отдельно
+      }
+    }
+
+    // итерации по состоянию диодов: до 6 переключений
+    for (let outer = 0; outer < 6; outer++) {
+      const A = [], b = [];
+      for (let i = 0; i < N; i++) { A.push(new Array(N).fill(0)); b.push(0); }
+
+      world.parts.forEach(function (p) {
+        if (p.type === 'source') {
+          const a = ni.netOf[p.id + ':0'], c = ni.netOf[p.id + ':1'];
+          const r = Math.max(p.props.r, 1e-3);
+          const g = 1 / r;
+          const emf = world.sourceTripped ? 0 : p.props.emf;
+          A[a][a] += g; A[c][c] += g; A[a][c] -= g; A[c][a] -= g;
+          b[c] += emf / r; b[a] -= emf / r;
+          return;
+        }
+        const a = ni.netOf[p.id + ':0'], c = ni.netOf[p.id + ':1'];
+        const g = conductanceOf(p);
+        if (!g) return;
+        A[a][a] += g; A[c][c] += g; A[a][c] -= g; A[c][a] -= g;
+        if (p.type === 'led' && p.state.ledOn && !p.state.burned) {
+          // вклад источника Uf: I(a→c) = (Ua − Uc − Uf)/Rd
+          b[a] += p.props.Uf / g_inv(g);
+          b[c] -= p.props.Uf / g_inv(g);
+        }
+      });
+
+      for (let i = 0; i < N; i++) A[i][i] += G_LEAK;
+      V = solveLinear(A, b);
+
+      // проверяем согласованность состояний диодов и при необходимости переключаем
+      let switched = false;
+      world.parts.forEach(function (p) {
+        if (p.type !== 'led' || p.state.burned) return;
+        const a = ni.netOf[p.id + ':0'], c = ni.netOf[p.id + ':1'];
+        const U = V[a] - V[c];
+        const g = conductanceOf(p);
+        const I = U * g - ((p.state.ledOn && !p.state.burned) ? p.props.Uf / g_inv(g) : 0);
+        if (p.state.ledOn) {
+          if (I < 1e-7) { p.state.ledOn = false; switched = true; }   // ток не идёт — закрыт
+        } else {
+          if (U > p.props.Uf) { p.state.ledOn = true; switched = true; } // напряжение выше порога — открыт
+        }
+      });
+      if (!switched) break;
+    }
+
+    // токи и напряжения на элементах
+    const info = {};
+    world.parts.forEach(function (p) {
+      const a = ni.netOf[p.id + ':0'], c = ni.netOf[p.id + ':1'];
+      const Uab = V[a] - V[c];
+      let I = 0, P = 0;
+      if (p.type === 'source') {
+        const emf = world.sourceTripped ? 0 : p.props.emf;
+        I = (emf - (V[c] - V[a])) / Math.max(p.props.r, 1e-3); // от − к + внутри, т.е. наружу из «+»
+        P = (V[c] - V[a]) * I;                                 // мощность, отдаваемая в цепь
+        info[p.id] = { I: I, U: V[c] - V[a], P: P, Uab: Uab, emf: emf };
+        return;
+      }
+      if (p.type === 'led') {
+        // кусочно-линейная модель: открыт → I = (U − Uf)/Rd, закрыт → ток утечки
+        if (p.state.ledOn && !p.state.burned) {
+          I = (Uab - p.props.Uf) / Math.max(p.props.Rd, 1e-6);
+          P = Math.max(0, I * (Uab - p.props.Uf) + I * p.props.Uf);
+        } else {
+          I = Uab * 1e-9;
+          P = 0;
+        }
+        info[p.id] = { I: I, U: Uab, P: P, Uab: Uab };
+        return;
+      }
+      const g = conductanceOf(p);
+      if (g > 0) { I = Uab * g; P = Math.abs(I * Uab); }
+      info[p.id] = { I: I, U: Uab, P: P, Uab: Uab };
+    });
+
+    return { V: V, nets: ni, parts: info };
+  }
+
+  /* ---------- факты о цепи (для заданий и интерфейса) ---------- */
+
+  function facts(world, sol) {
+    const f = {
+      partCount: world.parts.length,
+      wireCount: world.wires.length,
+      lampBright: 0,
+      lamps: 0,
+      lampsOn: 0,
+      resistors: 0,
+      leds: 0,
+      ledCurrentMa: 0,
+      ledIntact: true,
+      closed: false,
+      sourceCurrent: 0,
+      sourceVoltage: 0,
+      sourcePower: 0,
+      loadVoltage: 0,
+      loadCurrent: 0,
+      loadPower: 0,
+      loadR: 0,
+      shortCircuit: world.counters.shortCircuit,
+      fuseBlown: world.counters.fuseBlown,
+      burned: world.counters.burned,
+      measurements: world.measurements.length,
+      energyWh: world.energyLoadWh
+    };
+
+    let best = null;
+    world.parts.forEach(function (p) {
+      const i = sol.parts[p.id];
+      if (!i) return;
+      if (p.type === 'lamp') {
+        f.lamps++;
+        const b = lampBrightness(p);
+        f.lampBright = Math.max(f.lampBright, b);
+        if (b > 0.12) f.lampsOn++;
+        if (!best || Math.abs(i.I) > Math.abs(best.I)) best = { I: i.I, U: i.U, P: i.P, part: p };
+      }
+      if (p.type === 'resistor') f.resistors++;
+      if (p.type === 'rheostat') f.resistors++;
+      if (p.type === 'led') {
+        f.leds++;
+        f.ledCurrentMa = Math.abs(i.I) * 1000;
+        f.ledIntact = !p.state.burned;
+        if (!best || Math.abs(i.I) > Math.abs(best.I)) best = { I: i.I, U: i.U, P: i.P, part: p };
+      }
+      if (p.type === 'source') {
+        f.sourceCurrent = i.I;
+        f.sourceVoltage = i.U;
+        f.sourcePower = i.U * i.I;
+      }
+    });
+
+    // «нагрузка» — элемент с наибольшим током среди потребителей
+    let load = null;
+    world.parts.forEach(function (p) {
+      if (['lamp', 'resistor', 'rheostat', 'led'].indexOf(p.type) < 0) return;
+      const i = sol.parts[p.id];
+      if (!i || Math.abs(i.I) < 1e-9) return;
+      if (!load || Math.abs(i.I) > Math.abs(load.I)) load = { I: i.I, U: i.U, P: i.P, part: p };
+    });
+    if (load) {
+      f.loadCurrent = Math.abs(load.I);
+      f.loadVoltage = Math.abs(load.U);
+      f.loadPower = Math.abs(load.P);
+      f.loadR = f.loadCurrent > 1e-9 ? f.loadVoltage / f.loadCurrent : 0;
+      f.loadType = load.part.type;
+    }
+
+    // «цепь замкнута»: через источник течёт заметный ток
+    f.closed = Math.abs(f.sourceCurrent) > 1e-4;
+
+    // нелинейность лампы по измерениям
+    const lampM = world.measurements.filter(function (m) { return m.kind === 'lamp'; });
+    const rl = lampM.filter(function (m) { return m.R > 0; }).map(function (m) { return m.R; });
+    f.lampRratio = rl.length >= 2 ? Math.max.apply(null, rl) / Math.min.apply(null, rl) : 0;
+    f.lampMeasurements = rl.length;
+    f.resistorMeasurements = world.measurements.filter(function (m) { return m.kind === 'resistor'; }).length;
+    const ri = world.measurements.filter(function (m) { return m.kind === 'resistor'; });
+    const cur = ri.map(function (m) { return m.I; });
+    f.resistorSpread = cur.length >= 2 ? Math.max.apply(null, cur) / Math.max(Math.min.apply(null, cur), 1e-9) : 0;
+
+    return f;
+  }
+
+  /* ---------- шаг моделирования ---------- */
+
+  function step(world, dt) {
+    const ni = buildNets(world);
+    const sol = analyze(world, ni);
+    const events = [];
+
+    world.parts.forEach(function (p) {
+      const i = sol.parts[p.id];
+      if (!i) return;
+      const U = Math.abs(i.U), I = Math.abs(i.I), P = U * I;
+
+      if (p.type === 'lamp' && !p.state.burned) {
+        const lm = lampResistance(p);
+        const k = 9.06e-4;                     // Вт/К
+        const C = 6.5e-4;                      // Дж/К  → τ ≈ 0,7 с
+        p.state.T += ((P - k * (p.state.T - AMB)) / C) * dt;
+        if (p.state.T < AMB) p.state.T = AMB;
+        if (p.state.T > 3300) {
+          p.state.burned = true;
+          world.counters.burned++;
+          events.push({ kind: 'burned', part: p.id, text: 'Лампа перегорела: нить перегрелась' });
+        }
+      }
+
+      if ((p.type === 'resistor' || p.type === 'rheostat') && !p.state.burned) {
+        if (P > p.props.pMax) {
+          p.state.overHeat += dt * (P / p.props.pMax);
+          if (p.state.overHeat > 1.2) {
+            p.state.burned = true;
+            world.counters.burned++;
+            events.push({ kind: 'burned', part: p.id, text: 'Резистор сгорел: мощность ' + P.toFixed(2) + ' Вт превысила допустимую ' + p.props.pMax + ' Вт' });
+          }
+        } else {
+          p.state.overHeat = Math.max(0, p.state.overHeat - dt * 0.5);
+        }
+      }
+
+      if (p.type === 'led' && !p.state.burned) {
+        if (I > p.props.iMax * 1.15) {
+          p.state.burned = true;
+          world.counters.burned++;
+          events.push({ kind: 'burned', part: p.id, text: 'Светодиод сгорел: ток ' + (I * 1000).toFixed(1) + ' мА больше предельного ' + (p.props.iMax * 1000).toFixed(0) + ' мА' });
+        }
+      }
+
+      if (p.type === 'fuse' && !p.props.blown) {
+        if (I > p.props.iRated) {
+          p.state.over += dt;
+          if (p.state.over > 0.08) {
+            p.props.blown = true;
+            world.counters.fuseBlown++;
+            events.push({ kind: 'fuse', part: p.id, text: 'Предохранитель сработал: ток ' + I.toFixed(2) + ' А превысил ' + p.props.iRated + ' А' });
+          }
+        } else {
+          p.state.over = Math.max(0, p.state.over - dt);
+        }
+      }
+
+      if (p.type === 'source' && !world.sourceTripped) {
+        if (I > 3.5) {
+          p.state.over += dt;
+          if (p.state.over > 2.5) {
+            world.sourceTripped = true;
+            world.counters.tripped++;
+            events.push({ kind: 'tripped', part: p.id, text: 'Защита источника: ток ' + I.toFixed(2) + ' А слишком велик, источник отключён' });
+          }
+        } else {
+          p.state.over = Math.max(0, p.state.over - dt);
+        }
+      }
+    });
+
+    // короткое замыкание: большой ток при малом сопротивлении внешней цепи
+    const src = world.parts.find(function (p) { return p.type === 'source'; });
+    if (src) {
+      const si = sol.parts[src.id];
+      if (si && Math.abs(si.I) > 3 && Math.abs(si.U) < 2.5) {
+        world._scTimer = (world._scTimer || 0) + dt;
+        if (world._scTimer > 0.03 && !world._scLogged) {
+          world.counters.shortCircuit++;
+          world._scLogged = true;
+          events.push({ kind: 'short', text: 'Короткое замыкание: клеммы источника соединены почти без нагрузки' });
+        }
+      } else {
+        world._scTimer = 0; world._scLogged = false;
+      }
+    }
+
+    // энергия
+    const gen = Math.max(0, (sol.parts[src ? src.id : ''] || { P: 0 }).P || 0);
+    let loadP = 0;
+    world.parts.forEach(function (p) {
+      if (['lamp', 'resistor', 'rheostat', 'led'].indexOf(p.type) >= 0) {
+        const i = sol.parts[p.id];
+        if (i) loadP += Math.abs(i.P);
+      }
+    });
+    world.energySourceWh += gen * dt / 3600;
+    world.energyLoadWh += loadP * dt / 3600;
+
+    world.t += dt;
+    events.forEach(function (e) { e.t = world.t; world.events.push(e); });
+    return { sol: sol, events: events };
+  }
+
+  const Lab = {
+    PART_DEFS: PART_DEFS,
+    AMB: AMB,
+    createWorld: createWorld,
+    addPart: addPart,
+    getPart: getPart,
+    removePart: removePart,
+    addWire: addWire,
+    removeWire: removeWire,
+    buildNets: buildNets,
+    analyze: analyze,
+    facts: facts,
+    step: step,
+    lampResistance: lampResistance,
+    lampBrightness: lampBrightness
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = Lab;
+  else root.Lab = Lab;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* ============================================================
+   Энерджиквантум · Виртуальная лаборатория
+   renewables.js — модель и интерфейс стенда «Возобновляемая энергетика»
+   Модель не зависит от DOM и тестируется в Node.
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  const LAT = 56 * Math.PI / 180;      // широта Красноярска
+  const RHO = 1.225;                   // плотность воздуха, кг/м³
+  const PANEL_A = 0.67;                // площадь модуля, м² (100 Вт при 1000 Вт/м²)
+  const PANEL_ETA = 0.15;              // КПД модуля
+  const TURB_D = 0.60;                 // диаметр ротора, м
+  const TURB_RATED = 150;              // номинальная мощность, Вт
+  const CUT_IN = 2.5, CUT_OUT = 16;    // рабочий диапазон ветра, м/с
+  const CP_BY_BLADES = { 2: 0.30, 3: 0.40, 5: 0.34 };
+  const EFF_CONTROLLER = { pwm: 0.78, mppt: 0.95 };
+
+  const LOADS = {
+    lamp: { name: 'Лампа', power: 10 },
+    pump: { name: 'Насос', power: 40 },
+    router: { name: 'Роутер', power: 8 }
+  };
+
+  function createState() {
+    return {
+      hour: 13.0,              // модельное время, ч
+      day: 172,                // 172 = 21 июня, 355 = 21 декабря
+      tilt: 0,                 // наклон панели от горизонта, °
+      azimuth: -55,            // азимут панели: 0 = юг, + = запад, − = восток
+      cloud: 0,                // 0 — ясно, 1 — плотная облачность
+      wind: 6,                 // скорость ветра, м/с
+      blades: 3,
+      controller: 'mppt',
+      loads: { lamp: true, pump: false, router: false },
+      capacity: 200,           // ёмкость АКБ, Вт·ч
+      soc: 0.35,               // 0…1
+      energyGen: 0,            // выработано за сессию, Вт·ч
+      energyUsed: 0,
+      dayStart: 13.0,
+      socMin: 0.35,
+      log: [],
+      sun: null,
+      pv: 0, wt: 0, load: 0, net: 0,
+      t: 0
+    };
+  }
+
+  /* ---------- положение солнца ---------- */
+
+  function declination(day) {
+    return 23.45 * Math.sin(2 * Math.PI / 365 * (284 + day)) * Math.PI / 180;
+  }
+
+  function sunPosition(hour, day) {
+    const dec = declination(day);
+    const H = (hour - 12) * 15 * Math.PI / 180;               // часовой угол
+    const sinH = Math.sin(LAT) * Math.sin(dec) + Math.cos(LAT) * Math.cos(dec) * Math.cos(H);
+    const elev = Math.asin(Math.max(-1, Math.min(1, sinH)));   // высота солнца
+    const azim = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(LAT) - Math.tan(dec) * Math.cos(LAT));
+    return { elev: elev, azim: azim, sinH: sinH };             // azim: 0 = юг, + = запад
+  }
+
+  function clearSky(elev) {
+    if (elev <= 0) return 0;
+    // прямая + рассеянная: простая модель, максимум ~1000 Вт/м²
+    return Math.min(1050, 1000 * Math.pow(Math.sin(elev), 1.15));
+  }
+
+  function irradiance(st) {
+    const s = sunPosition(st.hour, st.day);
+    const g = clearSky(s.elev) * (1 - 0.75 * st.cloud);
+    return { G: g, sun: s };
+  }
+
+  /* ---------- выработка ---------- */
+
+  function incidenceCos(st) {
+    const s = sunPosition(st.hour, st.day);
+    if (s.elev <= 0) return 0;
+    const beta = st.tilt * Math.PI / 180;
+    const alpha = st.azimuth * Math.PI / 180;
+    const cosT = Math.sin(s.elev) * Math.cos(beta) +
+      Math.cos(s.elev) * Math.sin(beta) * Math.cos(s.azim - alpha);
+    return Math.max(0, cosT);
+  }
+
+  function panelTemp(st) {
+    const ir = irradiance(st);
+    return 25 + (ir.G / 800) * 28;   // нагрев модуля: до +28 °C при полном солнце
+  }
+
+  function pvPower(st) {
+    const ir = irradiance(st);
+    const cosT = incidenceCos(st);
+    const tCoeff = 1 - 0.004 * (panelTemp(st) - 25);
+    return Math.max(0, ir.G * cosT * PANEL_A * PANEL_ETA * tCoeff);
+  }
+
+  function windPower(st) {
+    const v = st.wind;
+    if (v < CUT_IN || v > CUT_OUT) return 0;
+    const A = Math.PI * TURB_D * TURB_D / 4;
+    const cp = CP_BY_BLADES[st.blades] || 0.40;
+    const p = 0.5 * RHO * A * v * v * v * cp;
+    return Math.min(TURB_RATED, p);
+  }
+
+  function loadPower(st) {
+    return Object.keys(st.loads).reduce(function (s, k) {
+      return s + (st.loads[k] ? LOADS[k].power : 0);
+    }, 0);
+  }
+
+  function controllerEff(st) { return EFF_CONTROLLER[st.controller] || 0.95; }
+
+  /* ---------- шаг модели ---------- */
+
+  function step(st, dtReal, speed) {
+    // 1 модельный час за 6 реальных секунд при ×1
+    const dHours = dtReal * speed / 6;
+    st.hour += dHours;
+    if (st.hour >= 24) { st.hour -= 24; st.log.push({ t: st.t, kind: 'ok', text: 'Наступили новые сутки' }); }
+    st.t += dtReal;
+
+    const dtSec = dHours * 3600;
+    st.pv = pvPower(st);
+    st.wt = windPower(st);
+    st.load = loadPower(st);
+    const gen = (st.pv + st.wt) * controllerEff(st);
+    st.net = gen - st.load;
+
+    let dE;
+    if (st.net > 0) {
+      const room = (1 - st.soc) * st.capacity;
+      dE = Math.min(st.net * dtSec / 3600 * 0.95, room);
+      st.soc += dE / st.capacity;
+    } else {
+      const avail = Math.max(0, (st.soc - 0) * st.capacity);
+      dE = -Math.min(Math.abs(st.net) * dtSec / 3600 / 0.95, avail);
+      st.soc += dE / st.capacity;
+    }
+    st.soc = Math.max(0, Math.min(1, st.soc));
+    st.socMin = Math.min(st.socMin, st.soc);
+    st.energyGen += Math.max(0, gen) * dtSec / 3600;
+    st.energyUsed += st.load * dtSec / 3600;
+    const ir = irradiance(st);
+    st.G = ir.G;
+    st.sun = ir.sun;
+    return st;
+  }
+
+  /* ---------- суточный профиль для графика ---------- */
+
+  function dayProfile(st) {
+    const out = [];
+    for (let h = 0; h <= 24; h += 0.5) {
+      const tmp = Object.assign({}, st, { hour: h < 24 ? h : 23.99 });
+      out.push({
+        h: h,
+        pv: pvPower(tmp) * controllerEff(st),
+        wt: windPower(tmp) * controllerEff(st),
+        load: loadPower(st)
+      });
+    }
+    return out;
+  }
+
+  function dayEnergy(st) {
+    const prof = dayProfile(st);
+    let pvGen = 0, wtGen = 0, use = 0;
+    for (let i = 1; i < prof.length; i++) {
+      const dh = prof[i].h - prof[i - 1].h;
+      pvGen += prof[i].pv * dh;
+      wtGen += prof[i].wt * dh;
+      use += prof[i].load * dh;
+    }
+    const gen = pvGen + wtGen;
+    return { gen: gen, pvGen: pvGen, wtGen: wtGen, use: use, kium: gen / ((100 + TURB_RATED) * 24) };
+  }
+
+  // сутки с учётом накопителя: возвращает минимум SoC
+  function simulateDay(st) {
+    const prof = dayProfile(st);
+    let soc = st.soc, min = soc;
+    for (let i = 1; i < prof.length; i++) {
+      const dh = prof[i].h - prof[i - 1].h;
+      const net = prof[i].pv + prof[i].wt - prof[i].load;
+      if (net > 0) soc = Math.min(1, soc + net * dh * 0.95 / st.capacity);
+      else soc = Math.max(0, soc + net * dh / 0.95 / st.capacity);
+      min = Math.min(min, soc);
+    }
+    return { socEnd: soc, socMin: min };
+  }
+
+  /* ---------- факты для заданий ---------- */
+
+  function facts(st) {
+    const ir = irradiance(st);
+    // максимально возможная мощность при текущем солнце (перебором наклона/азимута)
+    let best = 0, bestTilt = 0, bestAz = 0;
+    for (let tilt = 0; tilt <= 90; tilt += 2) {
+      for (let az = -90; az <= 90; az += 5) {
+        const tmp = Object.assign({}, st, { tilt: tilt, azimuth: az });
+        const p = pvPower(tmp);
+        if (p > best) { best = p; bestTilt = tilt; bestAz = az; }
+      }
+    }
+    const f = {
+      hour: st.hour,
+      G: ir.G,
+      elevDeg: ir.sun.elev * 180 / Math.PI,
+      pv: pvPower(st),
+      wt: windPower(st),
+      load: loadPower(st),
+      soc: st.soc,
+      pvMax: best,
+      pvRatio: best > 0.5 ? pvPower(st) / best : 0,
+      bestTilt: bestTilt,
+      bestAz: bestAz,
+      energyGen: st.energyGen,
+      energyUsed: st.energyUsed,
+      day: dayEnergy(st),
+      sim: simulateDay(st),
+      windRatio: 0,
+      measures: (st.measures || []).slice(),
+      pvMeasure: (st.measures || []).filter(function (m) { return m.kind === 'pv'; }).length,
+      windMeasure: (st.measures || []).filter(function (m) { return m.kind === 'wind'; }),
+      dayRuns: (st.measures || []).filter(function (m) { return m.kind === 'day'; }),
+      seasonRuns: (st.measures || []).filter(function (m) { return m.kind === 'day'; })
+    };
+    // кубическая зависимость: ищем пару измерений, где скорость отличается примерно вдвое
+    const w = f.windMeasure;
+    let pair = null;
+    for (let i = 0; i < w.length; i++) {
+      for (let j = 0; j < w.length; j++) {
+        if (i === j) continue;
+        const ratio = w[i].v / w[j].v;
+        if (ratio >= 1.8 && ratio <= 2.2 && w[j].p > 0.5) {
+          pair = { hi: w[i], lo: w[j], ratio: ratio };
+          break;
+        }
+      }
+      if (pair) break;
+    }
+    if (pair) {
+      f.windRatio = pair.hi.p / pair.lo.p;
+      f.windRatioTheory = Math.pow(pair.ratio, 3);
+      f.windPair = { lo: pair.lo.v, hi: pair.hi.v };
+    } else if (w.length >= 2) {
+      const a = w.reduce(function (x, m) { return m.v > x.v ? m : x; }, w[0]);
+      const b = w.reduce(function (x, m) { return m.v < x.v ? m : x; }, w[0]);
+      f.windRatio = (a.v !== b.v && b.p > 0.5) ? a.p / b.p : 0;
+      f.windRatioTheory = Math.pow(a.v / b.v, 3);
+      f.windPair = { lo: b.v, hi: a.v };
+    }
+    return f;
+  }
+
+  /* ---------- задачи ---------- */
+
+  const TASKS = [
+    {
+      t: 'Навести панель на солнце',
+      goal: 'Наклоните и разверните панель так, чтобы она давала не меньше 90 % максимально возможной мощности при текущем солнце.',
+      steps: ['Посмотрите на высоту солнца и его азимут.', 'Подберите наклон панели.', 'Проверьте азимут: 0 — на юг.'],
+      hints: ['Панель смотрит на солнце, когда её нормаль направлена на него: наклон ≈ 90° − высота солнца.',
+              'Если солнце на западе — азимут положительный, на востоке — отрицательный.',
+              'Задача считается выполненной при отношении ≥ 90 % от максимума.'],
+      check: function (f) { return f.pvRatio >= 0.9; },
+      stars: function (f) { return f.pvRatio >= 0.97 ? 3 : (f.pvRatio >= 0.9 ? 2 : 1); },
+      why: 'Мощность панели пропорциональна косинусу угла падения света. Отклонение на 30° от нормали стоит 13 % мощности.'
+    },
+    {
+      t: 'Солнце и облака',
+      goal: 'Снимите в протокол 3 точки при одной orientation панели и разной облачности: ясно, облачно, пасмурно.',
+      steps: ['Наведите панель на солнце.', 'Установите облачность 0 и снимите показания.', 'Повторите при 0,5 и при 1.'],
+      hints: ['Облачность снижает освещённость линейно — так устроена модель.',
+              'Кнопка «Снять показания» пишет точку в протокол.',
+              'Проверьте по прибору G: при плотной облачности освещённость падает в 4 раза.'],
+      check: function (f) {
+        const pv = f.measures.filter(function (m) { return m.kind === 'pv'; });
+        const clouds = {};
+        pv.forEach(function (m) { clouds[Math.round(m.cloud * 10)] = 1; });
+        return Object.keys(clouds).length >= 3;
+      },
+      stars: function (f) {
+        const pv = f.measures.filter(function (m) { return m.kind === 'pv'; });
+        const clouds = {};
+        pv.forEach(function (m) { clouds[Math.round(m.cloud * 10)] = 1; });
+        return Object.keys(clouds).length >= 4 ? 3 : 2;
+      },
+      why: 'Освещённость (и мощность) падает почти пропорционально облачности: при плотных облаках остаётся около четверти мощности.'
+    },
+    {
+      t: 'Куб скорости ветра',
+      goal: 'Измерьте мощность ветрогенератора при 4, 6 и 8 м/с. Убедитесь, что при удвоении скорости (4 → 8 м/с) мощность растёт примерно в 8 раз.',
+      steps: ['Установите ветер 4 м/с и снимите показания.', 'Повторите при 6 и 8 м/с.', 'Сравните мощности при 4 и 8 м/с.'],
+      hints: ['Формула: P = ½·ρ·A·v³·Cp — скорость в третьей степени.',
+              'Снимайте показания при одном и том же числе лопастей.',
+              'Выше 12 м/с генератор выходит на номинал, а после 16 м/с — останавливается, поэтому берите 4…8 м/с.'],
+      check: function (f) { return f.windMeasure.length >= 3 && f.windRatio >= 6 && f.windRatio <= 10; },
+      stars: function (f) {
+        if (!(f.windMeasure.length >= 3 && f.windRatio >= 6 && f.windRatio <= 10)) return 1;
+        return f.windMeasure.length >= 4 ? 3 : 2;
+      },
+      why: 'Мощность ветра растёт как куб скорости: удвоение скорости даёт восьмикратную мощность. Поэтому ветроэнергетика любит ветреные места.'
+    },
+    {
+      t: 'MPPT против PWM',
+      goal: 'Прогоните сутки с контроллером PWM и с MPPT при одинаковой нагрузке. MPPT должен дать заметно больше энергии.',
+      steps: ['Включите лампу и насос.', 'Выберите PWM и нажмите «Прогнать сутки».', 'Повторите с MPPT и сравните.'],
+      hints: ['PWM теряет до 22 % энергии, MPPT — около 5 %.',
+              'Кнопка «Прогнать сутки» считает энергию за 24 часа при текущих настройках.',
+              'Сравнивайте прогоны при одинаковой нагрузке и одинаковой облачности.'],
+      check: function (f) {
+        const d = f.dayRuns;
+        const pwm = d.filter(function (m) { return m.controller === 'pwm'; }).pop();
+        const mppt = d.filter(function (m) { return m.controller === 'mppt'; }).pop();
+        return !!(pwm && mppt && mppt.gen > pwm.gen * 1.1);
+      },
+      stars: function (f) {
+        const d = f.dayRuns;
+        const pwm = d.filter(function (m) { return m.controller === 'pwm'; }).pop();
+        const mppt = d.filter(function (m) { return m.controller === 'mppt'; }).pop();
+        if (!(pwm && mppt && mppt.gen > pwm.gen * 1.1)) return 1;
+        return (mppt.gen > pwm.gen * 1.15) ? 3 : 2;
+      },
+      why: 'MPPT подстраивает рабочую точку панели под максимум мощности, PWM просто «срезает» напряжение. На практике MPPT даёт 15–25 % прироста в пасмурную погоду.'
+    },
+    {
+      t: 'Автономные сутки',
+      goal: 'Обеспечьте работу лампы и роутера круглые сутки без разряда аккумулятора ниже 20 %.',
+      steps: ['Включите лампу и роутер, насос выключите.', 'Подберите ёмкость и контроллер.', 'Проверьте минимум SoC по прогону суток.'],
+      hints: ['Сначала посчитайте потребление: (10 + 8) Вт × 24 ч = 432 Вт·ч.',
+              'Запас на пасмурный день: ёмкость около 2 суточных норм.',
+              'Ночи без солнца — накопитель должен продержаться до рассвета.'],
+      check: function (f) { return f.load >= 18 && f.sim.socMin >= 0.2 && f.day.gen >= f.day.use; },
+      stars: function (f) {
+        if (!(f.load >= 18 && f.sim.socMin >= 0.2 && f.day.gen >= f.day.use)) return 1;
+        return f.sim.socMin >= 0.35 ? 3 : 2;
+      },
+      why: 'Автономная система считается по худшему случаю: выработка за сутки должна покрывать потребление, а ёмкость — держать нагрузку ночью.'
+    },
+    {
+      t: 'Лето и зима',
+      goal: 'Сравните суточную выработку 21 июня и 21 декабря при одинаковых настройках. Разница должна быть заметной.',
+      steps: ['Выберите 21 июня и нажмите «Прогнать сутки».', 'Выберите 21 декабря и повторите.', 'Сравните солнечную выработку в протоколе.'],
+      hints: ['В декабре солнце низко, день короткий — выработка падает в несколько раз.',
+              'Для зимы помогает увеличить наклон панели: солнце низко над горизонтом.',
+              'Прогон записывается в протокол с датой и энергией.'],
+      check: function (f) {
+        const s = f.seasonRuns;
+        const summer = s.filter(function (m) { return m.day <= 200; }).pop();
+        const winter = s.filter(function (m) { return m.day > 200; }).pop();
+        return !!(summer && winter && winter.pvGen > 0 && summer.pvGen > winter.pvGen * 2.5);
+      },
+      stars: function (f) {
+        const s = f.seasonRuns;
+        const summer = s.filter(function (m) { return m.day <= 200; }).pop();
+        const winter = s.filter(function (m) { return m.day > 200; }).pop();
+        if (!(summer && winter && winter.pvGen > 0 && summer.pvGen > winter.pvGen * 2.5)) return 1;
+        return (summer.pvGen > winter.pvGen * 4) ? 3 : 2;
+      },
+      why: 'На широте Красноярска (56°) зимой солнце поднимается низко, а день короткий: суммарная выработка падает в 3–4 раза. Поэтому в автономных системах закладывают зимний расчёт.'
+    }
+  ];
+
+  const API = {
+    LAT: LAT, PANEL_A: PANEL_A, TURB_D: TURB_D, LOADS: LOADS, TASKS: TASKS,
+    CP_BY_BLADES: CP_BY_BLADES, EFF_CONTROLLER: EFF_CONTROLLER,
+    createState: createState, sunPosition: sunPosition, irradiance: irradiance,
+    pvPower: pvPower, windPower: windPower, loadPower: loadPower,
+    incidenceCos: incidenceCos, panelTemp: panelTemp, controllerEff: controllerEff,
+    step: step, dayProfile: dayProfile, dayEnergy: dayEnergy, simulateDay: simulateDay,
+    facts: facts, declination: declination, clearSky: clearSky
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.Renew = API;
+
+  /* ============================================================
+     Интерфейс стенда (только в браузере)
+     ============================================================ */
+  if (typeof document === 'undefined' || !root.Renew || !root.Renew.ui) {
+    if (typeof document !== 'undefined') root.RenewUI = function () {};
+    return;
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* ============================================================
+   Энерджиквантум · renew.ui.js
+   Интерфейс стенда «Возобновляемая энергетика»
+   ============================================================ */
+(function () {
+  'use strict';
+  var R = window.Renew;
+  if (!R || !document.getElementById('benchRenew')) return;
+  window.__renInit = function () { init(); };
+  function init() {
+
+  var $ = function (id) { return document.getElementById(id); };
+  var st = R.createState();
+  st.measures = [];
+  var run = { playing: true, speed: 1 };
+  var solved = {}, taskIndex = 0, lastTick = 0, taskTick = 0, lastFacts = null;
+
+  /* ---------- стили (добавляем один раз) ---------- */
+  var css = document.createElement('style');
+  css.textContent = `
+  .renew main{display:grid;grid-template-columns:236px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
+  .rctl{display:flex;flex-direction:column;min-height:0;overflow:auto}
+  .rctl .grp{padding:9px 11px;border-bottom:1px solid var(--line)}
+  .rctl .grp:last-child{border-bottom:0}
+  .rctl .gl{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;font-weight:600}
+  .rctl .fld{margin-bottom:9px}
+  .rctl .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:2px}
+  .rctl .fld .top b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .rctl input[type=range]{width:100%}
+  .rctl .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .rctl .seg button{flex:1;padding:4px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
+  .rctl .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .rctl .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:4px 0;color:var(--ink)}
+  .rctl .chk input{width:15px;height:15px;accent-color:var(--accent)}
+  .rctl .chk span.pw{margin-left:auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+
+  .rstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);overflow:hidden;
+    box-shadow:inset 0 0 60px rgba(11,110,153,.04);background:#dbeaf6}
+  .rstage svg{width:100%;height:100%;display:block}
+  .rflow{stroke-dasharray:4 10;stroke-linecap:round}
+  .rrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .chartbox{padding:6px 9px 9px}
+  .chartbox svg{width:100%;height:132px;display:block}
+  .legend{display:flex;gap:10px;font-size:10.5px;color:var(--muted);padding:0 9px 8px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:9px;height:3px;border-radius:2px;margin-right:4px;vertical-align:middle}
+  .mtable{width:100%;border-collapse:collapse;font-size:11px}
+  .mtable th,.mtable td{padding:3px 8px;text-align:right;border-bottom:1px solid #eef2f6}
+  .mtable th{color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
+  .mtable th:first-child,.mtable td:first-child{text-align:left}
+  @media (max-width:1180px){.renew main{grid-template-columns:210px minmax(360px,1fr) 290px}}
+  @media (max-width:980px){.renew main{grid-template-columns:1fr}.rstage{min-height:420px}}
+  `;
+  document.head.appendChild(css);
+
+  /* ---------- разметка стенда ---------- */
+  var main = document.querySelector('#benchRenew');
+  main.className = 'renew';
+  main.innerHTML = `
+    <aside class="panel rctl" id="rctl">
+      <h2>Условия опыта</h2>
+      <div class="grp">
+        <div class="gl">Солнце и ветер</div>
+        <div class="fld"><span class="top"><span>Время суток</span><b id="vHour">13:00</b></span>
+          <input type="range" id="sHour" min="0" max="23.9" step="0.1" value="13"></div>
+        <div class="fld"><span class="top"><span>Дата</span><b id="vDate">21 июня</b></span>
+          <input type="range" id="sDay" min="1" max="365" step="1" value="172"></div>
+        <div class="fld"><span class="top"><span>Облачность</span><b id="vCloud">ясно</b></span>
+          <input type="range" id="sCloud" min="0" max="1" step="0.05" value="0"></div>
+        <div class="fld"><span class="top"><span>Скорость ветра</span><b id="vWind">6,0 м/с</b></span>
+          <input type="range" id="sWind" min="0" max="18" step="0.5" value="6"></div>
+      </div>
+      <div class="grp">
+        <div class="gl">Панель и генератор</div>
+        <div class="fld"><span class="top"><span>Наклон панели</span><b id="vTilt">0°</b></span>
+          <input type="range" id="sTilt" min="0" max="90" step="1" value="0"></div>
+        <div class="fld"><span class="top"><span>Азимут панели</span><b id="vAz">−55°</b></span>
+          <input type="range" id="sAz" min="-90" max="90" step="5" value="-55"></div>
+        <div class="fld"><span class="top"><span>Число лопастей</span></span>
+          <div class="seg" id="segBlades">
+            <button data-blades="2">2</button><button data-blades="3" class="active">3</button><button data-blades="5">5</button>
+          </div></div>
+        <div class="fld"><span class="top"><span>Контроллер заряда</span></span>
+          <div class="seg" id="segCtrl">
+            <button data-ctrl="pwm">PWM</button><button data-ctrl="mppt" class="active">MPPT</button>
+          </div></div>
+      </div>
+      <div class="grp">
+        <div class="gl">Нагрузка</div>
+        <label class="chk"><input type="checkbox" id="loadLamp" checked>Лампа<span class="pw">10 Вт</span></label>
+        <label class="chk"><input type="checkbox" id="loadPump">Насос<span class="pw">40 Вт</span></label>
+        <label class="chk"><input type="checkbox" id="loadRouter">Роутер<span class="pw">8 Вт</span></label>
+        <div class="fld" style="margin-top:8px"><span class="top"><span>Ёмкость АКБ</span><b id="vCap">200 Вт·ч</b></span>
+          <input type="range" id="sCap" min="50" max="1000" step="50" value="200"></div>
+      </div>
+    </aside>
+
+    <section class="stagewrap">
+      <div class="timebar panel">
+        <div class="grp" role="group" aria-label="Время">
+          <button id="rPlay" title="Пауза / пуск">⏸</button>
+          <button data-rspeed="1" class="active">×1</button>
+          <button data-rspeed="2">×2</button>
+          <button data-rspeed="4">×4</button>
+        </div>
+        <div class="clock">t = <b id="rClock">13:00</b></div>
+        <button class="btn ghost" id="rNoon" title="Перейти к полудню">Полдень</button>
+        <div class="grow"></div>
+        <button class="btn" id="btnDay" title="Посчитать энергию за 24 часа при текущих настройках">Прогнать сутки</button>
+        <button class="btn primary" id="btnSample">＋ Снять показания</button>
+      </div>
+
+      <div class="rstage" id="rStage">
+        <svg id="rScene" viewBox="0 0 800 460" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#8fc6ea"/><stop offset="100%" stop-color="#e7f3fb"/>
+            </linearGradient>
+            <linearGradient id="skyNight" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#16283d"/><stop offset="100%" stop-color="#264a68"/>
+            </linearGradient>
+            <radialGradient id="sunGlow"><stop offset="0%" stop-color="#fff3c4" stop-opacity=".95"/>
+              <stop offset="100%" stop-color="#ffd166" stop-opacity="0"/></radialGradient>
+            <linearGradient id="panelFace" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1b4f72"/><stop offset="55%" stop-color="#2d7096"/><stop offset="100%" stop-color="#1b4f72"/>
+            </linearGradient>
+            <linearGradient id="battFill" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#7ed0a8"/><stop offset="100%" stop-color="#1f9d6b"/>
+            </linearGradient>
+          </defs>
+          <rect id="sky" x="0" y="0" width="800" height="460" fill="url(#skyDay)"/>
+          <g id="clouds"></g>
+          <circle id="sunGlowC" cx="0" cy="0" r="70" fill="url(#sunGlow)" opacity="0"/>
+          <circle id="sunDisc" cx="0" cy="0" r="22" fill="#ffd166" opacity="0"/>
+          <g id="sunRays" opacity="0"></g>
+          <line id="horizon" x1="0" y1="372" x2="800" y2="372" stroke="#b7cbd9" stroke-width="2"/>
+          <rect x="0" y="372" width="800" height="88" fill="#e6eef4"/>
+
+          <g id="gPanel" transform="translate(215,300)">
+            <line x1="0" y1="52" x2="0" y2="72" stroke="#6b7d8c" stroke-width="5"/>
+            <g id="panelTilt">
+              <rect id="panelRect" x="-70" y="-46" width="140" height="92" rx="4" fill="url(#panelFace)" stroke="#123c56" stroke-width="2"/>
+              <g stroke="#79b4d4" stroke-width="1.2" opacity=".85">
+                <line x1="-70" y1="-23" x2="70" y2="-23"/><line x1="-70" y1="0" x2="70" y2="0"/><line x1="-70" y1="23" x2="70" y2="23"/>
+                <line x1="-35" y1="-46" x2="-35" y2="46"/><line x1="0" y1="-46" x2="0" y2="46"/><line x1="35" y1="-46" x2="35" y2="46"/>
+              </g>
+            </g>
+            <text x="0" y="88" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">панель 100 Вт</text>
+          </g>
+
+          <g id="gTurb" transform="translate(450,296)">
+            <path d="M-6 72 L6 72 L4 -60 L-4 -60 Z" fill="#dfe8ee" stroke="#a9bcc9" stroke-width="1.5"/>
+            <g id="rotor" transform="translate(0,-62)">
+              <circle cx="0" cy="0" r="7" fill="#7a8fa0"/>
+              <g id="blades">
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4" transform="rotate(120)"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4" transform="rotate(240)"/>
+              </g>
+              <circle cx="0" cy="0" r="4" fill="#33475a"/>
+            </g>
+            <text x="0" y="88" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">ветрогенератор</text>
+          </g>
+
+          <g id="gHouse" transform="translate(620,300)">
+            <path d="M-46 32 L-46 -12 L0 -48 L46 -12 L46 32 Z" fill="#f7fafc" stroke="#a9bcc9" stroke-width="2"/>
+            <rect id="win" x="-16" y="-6" width="32" height="24" rx="2" fill="#cfe3ee" stroke="#a9bcc9"/>
+            <circle id="lampGlow" cx="0" cy="6" r="30" fill="#ffd166" opacity="0"/>
+            <text x="0" y="56" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">потребители</text>
+          </g>
+
+          <g id="gBatt" transform="translate(560,406)">
+            <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#7a8fa0" stroke-width="2"/>
+            <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#7a8fa0"/>
+            <rect id="battFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#battFill)"/>
+            <text id="battTxt" x="0" y="30" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">АКБ 35 %</text>
+          </g>
+
+          <g id="flows">
+            <path id="flowPV" d="M215 332 C 300 356 370 384 416 396" fill="none" stroke="#f2a93b" stroke-width="3" class="rflow" opacity="0"/>
+            <path id="flowWT" d="M450 318 C 450 356 500 380 528 396" fill="none" stroke="#3aa0c9" stroke-width="3" class="rflow" opacity="0"/>
+            <path id="flowLoad" d="M592 396 C 616 386 618 352 620 330" fill="none" stroke="#8f6bd0" stroke-width="3" class="rflow" opacity="0"/>
+          </g>
+          <g id="warnText" opacity="0">
+            <rect x="300" y="16" width="200" height="26" rx="7" fill="#fff4e5" stroke="#f2cf9e"/>
+            <text x="400" y="33" text-anchor="middle" font-size="11.5" fill="#8a5a00" font-family="sans-serif" id="warnLabel"></text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="bottombar panel">
+        <div class="tabs">
+          <button class="active" data-rtab="journal">Журнал</button>
+          <button data-rtab="meas">Протокол <span id="rMeasCount" class="badge"></span></button>
+          <div class="grow"></div>
+          <button class="btn ghost tiny" id="rCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+        </div>
+        <div class="tabbody" id="rTabJournal"><div class="journal" id="rJournal"></div></div>
+        <div class="tabbody" id="rTabMeas" hidden></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card task" id="rTaskCard">
+        <h2>Задание <span class="badge" id="rTaskId">1 / 6</span></h2>
+        <div class="body" id="rTaskBody"></div>
+        <div class="tasklist" id="rTaskList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Мощности</h2>
+        <div class="meters">
+          <div class="meter accent"><div class="k"><span>Солнце</span><span>PV</span></div>
+            <div class="v" id="rPV">0 <small>Вт</small></div></div>
+          <div class="meter"><div class="k"><span>Ветер</span><span>WT</span></div>
+            <div class="v" id="rWT">0 <small>Вт</small></div></div>
+          <div class="meter"><div class="k"><span>Нагрузка</span><span>P</span></div>
+            <div class="v" id="rLoad">0 <small>Вт</small></div></div>
+          <div class="meter"><div class="k"><span>Баланс</span><span>Δ</span></div>
+            <div class="v" id="rNet">0 <small>Вт</small></div></div>
+          <div class="meter wide" id="rSocBox"><div class="k"><span>Заряд АКБ</span><span id="rSocState">—</span></div>
+            <div class="v" id="rSoc">35 <small>%</small></div>
+            <div class="bar"><i id="rSocBar" style="width:35%"></i></div></div>
+        </div>
+        <div class="aux">
+          <span>Освещённость: <b id="rG">0</b></span>
+          <span>Высота солнца: <b id="rElev">0°</b></span>
+        </div>
+        <div class="aux">
+          <span>Выработано: <b id="rGen">0</b></span>
+          <span>Потреблено: <b id="rUse">0</b></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Выработка за сутки</h2>
+        <div class="chartbox"><svg id="rChart" viewBox="0 0 300 132" preserveAspectRatio="none"></svg></div>
+        <div class="legend">
+          <span><i style="background:#f2a93b"></i>солнце</span>
+          <span><i style="background:#3aa0c9"></i>ветер</span>
+          <span><i style="background:#8f6bd0"></i>нагрузка</span>
+        </div>
+        <div class="aux" style="padding:0 9px 9px">
+          <span>За сутки: <b id="rDayGen">—</b></span>
+          <span>Расход: <b id="rDayUse">—</b></span>
+        </div>
+      </div>
+    </aside>`;
+
+  /* ---------- инициализация управления ---------- */
+  function pct(v, d) { return v.toFixed(d === undefined ? 1 : d).replace('.', ','); }
+  function fmtW(v) { return v < 100 ? pct(v, 1) : Math.round(v) + ''; }
+
+  function bindRange(id, key, after) {
+    var el = $(id);
+    el.addEventListener('input', function () {
+      st[key] = parseFloat(el.value);
+      if (after) after();
+      renderControls();
+      renderChart();
+    });
+  }
+  function renderControls() {
+    $('vHour').textContent = timeText(st.hour);
+    $('vDate').textContent = dateText(st.day);
+    $('vCloud').textContent = st.cloud < 0.08 ? 'ясно' : (st.cloud < 0.45 ? 'переменная' : (st.cloud < 0.8 ? 'облачно' : 'пасмурно'));
+    $('vWind').textContent = pct(st.wind, 1) + ' м/с';
+    $('vTilt').textContent = st.tilt + '°';
+    $('vAz').textContent = (st.azimuth > 0 ? '+' : (st.azimuth < 0 ? '−' : '')) + Math.abs(st.azimuth) + '°';
+    $('vCap').textContent = st.capacity + ' Вт·ч';
+    [].forEach.call($('segBlades').children, function (b) { b.classList.toggle('active', +b.dataset.blades === st.blades); });
+    [].forEach.call($('segCtrl').children, function (b) { b.classList.toggle('active', b.dataset.ctrl === st.controller); });
+    $('loadLamp').checked = st.loads.lamp;
+    $('loadPump').checked = st.loads.pump;
+    $('loadRouter').checked = st.loads.router;
+  }
+  function timeText(h) {
+    var hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+    if (mm === 60) { mm = 0; hh = (hh + 1) % 24; }
+    return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+  function dateText(d) {
+    var months = [['января', 31], ['февраля', 28], ['марта', 31], ['апреля', 30], ['мая', 31], ['июня', 30],
+      ['июля', 31], ['августа', 31], ['сентября', 30], ['октября', 31], ['ноября', 30], ['декабря', 31]];
+    var rest = d, i = 0;
+    while (i < 12 && rest > months[i][1]) { rest -= months[i][1]; i++; }
+    var day = Math.max(1, Math.min(months[Math.min(i, 11)][1], rest));
+    return day + ' ' + months[Math.min(i, 11)][0];
+  }
+
+  bindRange('sHour', 'hour', function () { st.socMin = st.soc; });
+  bindRange('sDay', 'day');
+  bindRange('sCloud', 'cloud');
+  bindRange('sWind', 'wind');
+  bindRange('sTilt', 'tilt');
+  bindRange('sAz', 'azimuth');
+  bindRange('sCap', 'capacity');
+  $('segBlades').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    st.blades = +b.dataset.blades; renderControls(); renderChart();
+    log('ok', 'Лопастей: ' + st.blades + ' (Cp = ' + R.CP_BY_BLADES[st.blades] + ')');
+  });
+  $('segCtrl').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    st.controller = b.dataset.ctrl; renderControls();
+    log('ok', 'Контроллер заряда: ' + (st.controller === 'mppt' ? 'MPPT' : 'PWM'));
+  });
+  ['lamp', 'pump', 'router'].forEach(function (k) {
+    $('load' + k.charAt(0).toUpperCase() + k.slice(1)).addEventListener('change', function (e) {
+      st.loads[k] = e.target.checked;
+      log('ok', (R.LOADS[k].name) + ' ' + (e.target.checked ? 'включён' : 'выключен') + ' · ' + R.LOADS[k].power + ' Вт');
+    });
+  });
+  $('rPlay').onclick = function () {
+    run.playing = !run.playing;
+    this.textContent = run.playing ? '⏸' : '▶';
+  };
+  [].forEach.call(document.querySelectorAll('[data-rspeed]'), function (b) {
+    b.onclick = function () {
+      run.speed = +b.dataset.rspeed;
+      [].forEach.call(document.querySelectorAll('[data-rspeed]'), function (x) { x.classList.toggle('active', x === b); });
+    };
+  });
+  $('rNoon').onclick = function () {
+    st.hour = 12.6; $('sHour').value = 12.6; st.socMin = st.soc;
+    renderControls(); renderChart(); log('ok', 'Время переведено на полдень');
+  };
+
+  /* ---------- журнал и протокол ---------- */
+  function log(kind, text) {
+    st.log.push({ t: st.t, hour: st.hour, kind: kind, text: text });
+    if (st.log.length > 300) st.log.shift();
+    renderJournal();
+  }
+  function renderJournal() {
+    var box = $('rJournal');
+    if (!st.log.length) { box.innerHTML = '<div class="empty-note">Меняйте условия опыта слева — действия будут записываться сюда.</div>'; return; }
+    box.innerHTML = st.log.slice(-90).map(function (r) {
+      return '<div class="jrow ' + r.kind + '"><span class="tm">' + timeText(r.hour !== undefined ? r.hour : (r.t % 24)) + '</span><span class="dot"></span>' +
+        '<span class="tx">' + String(r.text).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</span></div>';
+    }).join('');
+    box.parentElement.scrollTop = box.parentElement.scrollHeight;
+  }
+
+  function sample() {
+    var f = facts();
+    var rec = {
+      t: st.t, hour: st.hour, day: st.day, cloud: st.cloud, tilt: st.tilt, azimuth: st.azimuth,
+      G: f.G, pv: f.pv, v: st.wind, wt: f.wt, load: f.load, soc: st.soc
+    };
+    st.measures.push(Object.assign({ kind: 'pv' }, rec));
+    st.measures.push(Object.assign({ kind: 'wind', p: f.wt, blades: st.blades }, rec));
+    log('ok', 'Показания: G = ' + Math.round(f.G) + ' Вт/м² · PV = ' + fmtW(f.pv) + ' Вт · ветер ' +
+      pct(st.wind, 1) + ' м/с → ' + fmtW(f.wt) + ' Вт · АКБ ' + Math.round(st.soc * 100) + ' %');
+    renderMeasurements();
+    checkTask(false);
+  }
+
+  function runDay() {
+    var d = R.dayEnergy(st);
+    var sim = R.simulateDay(st);
+    st.measures.push({
+      kind: 'day', t: st.t, day: st.day, cloud: st.cloud, tilt: st.tilt, azimuth: st.azimuth,
+      controller: st.controller, gen: d.gen, pvGen: d.pvGen, wtGen: d.wtGen, use: d.use,
+      socMin: sim.socMin, capacity: st.capacity
+    });
+    log(d.gen >= d.use ? 'ok' : 'warn', 'Прогон суток (' + dateText(st.day) + ', ' +
+      (st.controller === 'mppt' ? 'MPPT' : 'PWM') + '): выработано ' + Math.round(d.gen) +
+      ' Вт·ч (солнце ' + Math.round(d.pvGen) + ', ветер ' + Math.round(d.wtGen) + '), расход ' + Math.round(d.use) +
+      ' Вт·ч, минимум АКБ ' + Math.round(sim.socMin * 100) + ' %');
+    renderMeasurements();
+    checkTask(false);
+    toast('Прогон суток: ' + Math.round(d.gen) + ' Вт·ч выработано, ' + Math.round(d.use) + ' Вт·ч израсходовано');
+  }
+
+  function renderMeasurements() {
+    var box = $('rTabMeas');
+    $('rMeasCount').textContent = st.measures.length || '';
+    var rows = st.measures.filter(function (m) { return m.kind !== 'wind'; }).slice(-60).reverse();
+    if (!rows.length) { box.innerHTML = '<div class="empty-note">Пока нет данных. Нажмите «Снять показания» или «Прогнать сутки».</div>'; return; }
+    box.innerHTML = '<table class="mtable"><thead><tr><th>Что</th><th>Условия</th><th>G, Вт/м²</th><th>PV, Вт</th>' +
+      '<th>Ветер, м/с</th><th>WT, Вт</th><th>Нагрузка, Вт</th><th>АКБ, %</th></tr></thead><tbody>' +
+      rows.map(function (m) {
+        if (m.kind === 'day') {
+          return '<tr><td>Сутки</td><td style="text-align:left">' + dateText(m.day) + ' · ' +
+            (m.controller === 'mppt' ? 'MPPT' : 'PWM') + '</td><td colspan="4" style="text-align:left">' +
+            'выработка ' + Math.round(m.gen) + ' Вт·ч (солнце ' + Math.round(m.pvGen) + ', ветер ' + Math.round(m.wtGen) + ')</td>' +
+            '<td>' + Math.round(m.use) + '</td><td>' + Math.round(m.socMin * 100) + '</td></tr>';
+        }
+        return '<tr><td>Точка</td><td style="text-align:left">' + timeText(m.hour) + ' · ' + dateText(m.day) + '</td><td>' +
+          Math.round(m.G) + '</td><td>' + fmtW(m.pv) + '</td><td>' + pct(m.v, 1) + '</td><td>' + fmtW(m.wt) + '</td><td>' +
+          fmtW(m.load) + '</td><td>' + Math.round(m.soc * 100) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function exportCsv() {
+    if (!st.measures.length) { toast('Протокол пуст'); return; }
+    var lines = ['Тип;Время;Дата;Облачность;Наклон;Азимут;G,Вт/м2;PV,Вт;Ветер,м/с;WT,Вт;Нагрузка,Вт;АКБ,%'];
+    st.measures.filter(function (m) { return m.kind !== 'wind'; }).forEach(function (m) {
+      lines.push([m.kind === 'day' ? 'сутки' : 'точка', timeText(m.hour), dateText(m.day),
+        pct(m.cloud, 2), m.tilt, m.azimuth, Math.round(m.G || 0), pct(m.pv || 0, 1),
+        pct(m.v || 0, 1), pct(m.wt || 0, 1), fmtW(m.load || m.use || 0),
+        Math.round((m.soc !== undefined ? m.soc : m.socMin) * 100)].join(';'));
+    });
+    var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'протокол-виэ.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    log('ok', 'Протокол выгружен в CSV');
+  }
+
+  [].forEach.call(document.querySelectorAll('.tabs button[data-rtab]'), function (b) {
+    b.onclick = function () {
+      [].forEach.call(document.querySelectorAll('.tabs button[data-rtab]'), function (x) { x.classList.toggle('active', x === b); });
+      $('rTabJournal').hidden = b.dataset.rtab !== 'journal';
+      $('rTabMeas').hidden = b.dataset.rtab !== 'meas';
+    };
+  });
+
+  /* ---------- задания ---------- */
+  function facts() { return lastFacts || R.facts(st); }
+
+  function renderTask() {
+    var tk = R.TASKS[taskIndex];
+    var done = solved[taskIndex];
+    $('rTaskId').textContent = (taskIndex + 1) + ' / ' + R.TASKS.length;
+    $('rTaskBody').innerHTML =
+      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+      '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
+      (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, done) + '</span><br>' + tk.why + '</div>' : '') +
+      '<div class="hints">' + (tk._hints || []).map(function (h, i) { return '<div class="hint">Подсказка ' + (i + 1) + ': ' + h + '</div>'; }).join('') + '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">' +
+      '<button class="btn" id="rHint">Подсказка</button>' +
+      '<button class="btn primary" id="rCheck">Проверить</button></div>' +
+      '<div id="rCheckOut"></div>';
+    $('rTaskList').innerHTML = R.TASKS.map(function (t, i) {
+      return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
+        '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
+    }).join('');
+    [].forEach.call($('rTaskList').children, function (b) {
+      b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); };
+    });
+    $('rHint').onclick = function () {
+      var t2 = R.TASKS[taskIndex];
+      t2._hints = t2._hints || [];
+      if (t2._hints.length < t2.hints.length) { t2._hints.push(t2.hints[t2._hints.length]); renderTask(); }
+      else toast('Подсказки закончились');
+    };
+    $('rCheck').onclick = function () {
+      var ok = checkTask(true);
+      if (!ok) {
+        var out = $('rCheckOut');
+        var f = facts();
+        out.innerHTML = '<div class="result bad">Пока не выполнено. ' +
+          (R.TASKS[taskIndex].t.indexOf('Навести') === 0 ? 'Сейчас ' + Math.round(f.pvRatio * 100) + ' % от максимума (нужно ≥ 90 %).'
+            : R.TASKS[taskIndex].t.indexOf('Солнце и облака') === 0 ? 'Точек с разной облачностью: ' + distinctClouds(f) + ' из 3.'
+            : R.TASKS[taskIndex].t.indexOf('Куб') === 0 ? 'Измерений ветра: ' + f.windMeasure.length + ' из 3, отношение P(высок.)/P(низк.) = ' + pct(f.windRatio, 1) + ' (нужно 6…10).'
+            : R.TASKS[taskIndex].t.indexOf('MPPT') === 0 ? 'Прогонов суток: ' + f.dayRuns.length + ' (нужно минимум по одному с PWM и MPPT).'
+            : R.TASKS[taskIndex].t.indexOf('Автономные') === 0 ? 'Нагрузка ' + f.load + ' Вт, минимум АКБ ' + Math.round(f.sim.socMin * 100) + ' % (нужно ≥ 20 %), выработка ' + Math.round(f.day.gen) + ' / расход ' + Math.round(f.day.use) + ' Вт·ч.'
+            : 'Прогонов суток: ' + f.seasonRuns.length + ' (нужны и летние, и зимние).') + '</div>';
+      }
+    };
+  }
+  function distinctClouds(f) {
+    var c = {};
+    f.measures.filter(function (m) { return m.kind === 'pv'; }).forEach(function (m) { c[Math.round(m.cloud * 10)] = 1; });
+    return Object.keys(c).length;
+  }
+  function checkTask(show) {
+    var tk = R.TASKS[taskIndex];
+    var f = facts();
+    var was = !!solved[taskIndex];
+    var ok = false;
+    try { ok = tk.check(f); } catch (e) { ok = false; }
+    if (ok && !was) {
+      var stars = 1;
+      try { stars = tk.stars(f) || 1; } catch (e) {}
+      solved[taskIndex] = stars;
+      log('ok', 'Задание выполнено: ' + tk.t + ' (' + stars + '★)');
+      renderTask();
+    } else if (ok && show) {
+      renderTask();
+    }
+    return ok;
+  }
+
+  /* ---------- график суток ---------- */
+  function renderChart() {
+    var prof = R.dayProfile(st);
+    var maxV = 1;
+    prof.forEach(function (p) { maxV = Math.max(maxV, p.pv + p.wt, p.load); });
+    var W = 300, H = 132, pad = 16;
+    function x(h) { return pad + (h / 24) * (W - pad - 6); }
+    function y(v) { return H - 18 - (v / maxV) * (H - 34); }
+    function line(key) {
+      return prof.map(function (p, i) { return (i ? 'L' : 'M') + x(p.h).toFixed(1) + ',' + y(p[key]).toFixed(1); }).join(' ');
+    }
+    var area = prof.map(function (p, i) { return (i ? 'L' : 'M') + x(p.h).toFixed(1) + ',' + y(p.pv + p.wt).toFixed(1); }).join(' ') +
+      ' L' + x(24).toFixed(1) + ',' + y(0).toFixed(1) + ' L' + x(0).toFixed(1) + ',' + y(0).toFixed(1) + ' Z';
+    var grid = '';
+    for (var hh = 0; hh <= 24; hh += 6) {
+      grid += '<line x1="' + x(hh) + '" y1="' + y(0) + '" x2="' + x(hh) + '" y2="8" stroke="#e7eef4" stroke-width="1"/>';
+      grid += '<text x="' + x(hh) + '" y="' + (H - 6) + '" font-size="8" fill="#9aabb8" text-anchor="middle" font-family="sans-serif">' + hh + '</text>';
+    }
+    var now = x(st.hour);
+    $('rChart').innerHTML =
+      grid +
+      '<path d="' + area + '" fill="#fdf0dc" opacity=".75"/>' +
+      '<path d="' + line('pv') + '" fill="none" stroke="#f2a93b" stroke-width="1.6"/>' +
+      '<path d="' + line('wt') + '" fill="none" stroke="#3aa0c9" stroke-width="1.6" stroke-dasharray="3 2"/>' +
+      '<path d="' + line('load') + '" fill="none" stroke="#8f6bd0" stroke-width="1.4"/>' +
+      '<line x1="' + now + '" y1="6" x2="' + now + '" y2="' + y(0) + '" stroke="#0b6e99" stroke-width="1.2" opacity=".8"/>' +
+      '<circle cx="' + now + '" cy="8" r="2.6" fill="#0b6e99"/>';
+    var d = R.dayEnergy(st);
+    $('rDayGen').textContent = Math.round(d.gen) + ' Вт·ч';
+    $('rDayUse').textContent = Math.round(d.use) + ' Вт·ч';
+  }
+
+  /* ---------- сцена ---------- */
+  var rotorAngle = 0;
+  function renderScene(f) {
+    var elev = f.elevDeg, day = elev > 0;
+    // небо
+    var sky = $('sky');
+    var night = elev < -6;
+    var t = Math.max(0, Math.min(1, (elev + 6) / 20));
+    sky.setAttribute('fill', night ? 'url(#skyNight)' : 'url(#skyDay)');
+    sky.setAttribute('opacity', night ? 1 : 0.15 + 0.85 * t);
+    // солнце: путь по небу
+    var x = 105 + (st.hour / 24) * 590;
+    var ySun = 300 - Math.max(0, elev) * 3.6;
+    ['sunDisc', 'sunGlowC'].forEach(function (id) {
+      var el = $(id);
+      el.setAttribute('cx', x); el.setAttribute('cy', ySun);
+      el.setAttribute('opacity', elev > 0 ? (id === 'sunDisc' ? Math.min(1, 0.35 + elev / 40) : 0.9) : 0);
+    });
+    $('sunGlowC').setAttribute('r', 50 + Math.max(0, elev) * 0.6);
+    // облака
+    var cl = $('clouds');
+    if (cl.dataset.level !== String(st.cloud.toFixed(2))) {
+      cl.dataset.level = String(st.cloud.toFixed(2));
+      var n = Math.round(st.cloud * 6);
+      var out = '';
+      for (var i = 0; i < n; i++) {
+        var cx = 80 + ((i * 137) % 640), cy = 40 + ((i * 53) % 90);
+        out += '<g opacity="' + (0.35 + 0.4 * st.cloud) + '"><ellipse cx="' + cx + '" cy="' + cy + '" rx="46" ry="17" fill="#fff"/>' +
+          '<ellipse cx="' + (cx + 30) + '" cy="' + (cy + 6) + '" rx="34" ry="13" fill="#f2f7fb"/></g>';
+      }
+      cl.innerHTML = out;
+    }
+    // панель: наклон (сжатие по вертикали) и азимут (сжатие по горизонтали)
+    var beta = st.tilt * Math.PI / 180;
+    var sx = 1 - 0.45 * Math.abs(Math.sin(st.azimuth * Math.PI / 180));
+    var sy = 0.12 + 0.88 * Math.sin(beta);   // tilt=0 — плашмя (видна с ребра), tilt=90 — анфас
+    $('panelTilt').setAttribute('transform', 'scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')');
+    // лопасти
+    var p = f.wt;
+    var speed = p > 0.5 ? Math.min(9, 1.2 + p / 18) : 0;
+    rotorAngle = (rotorAngle + speed) % 360;
+    $('blades').setAttribute('transform', 'rotate(' + rotorAngle.toFixed(1) + ')');
+    // дом и лампа
+    var lampOn = st.loads.lamp;
+    $('lampGlow').setAttribute('opacity', lampOn ? 0.55 : 0);
+    $('win').setAttribute('fill', lampOn ? '#ffe9a8' : '#cfe3ee');
+    // батарея
+    var battW = 60 * st.soc;
+    $('battFill').setAttribute('width', Math.max(0, battW));
+    $('battFill').setAttribute('fill', st.soc < 0.2 ? '#e8850c' : (st.soc > 0.8 ? '#1f9d6b' : 'url(#battFill)'));
+    $('battTxt').textContent = 'АКБ ' + Math.round(st.soc * 100) + ' %';
+    // потоки энергии
+    var fPV = f.pv > 1 ? Math.min(1, 0.35 + f.pv / 100) : 0;
+    var fWT = f.wt > 1 ? Math.min(1, 0.35 + f.wt / 100) : 0;
+    var fL = f.load > 0 ? 0.7 : 0;
+    $('flowPV').setAttribute('opacity', fPV);
+    $('flowWT').setAttribute('opacity', fWT);
+    $('flowLoad').setAttribute('opacity', fL);
+    // предупреждение
+    var warn = '', show = false;
+    if (st.wind > 16) { warn = 'шторм: ветрогенератор остановлен'; show = true; }
+    else if (st.soc < 0.06 && f.load > 0) { warn = 'аккумулятор разряжен'; show = true; }
+    else if (f.pv < 1 && f.wt < 1 && f.load > 0 && st.hour > 20 || f.pv < 1 && f.wt < 1 && f.load > 0 && st.hour < 5) { warn = 'нет выработки — работаем от АКБ'; show = true; }
+    $('warnText').setAttribute('opacity', show ? 1 : 0);
+    $('warnLabel').textContent = warn;
+  }
+
+  /* ---------- приборы ---------- */
+  function renderMeters(f) {
+    $('rPV').innerHTML = fmtW(f.pv) + ' <small>Вт</small>';
+    $('rWT').innerHTML = fmtW(f.wt) + ' <small>Вт</small>';
+    $('rLoad').innerHTML = fmtW(f.load) + ' <small>Вт</small>';
+    var net = f.pv + f.wt * 1 - f.load;
+    var netCtrl = Math.round((f.pv + f.wt) * R.controllerEff(st) - f.load);
+    $('rNet').innerHTML = (netCtrl >= 0 ? '+' : '−') + Math.abs(netCtrl) + ' <small>Вт</small>';
+    $('rNet').style.color = netCtrl >= 0 ? '#1f9d6b' : '#d64545';
+    $('rSoc').innerHTML = Math.round(st.soc * 100) + ' <small>%</small>';
+    $('rSocBar').style.width = Math.round(st.soc * 100) + '%';
+    $('rSocBar').style.background = st.soc < 0.2 ? '#d64545' : (st.soc > 0.8 ? '#1f9d6b' : 'linear-gradient(90deg,#ffd08a,#f28c28)');
+    $('rSocState').textContent = st.soc < 0.2 ? 'низкий' : (st.soc > 0.9 ? 'полный' : 'заряд');
+    $('rG').textContent = Math.round(f.G) + ' Вт/м²';
+    $('rElev').textContent = pct(Math.max(0, f.elevDeg), 1) + '°';
+    $('rGen').textContent = Math.round(st.energyGen) + ' Вт·ч';
+    $('rUse').textContent = Math.round(st.energyUsed) + ' Вт·ч';
+    $('rClock').textContent = timeText(st.hour);
+    $('sHour').value = st.hour;
+    $('vHour').textContent = timeText(st.hour);
+  }
+
+  /* ---------- цикл ---------- */
+  function frame(now) {
+    var dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
+    lastTick = now;
+    if (window.__bench === 'renew') {
+      if (run.playing && dt > 0) R.step(st, dt, run.speed);
+      else R.step(st, 0, 0);
+      lastFacts = R.facts(st);
+      renderScene(lastFacts);
+      renderMeters(lastFacts);
+      if (Math.abs(st.hour - (lastFacts._chartHour || -1)) > 0.25) {
+        lastFacts._chartHour = st.hour;
+        renderChart();
+      }
+      taskTick += dt;
+      if (taskTick > 0.4) { taskTick = 0; checkTask(false); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- сервис ---------- */
+  function toast(text) {
+    var t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = text; t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove('show'); }, 2400);
+  }
+
+  $('btnSample').onclick = sample;
+  $('btnDay').onclick = runDay;
+  $('rCsv').onclick = exportCsv;
+
+  renderControls();
+  renderChart();
+  renderJournal();
+  renderMeasurements();
+  renderTask();
+  log('ok', 'Стенд «Возобновляемая энергетика»: 21 июня, 13:00, ясно, ветер 6 м/с.');
+  log('ok', 'Панель пока стоит плашмя и развёрнута на восток — начните с задания 1.');
+  requestAnimationFrame(frame);
+
+  // для отладки и сквозных проверок
+  window.__renew = {
+    state: function () { return st; }, facts: function () { return R.facts(st); },
+    R: R, sample: sample, runDay: runDay, solved: function () { return solved; },
+    setHour: function (h) { st.hour = h; $('sHour').value = h; renderControls(); renderChart(); }
+  };
+  }   // init
+})();
+</script>
+<script>
+(function () {
+  'use strict';
+  var Lab = window.Lab;
+  var PART_W = 76, PART_H = 56;
+
+  /* ================= состояние ================= */
+  var world = Lab.createWorld();
+  var selected = null;
+  var pendingTerm = null;         // {partId, idx}
+  var speed = 1, running = true;
+  var mode = 'free';
+  var zoom = 1;
+  var taskIndex = 0, solved = {};
+  var taskHintShown = 0;
+  var hist = { I: [], U: [], P: [] };
+  var lastTick = performance.now();
+  var acc = 0, taskTick = 0;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var stage = $('stage'), wires = $('wires');
+
+  /* ================= утилиты ================= */
+  function fmt(v, d) {
+    if (!isFinite(v)) v = 0;
+    var s = Math.abs(v).toFixed(d === undefined ? 2 : d);
+    return s.replace('.', ',');
+  }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+  function toast(text) {
+    var t = $('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove('show'); }, 2200);
+  }
+
+  /* ================= палитра ================= */
+  var CATS = { all: 'Всё', src: 'Источники', load: 'Потребители', sw: 'Коммутация', inst: 'Приборы' };
+  var DESCR = {
+    source: '9 В · r 0,5 Ом',
+    resistor: '10 Ом · 2 Вт',
+    lamp: '9 В · 2 Вт',
+    led: 'красный · 20 мА',
+    rheostat: '0…20 Ом',
+    key: 'замыкает цепь',
+    fuse: '2 А',
+    ammeter: 'последовательно',
+    voltmeter: 'параллельно',
+    wattmeter: 'U·I'
+  };
+  var ORDER = ['source', 'resistor', 'lamp', 'led', 'rheostat', 'key', 'fuse', 'ammeter', 'voltmeter', 'wattmeter'];
+  var filterCat = 'all', filterText = '';
+
+  function iconSVG(type, w) {
+    w = w || 30;
+    var s = '<svg viewBox="0 0 76 56" aria-hidden="true">';
+    s += '<g fill="none" stroke="#33475a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">';
+    switch (type) {
+      case 'source':
+        s += '<line x1="14" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="62" y2="28"/>' +
+             '<rect x="24" y="14" width="28" height="28" rx="4" fill="#fff"/>' +
+             '<line x1="31" y1="21" x2="31" y2="35"/><line x1="45" y1="24" x2="45" y2="32" stroke-width="4"/>';
+        break;
+      case 'resistor':
+        s += '<line x1="12" y1="28" x2="22" y2="28"/><line x1="54" y1="28" x2="64" y2="28"/>' +
+             '<path d="M22 28 L27 18 L33 38 L39 18 L45 38 L51 18 L54 28" fill="#fff"/>';
+        break;
+      case 'lamp':
+        s += '<line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>' +
+             '<circle cx="38" cy="28" r="13" fill="#fff"/>' +
+             '<path d="M31 21 L45 35 M45 21 L31 35" stroke-width="2"/>';
+        break;
+      case 'led':
+        s += '<line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>' +
+             '<path d="M26 16 L26 40 L46 28 Z" fill="#fff"/><line x1="46" y1="16" x2="46" y2="40"/>' +
+             '<path d="M50 16 L58 8 M54 20 L62 12" stroke-width="1.8"/>';
+        break;
+      case 'rheostat':
+        s += '<line x1="10" y1="28" x2="20" y2="28"/><line x1="56" y1="28" x2="66" y2="28"/>' +
+             '<rect x="20" y="18" width="36" height="20" rx="3" fill="#fff"/>' +
+             '<path d="M28 14 L44 20 L36 30 L48 38 L32 42" stroke-width="1.8"/>' +
+             '<line x1="44" y1="10" x2="44" y2="18" stroke-width="3"/>';
+        break;
+      case 'key':
+        s += '<line x1="12" y1="28" x2="26" y2="28"/><line x1="50" y1="28" x2="64" y2="28"/>' +
+             '<circle cx="26" cy="28" r="3" fill="#33475a"/><circle cx="50" cy="28" r="3" fill="#33475a"/>' +
+             '<line x1="26" y1="28" x2="48" y2="14" stroke-width="3"/>';
+        break;
+      case 'fuse':
+        s += '<line x1="12" y1="28" x2="22" y2="28"/><line x1="54" y1="28" x2="64" y2="28"/>' +
+             '<rect x="22" y="18" width="32" height="20" rx="4" fill="#fff"/><line x1="28" y1="28" x2="48" y2="28"/>';
+        break;
+      case 'ammeter':
+        s += '<line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>' +
+             '<circle cx="38" cy="28" r="14" fill="#fff"/><text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">A</text>';
+        break;
+      case 'voltmeter':
+        s += '<line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>' +
+             '<circle cx="38" cy="28" r="14" fill="#fff"/><text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">V</text>';
+        break;
+      case 'wattmeter':
+        s += '<line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>' +
+             '<circle cx="38" cy="28" r="14" fill="#fff"/><text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">W</text>';
+        break;
+    }
+    s += '</g></svg>';
+    return s;
+  }
+
+  function renderPalette() {
+    var box = $('parts');
+    box.innerHTML = '';
+    ORDER.forEach(function (type) {
+      var def = Lab.PART_DEFS[type];
+      if (filterCat !== 'all' && def.cat !== filterCat) return;
+      var nm = def.name.toLowerCase();
+      if (filterText && nm.indexOf(filterText) < 0) return;
+      var b = document.createElement('button');
+      b.className = 'partitem';
+      b.setAttribute('draggable', 'false');
+      b.innerHTML = '<span class="mini">' + iconSVG(type) + '</span>' +
+        '<span class="nm">' + def.name + '<i>' + DESCR[type] + '</i></span>';
+      b.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        startPaletteDrag(type, e);
+      });
+      b.addEventListener('click', function () { addAtFreeSpot(type); });
+      box.appendChild(b);
+    });
+    if (!box.children.length) box.innerHTML = '<div class="empty-note">Ничего не найдено</div>';
+  }
+
+  $('chips').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    filterCat = b.dataset.cat;
+    [].forEach.call($('chips').children, function (c) { c.classList.toggle('active', c === b); });
+    renderPalette();
+  });
+  $('q').addEventListener('input', function (e) { filterText = e.target.value.trim().toLowerCase(); renderPalette(); });
+
+  /* ================= создание деталей ================= */
+  function addPartAt(type, x, y, props) {
+    var p = Lab.addPart(world, type, x, y, props);
+    log('ok', 'На стол добавлено: ' + Lab.PART_DEFS[type].name);
+    if (type === 'source') setSourceTrippedInLog();
+    renderParts();
+    return p;
+  }
+  function addAtFreeSpot(type) {
+    var W = stage.clientWidth, H = stage.clientHeight;
+    var cols = Math.max(2, Math.floor((W - 80) / 170));
+    var rows = Math.max(2, Math.floor((H - 80) / 130));
+    var best = null, bestScore = -1;
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var x = 60 + c * ((W - 120) / Math.max(1, cols - 1));
+        var y = 70 + r * ((H - 150) / Math.max(1, rows - 1));
+        x = Math.max(20, Math.min(W - PART_W - 20, x));
+        y = Math.max(20, Math.min(H - PART_H - 34, y));
+        var minDist = 1e9;
+        world.parts.forEach(function (q) {
+          minDist = Math.min(minDist, Math.hypot(q.x - x, q.y - y));
+        });
+        if (minDist > bestScore) { bestScore = minDist; best = { x: x, y: y }; }
+      }
+    }
+    addPartAt(type, best ? best.x : 40, best ? best.y : 40);
+  }
+  function setSourceTrippedInLog() {}
+
+  /* ---------- перетаскивание из палитры ---------- */
+  var ghost = null;
+  function startPaletteDrag(type, e) {
+    var moved = false;
+    var sx = e.clientX, sy = e.clientY;
+    function onMove(ev) {
+      if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+      if (!moved) {
+        moved = true;
+        ghost = document.createElement('div');
+        ghost.className = 'part dragging';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.opacity = '0.85';
+        ghost.innerHTML = iconSVG(type);
+        document.body.appendChild(ghost);
+      }
+      ghost.style.position = 'fixed';
+      ghost.style.left = (ev.clientX - PART_W / 2) + 'px';
+      ghost.style.top = (ev.clientY - PART_H / 2) + 'px';
+    }
+    function onUp(ev) {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (!moved) return;               // это был клик — обработает click
+      if (ghost) { ghost.remove(); ghost = null; }
+      var r = stage.getBoundingClientRect();
+      if (ev.clientX > r.left && ev.clientX < r.right && ev.clientY > r.top && ev.clientY < r.bottom) {
+        addPartAt(type, ev.clientX - r.left - PART_W / 2, ev.clientY - r.top - PART_H / 2);
+      }
+    }
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
+
+  /* ================= отрисовка деталей ================= */
+  function termPos(p, idx) {
+    return { x: p.x + (idx === 0 ? 0 : PART_W), y: p.y + PART_H / 2 };
+  }
+
+  function renderParts() {
+    var keep = selected;
+    [].forEach.call(stage.querySelectorAll('.part,.term'), function (n) { n.remove(); });
+    stage.classList.toggle('empty', world.parts.length === 0);
+
+    world.parts.forEach(function (p) {
+      var el = document.createElement('div');
+      el.className = 'part' + (keep === p.id ? ' selected' : '');
+      el.dataset.id = p.id;
+      el.style.left = p.x + 'px';
+      el.style.top = p.y + 'px';
+      el.tabIndex = 0;
+      el.setAttribute('role', 'button');
+      el.setAttribute('aria-label', Lab.PART_DEFS[p.type].name);
+
+      var bright = p.type === 'lamp' ? Lab.lampBrightness(p) : 0;
+      var glow = '';
+      if (p.type === 'lamp' && bright > 0.02) {
+        glow = '<circle cx="38" cy="28" r="' + (16 + bright * 10) + '" fill="url(#lampGlow)" opacity="' + Math.min(0.85, bright) + '"/>';
+      }
+      var extra = '';
+      if (p.type === 'lamp' && p.state.burned) extra = '<path d="M31 21 L45 35 M45 21 L31 35" stroke="#d64545" stroke-width="2.4"/>';
+      if (p.type === 'led' && !p.state.burned && Math.abs((p._I || 0)) > 0.002) {
+        extra = '<circle cx="38" cy="28" r="20" fill="#ff5a5a" opacity="' + Math.min(0.55, Math.abs(p._I) * 14) + '"/>';
+      }
+      if (p.type === 'led' && p.state.burned) extra = '<path d="M30 20 L46 36 M46 20 L30 36" stroke="#d64545" stroke-width="2.2"/>';
+
+      el.innerHTML =
+        '<svg viewBox="0 0 76 56">' +
+        '<defs><radialGradient id="lampGlow"><stop offset="0%" stop-color="#ffd479" stop-opacity=".95"/>' +
+        '<stop offset="100%" stop-color="#ffb347" stop-opacity="0"/></radialGradient></defs>' +
+        glow + '<g class="body">' + iconSVG(p.type).replace(/^<svg[^>]*>|<\/svg>$/g, '') + '</g>' + extra +
+        '</svg>' +
+        '<span class="lbl">' + labelText(p) + '</span>';
+
+      // бейджи состояний
+      if (p.type === 'fuse' && p.props.blown) {
+        var bf = document.createElement('span'); bf.className = 'badge-flag err'; bf.textContent = 'сработал';
+        el.appendChild(bf);
+      }
+      if ((p.type === 'resistor' || p.type === 'rheostat') && p.state.overHeat > 0.35 && !p.state.burned) {
+        var bw = document.createElement('span'); bw.className = 'badge-flag warn'; bw.textContent = 'нагрев';
+        el.appendChild(bw);
+      }
+      if (p.state.burned) {
+        var be = document.createElement('span'); be.className = 'badge-flag err'; be.textContent = 'сгорел';
+        el.appendChild(be);
+      }
+      if (p.type === 'source' && world.sourceTripped) {
+        var bt = document.createElement('span'); bt.className = 'badge-flag err'; bt.textContent = 'защита';
+        el.appendChild(bt);
+      }
+
+      // клеммы
+      var def = Lab.PART_DEFS[p.type];
+      def.terms.forEach(function (tn, i) {
+        var t = document.createElement('div');
+        t.className = 'term' + (pendingTerm && pendingTerm.partId === p.id && pendingTerm.idx === i ? ' armed' : '');
+        t.dataset.term = '1';
+        t.dataset.pid = p.id;
+        t.dataset.idx = i;
+        var tp = termPos(p, i);
+        t.style.left = tp.x + 'px';
+        t.style.top = tp.y + 'px';
+        t.setAttribute('aria-label', Lab.PART_DEFS[p.type].name + ', клемма ' + tn);
+        t.title = Lab.PART_DEFS[p.type].name + ': клемма ' + tn;
+        t.addEventListener('pointerdown', onTermDown);
+        t.addEventListener('click', function (e) { e.stopPropagation(); });
+        stage.appendChild(t);
+      });
+
+      el.addEventListener('pointerdown', onPartDown);
+      el.addEventListener('dblclick', function (e) { e.stopPropagation(); quickToggle(p); });
+      if (p.type === 'key' || p.type === 'fuse' || p.type === 'source' || p.type === 'lamp') {
+        el.addEventListener('click', function (e) {
+          if (el.dataset.dragged === '1') return;
+          if (e.detail === 1 && (p.type === 'key' || p.type === 'fuse')) {
+            // одиночный клик по коммутационному элементу — переключить
+            quickToggle(p);
+          }
+        });
+      }
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { quickToggle(p); e.preventDefault(); }
+      });
+      stage.appendChild(el);
+    });
+
+    // обновляем позиции клемм при движении
+    syncTerms();
+    renderWires();
+    updateInspector();
+  }
+
+  function labelText(p) {
+    switch (p.type) {
+      case 'source': return p.props.emf + ' В · r ' + fmt(p.props.r, 1) + ' Ом';
+      case 'resistor': return p.props.R + ' Ом';
+      case 'rheostat': return p.props.R + ' Ом';
+      case 'lamp': return p.props.ratedU + ' В · ' + p.props.ratedP + ' Вт';
+      case 'led': return 'Uпр ' + fmt(p.props.Uf, 1) + ' В';
+      case 'key': return p.props.closed ? 'замкнут' : 'разомкнут';
+      case 'fuse': return p.props.iRated + ' А' + (p.props.blown ? ' · сработал' : '');
+      case 'ammeter': return 'амперметр';
+      case 'voltmeter': return 'вольтметр';
+      case 'wattmeter': return 'ваттметр';
+      default: return '';
+    }
+  }
+
+  function syncTerms() {
+    [].forEach.call(stage.querySelectorAll('.term'), function (t) {
+      var p = Lab.getPart(world, t.dataset.pid);
+      if (!p) return;
+      var tp = termPos(p, +t.dataset.idx);
+      t.style.left = tp.x + 'px';
+      t.style.top = tp.y + 'px';
+    });
+  }
+
+  function onPartDown(e) {
+    if (e.target.classList.contains('term')) { e.stopPropagation(); onTermDown(e); return; }
+    var el = e.currentTarget;
+    var id = el.dataset.id;
+    var p = Lab.getPart(world, id);
+    if (!p) return;
+    select(id);
+    var r = stage.getBoundingClientRect();
+    var dx = e.clientX - r.left - p.x;
+    var dy = e.clientY - r.top - p.y;
+    var moved = false;
+    el.dataset.dragged = '';
+    function onMove(ev) {
+      moved = true;
+      p.x = Math.max(-8, Math.min(stage.clientWidth - PART_W + 8, ev.clientX - r.left - dx));
+      p.y = Math.max(-8, Math.min(stage.clientHeight - PART_H + 8, ev.clientY - r.top - dy));
+      el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+      syncTerms(); renderWires();
+    }
+    function onUp() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      el.classList.remove('dragging');
+      if (moved) { el.dataset.dragged = '1'; renderWires(); }
+    }
+    el.classList.add('dragging');
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
+
+  function quickToggle(p) {
+    if (p.type === 'key') {
+      p.props.closed = !p.props.closed;
+      log('ok', 'Ключ ' + (p.props.closed ? 'замкнут' : 'разомкнут'));
+    } else if (p.type === 'fuse' && p.props.blown) {
+      p.props.blown = false; p.state.over = 0;
+      log('ok', 'Предохранитель заменён');
+    } else if (p.type === 'source' && world.sourceTripped) {
+      world.sourceTripped = false;
+      for (var i = 0; i < world.parts.length; i++) world.parts[i].state.over = 0;
+      log('ok', 'Защита источника сброшена');
+    } else if (p.state.burned) {
+      p.state.burned = false; p.state.overHeat = 0; p.state.T = Lab.AMB;
+      log('ok', 'Деталь заменена на исправную');
+    }
+    renderParts();
+  }
+
+  /* ================= провода ================= */
+  // ортогональная разводка с закруглениями
+  function roundPath(pts, r) {
+    if (pts.length < 2) return '';
+    var d = 'M' + pts[0].x + ',' + pts[0].y;
+    for (var i = 1; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      var v1 = { x: p1.x - p0.x, y: p1.y - p0.y }, v2 = { x: p2.x - p1.x, y: p2.y - p1.y };
+      var l1 = Math.hypot(v1.x, v1.y), l2 = Math.hypot(v2.x, v2.y);
+      if (l1 < 0.5 || l2 < 0.5) { d += ' L' + p1.x + ',' + p1.y; continue; }
+      var rr = Math.min(r, l1 / 2, l2 / 2);
+      var a = { x: p1.x - v1.x / l1 * rr, y: p1.y - v1.y / l1 * rr };
+      var b = { x: p1.x + v2.x / l2 * rr, y: p1.y + v2.y / l2 * rr };
+      d += ' L' + a.x + ',' + a.y + ' Q' + p1.x + ',' + p1.y + ' ' + b.x + ',' + b.y;
+    }
+    var last = pts[pts.length - 1];
+    d += ' L' + last.x + ',' + last.y;
+    return d;
+  }
+
+  function routePoints(p1, d1, p2, d2, lane) {
+    var stub = 16;
+    var e1 = { x: p1.x + d1 * stub, y: p1.y };
+    var e2 = { x: p2.x + d2 * stub, y: p2.y };
+    var pts = [{ x: p1.x, y: p1.y }, e1];
+    if (Math.abs(e1.y - e2.y) < 1.5) {
+      pts.push(e2);
+    } else {
+      var laneX = (e1.x + e2.x) / 2 + (lane || 0);
+      // если точки «смотрят» в разные стороны и близко — уводим дорожку в сторону
+      if (Math.abs(e2.x - e1.x) < stub * 2) laneX = e1.x + (lane >= 0 ? 1 : -1) * (26 + Math.abs(lane || 0));
+      pts.push({ x: laneX, y: e1.y }, { x: laneX, y: e2.y });
+      pts.push(e2);
+    }
+    pts.push({ x: p2.x, y: p2.y });
+    return pts;
+  }
+
+  function termDir(idx) { return idx === 0 ? -1 : 1; }
+
+  function renderWires() {
+    var svg = '';
+    world.wires.forEach(function (w, wi) {
+      var pa = parseTerm(w.a), pb = parseTerm(w.b);
+      if (!pa || !pb) return;
+      var a = Lab.getPart(world, pa.id), b = Lab.getPart(world, pb.id);
+      if (!a || !b) return;
+      var p1 = termPos(a, pa.idx), p2 = termPos(b, pb.idx);
+      var lane = ((wi % 3) - 1) * 9;
+      var d = roundPath(routePoints(p1, termDir(pa.idx), p2, termDir(pb.idx), lane), 9);
+      var I = Math.abs(w._I || 0);
+      var live = I > 0.02;
+      var col = live ? '#12698f' : '#93a7b6';
+      svg += '<path d="' + d + '" fill="none" stroke="#ffffff" stroke-width="' + (live ? 7 : 6) + '" stroke-linecap="round"/>';
+      svg += '<path class="w" data-wid="' + w.id + '" d="' + d + '" fill="none" stroke="' + col + '" stroke-width="' +
+        (live ? 3.2 : 2.4) + '" stroke-linecap="round" style="pointer-events:stroke;cursor:pointer"/>';
+      if (live) {
+        svg += '<path d="' + d + '" fill="none" stroke="#7ed0ff" stroke-width="1.9" stroke-linecap="round" ' +
+          'stroke-dasharray="3 13" opacity="0.95"><animate attributeName="stroke-dashoffset" from="16" to="0" dur="' +
+          Math.max(0.25, 0.85 / Math.min(2, I)) + 's" repeatCount="indefinite"/></path>';
+      }
+    });
+    if (pendingTerm && rubber) svg += rubber;
+    wires.innerHTML = svg;
+  }
+
+  function parseTerm(t) {
+    var m = /^(p\d+):(\d+)$/.exec(t || '');
+    return m ? { id: m[1], idx: +m[2] } : null;
+  }
+
+  wires.addEventListener('click', function (e) {
+    var p = e.target.closest('path.w');
+    if (!p) return;
+    Lab.removeWire(world, p.dataset.wid);
+    log('warn', 'Провод удалён');
+    renderWires();
+  });
+
+  /* ---------- соединение клемм ---------- */
+  var rubber = null, mouse = { x: 0, y: 0 };
+  function onTermDown(e) {
+    e.stopPropagation();
+    var pid = e.target.dataset.pid, idx = +e.target.dataset.idx;
+    var r = stage.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+
+    if (!pendingTerm) {
+      pendingTerm = { partId: pid, idx: idx };
+      renderParts();
+      document.addEventListener('pointermove', onRubberMove);
+      document.addEventListener('pointerup', onRubberUp);
+      return;
+    }
+    if (pendingTerm.partId === pid && pendingTerm.idx === idx) {
+      pendingTerm = null;
+      document.removeEventListener('pointermove', onRubberMove);
+      document.removeEventListener('pointerup', onRubberUp);
+      renderParts();
+      return;
+    }
+    connect(pendingTerm, { partId: pid, idx: idx });
+    pendingTerm = null;
+    document.removeEventListener('pointermove', onRubberMove);
+    document.removeEventListener('pointerup', onRubberUp);
+    renderParts();
+  }
+
+  function onRubberMove(ev) {
+    var r = stage.getBoundingClientRect();
+    mouse.x = ev.clientX - r.left; mouse.y = ev.clientY - r.top;
+    if (!pendingTerm) return;
+    var p = Lab.getPart(world, pendingTerm.partId);
+    if (!p) return;
+    var s = termPos(p, pendingTerm.idx);
+    var d = roundPath(routePoints(s, termDir(pendingTerm.idx), { x: mouse.x, y: mouse.y }, mouse.x >= s.x ? -1 : 1, 0), 9);
+    rubber = '<path d="' + d + '" fill="none" stroke="#f28c28" stroke-width="2.2" stroke-dasharray="5 5"/>';
+    renderWires();
+  }
+  function onRubberUp() {
+    // остаёмся в режиме «выбрана клемма» — ждём клика по второй
+    if (rubber) { rubber = null; renderWires(); }
+  }
+
+  function connect(a, b) {
+    var A = { id: a.partId, idx: a.idx }, B = { id: b.partId, idx: b.idx };
+    if (A.id === B.id) { toast('Нельзя соединить клеммы одной детали'); return; }
+    var w = Lab.addWire(world, A.id + ':' + A.idx, B.id + ':' + B.idx);
+    if (!w) { toast('Эти клеммы уже соединены'); return; }
+    log('ok', 'Соединены клеммы: ' + Lab.PART_DEFS[Lab.getPart(world, A.id).type].name + ' → ' +
+      Lab.PART_DEFS[Lab.getPart(world, B.id).type].name);
+    checkAll();
+  }
+
+  /* ================= инспектор ================= */
+  function select(id) {
+    selected = id;
+    [].forEach.call(stage.querySelectorAll('.part'), function (n) {
+      n.classList.toggle('selected', n.dataset.id === id);
+    });
+    updateInspector();
+  }
+
+  function updateInspector() {
+    var box = $('inspBody');
+    var p = selected ? Lab.getPart(world, selected) : null;
+    if (!p) {
+      box.innerHTML = '<div class="muted" style="font-size:12px">Нажмите на деталь на столе, чтобы изменить её параметры.</div>';
+      return;
+    }
+    var h = '';
+    h += '<div class="row"><b>' + Lab.PART_DEFS[p.type].name + '</b><button class="btn ghost tiny" id="btnDel">Удалить</button></div>';
+
+    function slider(key, min, max, step, unit, label, decimals) {
+      var v = p.props[key];
+      return '<div class="field"><span class="top"><span>' + label + '</span><b>' + fmt(v, decimals) + ' ' + unit + '</b></span>' +
+        '<input type="range" data-prop="' + key + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + v + '"></div>';
+    }
+
+    if (p.type === 'source') {
+      h += '<div class="field"><span class="top"><span>Напряжение (ЭДС)</span></span><div class="seg">' +
+        [1.5, 4.5, 9, 12].map(function (v) {
+          return '<button data-emf="' + v + '" class="' + (p.props.emf === v ? 'active' : '') + '">' + fmt(v, 1) + '</button>';
+        }).join('') + '</div></div>';
+      h += slider('r', 0.1, 5, 0.1, 'Ом', 'Внутреннее сопротивление', 1);
+      if (world.sourceTripped) h += '<div class="result bad">Защита источника сработала. <button class="btn tiny" id="btnResetSrc">Сбросить</button></div>';
+      h += '<div class="aux" style="padding:6px 0 0;gap:12px;flex-wrap:wrap">' +
+        '<span>U на клеммах: <b data-live="srcU">—</b></span>' +
+        '<span>Ток: <b data-live="srcI">—</b></span>' +
+        '<span>Падение на r: <b data-live="srcDrop">—</b></span></div>';
+    }
+    if (p.type === 'resistor') {
+      h += '<div class="field"><span class="top"><span>Сопротивление</span></span><div class="seg">' +
+        [10, 100, 330, 1000].map(function (v) {
+          return '<button data-res="' + v + '" class="' + (p.props.R === v ? 'active' : '') + '">' + v + '</button>';
+        }).join('') + '</div></div>';
+      h += slider('pMax', 0.125, 2, 0.125, 'Вт', 'Допустимая мощность', 3);
+      h += '<div class="aux" style="padding:0 0 6px;gap:12px;flex-wrap:wrap">' +
+        '<span>Мощность: <b data-live="resP">—</b></span>' +
+        '<span>Ток: <b data-live="resI">—</b></span></div>';
+      if (p.state.overHeat > 0.01 && !p.state.burned) {
+        h += '<div class="field"><span class="top"><span>Перегрузка</span><b>' + Math.round(Math.min(1, p.state.overHeat) * 100) + ' %</b></span><div class="bar"><i style="width:' +
+          Math.min(100, p.state.overHeat * 100) + '%"></i></div></div>';
+      }
+    }
+    if (p.type === 'rheostat') {
+      h += slider('R', 0, 20, 1, 'Ом', 'Сопротивление', 0);
+      h += '<div class="tiny muted">Меняйте ползунок и снимайте точки — так получается серия измерений для ВАХ.</div>';
+    }
+    if (p.type === 'lamp') {
+      h += '<div class="field"><span class="top"><span>Номинал</span></span><div class="seg">' +
+        [[4.5, 0.7, '4,5 В'], [9, 2, '9 В'], [12, 3, '12 В'], [12, 21, 'авто']].map(function (pair) {
+          var act = (p.props.ratedU === pair[0] && p.props.ratedP === pair[1]);
+          return '<button data-lamp="' + pair[0] + ':' + pair[1] + '" title="' + fmt(pair[0], 1) + ' В · ' + pair[1] + ' Вт" class="' +
+            (act ? 'active' : '') + '">' + pair[2] + '</button>';
+        }).join('') + '</div></div>';
+      h += '<div class="tiny muted" style="margin-top:-2px">Номиналы: 4,5 В · 0,7 Вт, 9 В · 2 Вт, 12 В · 3 Вт, автомобильная 12 В · 21 Вт</div>';
+      h += '<div class="aux" style="padding:0 0 6px;gap:10px;flex-direction:column">' +
+        '<span>Сопротивление нити: <b data-live="lampR">—</b></span>' +
+        '<span>Накал: <b data-live="lampB">—</b></span>' +
+        '<span>Температура: <b data-live="lampT">—</b></span>' +
+        '<span>Мощность: <b data-live="lampP">—</b></span></div>';
+    }
+    if (p.type === 'led') {
+      h += '<div class="field"><span class="top"><span>Ток через диод</span><b data-live="ledI">—</b></span>' +
+        '<div class="bar"><i data-livebar="ledI" style="width:0"></i></div></div>';
+      h += '<div class="tiny muted">Предельный ток 25 мА. Без резистора диод сгорит.</div>';
+    }
+    if (p.type === 'key') {
+      h += '<div class="row"><span>Состояние</span><button class="btn ' + (p.props.closed ? 'primary' : '') + '" id="btnKey">' +
+        (p.props.closed ? 'Замкнут' : 'Разомкнут') + '</button></div>';
+      h += '<div class="tiny muted">Щелчок по ключу на столе тоже переключает его.</div>';
+    }
+    if (p.type === 'fuse') {
+      h += '<div class="field"><span class="top"><span>Номинал</span></span><div class="seg">' +
+        [1, 2, 5].map(function (v) {
+          return '<button data-fuse="' + v + '" class="' + (p.props.iRated === v ? 'active' : '') + '">' + v + ' А</button>';
+        }).join('') + '</div></div>';
+      if (p.props.blown) h += '<div class="result bad">Предохранитель перегорел. <button class="btn tiny" id="btnFuse">Заменить</button></div>';
+      h += '<div class="aux" style="padding:0"><span>Ток: <b data-live="fuseI">—</b></span></div>';
+    }
+    if (p.type === 'ammeter' || p.type === 'voltmeter' || p.type === 'wattmeter') {
+      h += '<div class="aux" style="padding:0;gap:8px;flex-direction:column"><span>Показание: <b data-live="meter">—</b></span>' +
+        '<span class="tiny muted">' + (p.type === 'voltmeter' ? 'Включается параллельно участку' : 'Включается последовательно') + '</span></div>';
+    }
+    box.innerHTML = h;
+
+    var del = $('btnDel'); if (del) del.onclick = function () { deleteSelected(); };
+    [].forEach.call(box.querySelectorAll('input[type=range]'), function (s2) {
+      s2.oninput = function () {
+        p.props[s2.dataset.prop] = parseFloat(s2.value);
+        var top = s2.parentElement.querySelector('.top b');
+        if (top) top.textContent = fmt(parseFloat(s2.value), s2.dataset.prop === 'r' ? 1 : (s2.dataset.prop === 'pMax' ? 3 : 0)) + (s2.dataset.prop === 'r' ? ' Ом' : (s2.dataset.prop === 'pMax' ? ' Вт' : ' Ом'));
+        renderParts();
+      };
+    });
+    [].forEach.call(box.querySelectorAll('[data-emf]'), function (b2) {
+      b2.onclick = function () { p.props.emf = parseFloat(b2.dataset.emf); log('ok', 'Напряжение источника: ' + b2.dataset.emf + ' В'); renderParts(); };
+    });
+    [].forEach.call(box.querySelectorAll('[data-res]'), function (b2) {
+      b2.onclick = function () { p.props.R = parseFloat(b2.dataset.res); renderParts(); };
+    });
+    [].forEach.call(box.querySelectorAll('[data-lamp]'), function (b2) {
+      b2.onclick = function () { var q = b2.dataset.lamp.split(':'); p.props.ratedU = +q[0]; p.props.ratedP = +q[1]; p.state.T = Lab.AMB; p.state.burned = false; renderParts(); };
+    });
+    [].forEach.call(box.querySelectorAll('[data-fuse]'), function (b2) {
+      b2.onclick = function () { p.props.iRated = +b2.dataset.fuse; p.props.blown = false; renderParts(); };
+    });
+    var bk = $('btnKey'); if (bk) bk.onclick = function () { quickToggle(p); };
+    var bf = $('btnFuse'); if (bf) bf.onclick = function () { quickToggle(p); };
+    var bs = $('btnResetSrc'); if (bs) bs.onclick = function () { quickToggle(p); };
+    updateInspectorLive();
+  }
+
+  // живые значения в инспекторе (обновляются без перерисовки, чтобы не мешать ползункам)
+  function updateInspectorLive() {
+    var box = $('inspBody');
+    if (!box) return;
+    var p = selected ? Lab.getPart(world, selected) : null;
+    if (!p) return;
+    function set(k, v) {
+      var el = box.querySelector('[data-live="' + k + '"]');
+      if (el) el.textContent = v;
+    }
+    if (p.type === 'source') {
+      set('srcU', fmt(Math.abs(p._U || 0), 2) + ' В');
+      set('srcI', fmt(Math.abs(p._I || 0), 3) + ' А');
+      set('srcDrop', fmt(Math.abs(p._I || 0) * p.props.r, 2) + ' В');
+    }
+    if (p.type === 'resistor') {
+      set('resP', fmt(Math.abs(p._P || 0), 3) + ' Вт');
+      set('resI', fmt(Math.abs(p._I || 0) * 1000, 1) + ' мА');
+    }
+    if (p.type === 'lamp') {
+      var lm = Lab.lampResistance(p);
+      set('lampR', fmt(lm.r, 1) + ' Ом (холодная ' + fmt(lm.rCold, 1) + ' Ом)');
+      set('lampB', Math.round(Lab.lampBrightness(p) * 100) + ' %');
+      set('lampT', Math.round((p.state.T || Lab.AMB) - 273.15) + ' °C');
+      set('lampP', fmt(Math.abs(p._P || 0), 2) + ' Вт');
+    }
+    if (p.type === 'led') {
+      var mA = Math.abs(p._I || 0) * 1000;
+      set('ledI', fmt(mA, 1) + ' мА' + (mA > 25 ? ' — перегрузка!' : ''));
+      var bar = box.querySelector('[data-livebar="ledI"]');
+      if (bar) {
+        bar.style.width = Math.min(100, mA / 25 * 100) + '%';
+        bar.style.background = mA > 25 ? '#d64545' : 'linear-gradient(90deg,#ffd08a,#f28c28)';
+      }
+    }
+    if (p.type === 'fuse') set('fuseI', fmt(Math.abs(p._I || 0), 3) + ' А');
+    if (p.type === 'ammeter') set('meter', fmt(Math.abs(p._I || 0) * 1000, 1) + ' мА');
+    if (p.type === 'voltmeter') set('meter', fmt(Math.abs(p._U || 0), 2) + ' В');
+    if (p.type === 'wattmeter') set('meter', fmt(Math.abs((p._U || 0) * (p._I || 0)), 2) + ' Вт');
+  }
+
+  function deleteSelected() {
+    if (!selected) return;
+    Lab.removePart(world, selected);
+    log('warn', 'Деталь убрана со стола');
+    selected = null;
+    pendingTerm = null;
+    renderParts();
+  }
+
+  /* ================= журнал ================= */
+  function log(kind, text) {
+    world.journal = world.journal || [];
+    world.journal.push({ t: world.t, kind: kind, text: text });
+    if (world.journal.length > 400) world.journal.shift();
+    renderJournal();
+  }
+  function renderJournal() {
+    var box = $('journal');
+    var rows = (world.journal || []).slice(-120);
+    if (!rows.length) { box.innerHTML = '<div class="empty-note">Здесь появятся ваши действия: добавленные детали, соединения, включения.</div>'; return; }
+    box.innerHTML = rows.map(function (r) {
+      return '<div class="jrow ' + r.kind + '"><span class="tm">' + fmt(r.t, 1) + ' с</span>' +
+        '<span class="dot"></span><span class="tx">' + esc(r.text) + '</span></div>';
+    }).join('');
+    box.parentElement.scrollTop = box.parentElement.scrollHeight;
+  }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  /* ================= измерения ================= */
+  function measure() {
+    var CONSUMERS = ['lamp', 'resistor', 'rheostat', 'led'];
+    var p = selected ? Lab.getPart(world, selected) : null;
+    // если выбран прибор или ключ — записываем показания потребителя
+    if (!p || CONSUMERS.indexOf(p.type) < 0) {
+      var best = null;
+      world.parts.forEach(function (q) {
+        if (CONSUMERS.indexOf(q.type) < 0) return;
+        if (!best) { best = q; return; }
+        if (Math.abs(q._I || 0) > Math.abs(best._I || 0)) best = q;
+      });
+      p = best || p || world.parts.find(function (q) { return q.type === 'source'; });
+    }
+    if (!p) { toast('Сначала поставьте на стол деталь'); return; }
+    var U = Math.abs(p._U || 0), I = Math.abs(p._I || 0), P = Math.abs((p._U || 0) * (p._I || 0));
+    var rec = {
+      t: world.t, kind: p.type, label: Lab.PART_DEFS[p.type].name,
+      U: U, I: I, P: P, R: I > 1e-6 ? U / I : 0
+    };
+    world.measurements.push(rec);
+    log('ok', 'В протокол: ' + rec.label + ' · U = ' + fmt(U, 2) + ' В · I = ' + fmt(I, 3) + ' А · R = ' + fmt(rec.R, 1) + ' Ом');
+    renderMeasurements();
+    checkAll();
+    toast('Точка добавлена в протокол (' + world.measurements.length + ')');
+  }
+
+  function renderMeasurements() {
+    var box = $('tabMeas');
+    $('measCount').textContent = world.measurements.length || '';
+    if (!world.measurements.length) {
+      box.innerHTML = '<div class="empty-note">Пока нет точек. Нажмите «Снять показания», когда цепь работает.</div>';
+      return;
+    }
+    var rows = world.measurements.slice().reverse().map(function (m, i) {
+      return '<tr><td>' + (world.measurements.length - i) + '</td><td>' + fmt(m.t, 1) + '</td><td style="text-align:left">' +
+        m.label + '</td><td>' + fmt(m.U, 2) + '</td><td>' + fmt(m.I, 3) + '</td><td>' +
+        (m.R > 0 ? fmt(m.R, 1) : '—') + '</td><td>' + fmt(m.P, 2) + '</td></tr>';
+    }).join('');
+    box.innerHTML = '<table class="meas"><thead><tr><th>№</th><th>t, с</th><th>Элемент</th><th>U, В</th><th>I, А</th><th>R, Ом</th><th>P, Вт</th></tr></thead><tbody>' +
+      rows + '</tbody></table>';
+    $('projCount').textContent = world.measurements.length;
+  }
+
+  function exportCsv() {
+    if (!world.measurements.length) { toast('Протокол пуст'); return; }
+    var lines = ['Время,с;Элемент;U,В;I,А;R,Ом;P,Вт'];
+    world.measurements.forEach(function (m) {
+      lines.push([fmt(m.t, 2), m.label, fmt(m.U, 3), fmt(m.I, 4), fmt(m.R, 2), fmt(m.P, 3)].join(';'));
+    });
+    var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'протокол-измерений.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    log('ok', 'Протокол выгружен в CSV');
+  }
+
+  /* ================= задания ================= */
+  var TASKS = [
+    {
+      t: 'Зажечь лампу',
+      goal: 'Соберите замкнутую цепь: источник — ключ — лампа. Добейтесь, чтобы лампа горела.',
+      steps: ['Поставьте батарею, ключ и лампу.', 'Соедините их проводами в одно кольцо.', 'Замкните ключ.'],
+      hints: ['Цепь должна быть замкнутой: от «+» батареи через ключ и лампу обратно к «−».',
+              'Щёлкните по клемме, затем по другой — так ставится провод.',
+              'Если лампа не горит, проверьте ключ: он должен быть замкнут.'],
+      guess: {
+        prompt: 'До включения: какой ток пойдёт через лампу 9 В · 2 Вт от батареи 9 В?',
+        placeholder: 'ток, А',
+        unit: 'А',
+        actual: function (f) { return Math.abs(f.loadCurrent || 0) || Math.abs(f.sourceCurrent || 0); }
+      },
+      check: function (f) { return f.closed && f.lampsOn >= 1 && f.lampBright > 0.35; },
+      stars: function (f) { return f.closed && f.lampBright > 0.35 ? (f.burned === 0 && Math.abs(f.sourceVoltage) > 0.8 ? 3 : 2) : 0; },
+      why: 'Лампа горит, потому что цепь замкнута и через нить течёт ток.'
+    },
+    {
+      t: 'ВАХ резистора',
+      goal: 'Снимите не менее 5 точек (U, I) для резистора, меняя сопротивление реостата в цепи. Убедитесь, что зависимость линейна.',
+      steps: ['Соберите цепь с источником, реостатом, резистором и ключом.', 'Меняйте реостат и снимайте показания.', 'Сравните отношение U/I в точках.'],
+      hints: ['Сначала проверьте: I = U/R для каждой точки должно давать одно и то же R.',
+              'Нужно минимум 5 точек — меняйте реостат от 0 до 20 Ом.',
+              'Кнопка «Снять показания» записывает выбранную деталь.'],
+      check: function (f) { return f.resistorMeasurements >= 5 && f.resistorSpread > 1.6; },
+      stars: function (f) { return f.resistorMeasurements >= 5 && f.resistorSpread > 1.6 ? (f.resistorMeasurements >= 7 ? 3 : 2) : 0; },
+      why: 'Для резистора R = U/I постоянно — это и есть закон Ома. Разные токи при разных реостатах дают одну и ту же прямую.'
+    },
+    {
+      t: 'Нелинейность лампы',
+      goal: 'Снимите не менее 4 точек для лампы при разных напряжениях. Сопротивление нити должно измениться не менее чем в 2 раза.',
+      steps: ['Цепь: источник — реостат — лампа.', 'Снимайте U и I при разном реостате.', 'Посчитайте R = U/I в каждой точке.'],
+      hints: ['Нить лампы холодная имеет сопротивление примерно в 10 раз меньше, чем раскалённая.',
+              'Возьмите точки при слабом и при сильном накале — разница будет видна.',
+              'Не перегрейте лампу: при 12 В лампа 9 В может перегореть.'],
+      check: function (f) { return f.lampMeasurements >= 4 && f.lampRratio >= 2; },
+      stars: function (f) { return f.lampMeasurements >= 4 && f.lampRratio >= 2 ? (f.lampRratio >= 4 ? 3 : 2) : 0; },
+      why: 'Лампа — нелинейный элемент: чем горячее нить, тем больше её сопротивление. Поэтому ВАХ лампы кривая, а не прямая.'
+    },
+    {
+      t: 'Резистор для светодиода',
+      goal: 'Соберите цепь со светодиодом так, чтобы ток через него был 10–20 мА и диод не сгорел.',
+      steps: ['Поставьте светодиод и резистор последовательно.', 'Подберите сопротивление.', 'Проверьте ток.'],
+      hints: ['R = (Uист − Uпр) / I. Для красного диода Uпр ≈ 2 В, I возьмите 15 мА.',
+              'При 9 В: R = (9 − 2) / 0,015 ≈ 470 Ом. Попробуйте 330 Ом и 1000 Ом.',
+              'Если диод сгорел — выберите его и нажмите «Заменить».'],
+      check: function (f) { return f.leds >= 1 && f.ledIntact && f.ledCurrentMa >= 10 && f.ledCurrentMa <= 20; },
+      stars: function (f) { return f.leds >= 1 && f.ledIntact && f.ledCurrentMa >= 10 && f.ledCurrentMa <= 20 ? (f.ledCurrentMa >= 12 && f.ledCurrentMa <= 18 ? 3 : 2) : 0; },
+      why: 'Светодиод — не лампа: ему нужен ограничитель тока. Без резистора ток растёт лавинообразно и диод выходит из строя.'
+    },
+    {
+      t: 'Короткое замыкание',
+      goal: 'Поставьте предохранитель на 2 А последовательно с источником и замкните цепь накоротко. Предохранитель должен сработать.',
+      steps: ['Источник — предохранитель — ключ, без потребителя.', 'Замкните ключ.', 'Посмотрите на журнал и показания.'],
+      hints: ['Короткое замыкание — это путь с почти нулевым сопротивлением.',
+              'Без предохранителя сработает защита источника через несколько секунд.',
+              'После срабатывания предохранитель можно заменить: выберите его и нажмите «Заменить».'],
+      check: function (f) { return f.fuseBlown >= 1 || f.shortCircuit >= 1; },
+      stars: function (f) { return f.fuseBlown >= 1 ? (f.shortCircuit >= 1 ? 3 : 2) : (f.shortCircuit >= 1 ? 1 : 0); },
+      why: 'Ток короткого замыкания ограничен только внутренним сопротивлением источника: I = ε/r. Именно поэтому в цепь ставят предохранитель.'
+    },
+    {
+      t: 'Две лампы: последовательно',
+      goal: 'Соберите цепь с двумя одинаковыми лампами последовательно. Обе должны гореть, а напряжение источника делиться между ними.',
+      steps: ['Поставьте две лампы.', 'Соедините их в цепочку.', 'Проверьте напряжение на каждой.'],
+      hints: ['При последовательном соединении ток одинаков, а напряжения складываются.',
+              'Снимите показания с каждой лампы в протокол и сравните напряжения.',
+              'Что будет, если одна лампа перегорит? Проверьте — это и есть ответ.'],
+      guess: {
+        prompt: 'Предскажите: какое напряжение будет на каждой из двух одинаковых ламп?',
+        placeholder: 'напряжение, В',
+        unit: 'В',
+        actual: function (f) { return f.loadVoltage || 0; }
+      },
+      check: function (f) { return f.lamps >= 2 && f.closed && f.lampsOn >= 2; },
+      stars: function (f) { return f.lamps >= 2 && f.lampsOn >= 2 ? (f.lampMeasurements >= 2 ? 3 : 2) : 0; },
+      why: 'Последовательное соединение: I одинаков, U делится пропорционально сопротивлениям. При перегорании одной лампы цепь разрывается и гаснут обе.'
+    }
+  ];
+
+  function setMode(m) {
+    mode = m;
+    [].forEach.call(document.querySelectorAll('.modes button'), function (b) {
+      b.classList.toggle('active', b.dataset.mode === m);
+    });
+    $('taskCard').hidden = (m !== 'task');
+    $('projectCard').hidden = (m !== 'project');
+    if (m === 'task') { taskHintShown = 0; renderTask(); }
+    if (m === 'project') { $('projCount').textContent = world.measurements.length; }
+  }
+  [].forEach.call(document.querySelectorAll('.modes button'), function (b) {
+    b.onclick = function () { setMode(b.dataset.mode); };
+  });
+
+  function renderTask() {
+    var tk = TASKS[taskIndex];
+    var f = currentFacts();
+    var done = solved[taskIndex];
+    var stars = done ? (tk._stars || 1) : 0;
+    $('taskId').textContent = (taskIndex + 1) + ' / ' + TASKS.length;
+    $('taskBody').innerHTML =
+      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+      '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
+      (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, stars) + '</span><br>' + tk.why + '</div>' : '') +
+      '<div class="hints">' + (tk._hints || []).map(function (hh, i) {
+        return '<div class="hint">Подсказка ' + (i + 1) + ': ' + hh + '</div>';
+      }).join('') + '</div>' +
+      (function () {
+        if (!tk.guess) return '';
+        var g = tk.guess;
+        return '<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:8px">' +
+          '<div class="tiny muted" style="margin-bottom:4px">' + g.prompt + '</div>' +
+          '<div style="display:flex;gap:6px;align-items:center">' +
+          '<input id="guessInput" type="number" step="0.01" min="0" placeholder="' + g.placeholder + '" ' +
+          'style="flex:1;padding:5px 8px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:12.5px">' +
+          '<button class="btn" id="btnGuess">Сравнить</button></div>' +
+          '<div id="guessOut" class="tiny" style="margin-top:4px">' + (tk._guessMsg || '') + '</div>' +
+          '</div>';
+      })() +
+      '<div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">' +
+      '<button class="btn" id="btnHint">Подсказка</button>' +
+      '<button class="btn primary" id="btnCheck">Проверить</button></div>' +
+      '<div id="checkOut"></div>';
+
+    $('taskList').innerHTML = TASKS.map(function (t, i) {
+      return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
+        '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
+    }).join('');
+    [].forEach.call($('taskList').children, function (b) {
+      b.onclick = function () { taskIndex = +b.dataset.i; taskHintShown = 0; TASKS[taskIndex]._hints = []; renderTask(); };
+    });
+    var bh = $('btnHint'); if (bh) bh.onclick = function () {
+      var tk2 = TASKS[taskIndex];
+      tk2._hints = tk2._hints || [];
+      if (tk2._hints.length < tk2.hints.length) { tk2._hints.push(tk2.hints[tk2._hints.length]); renderTask(); }
+      else toast('Подсказки закончились — попробуйте собрать цепь по шагам');
+    };
+    var bc = $('btnCheck'); if (bc) bc.onclick = function () { checkTask(true); };
+    var bg = $('btnGuess'); if (bg) bg.onclick = function () {
+      var tk3 = TASKS[taskIndex];
+      var inp = $('guessInput');
+      var v = parseFloat(String(inp.value).replace(',', '.'));
+      if (!isFinite(v)) { $('guessOut').textContent = 'Введите число'; return; }
+      var act = tk3.guess.actual(currentFacts());
+      var diff = Math.abs(v - act) / Math.max(Math.abs(act), 1e-6);
+      var ok = diff <= 0.15;
+      if (ok) { tk3._guessOk = true; }
+      tk3._guessMsg = (ok ? '✓ Прогноз совпал: ' : '✗ Прогноз ' + (v > act ? 'завышен' : 'занижен') + ': ') +
+        'вы указали ' + fmt(v, 2) + ' ' + tk3.guess.unit + ', в модели ' + fmt(act, 2) + ' ' + tk3.guess.unit +
+        ' (расхождение ' + Math.round(diff * 100) + ' %).';
+      log(ok ? 'ok' : 'warn', 'Прогноз: ' + fmt(v, 2) + ' ' + tk3.guess.unit + ', модель: ' + fmt(act, 2) + ' ' + tk3.guess.unit);
+      $('guessOut').textContent = tk3._guessMsg;
+      checkTask(false);
+      renderTask();
+    };
+  }
+
+  function checkTask(showResult) {
+    var tk = TASKS[taskIndex];
+    var f = currentFacts();
+    var ok = false;
+    var wasSolved = !!solved[taskIndex];
+    try { ok = tk.check(f); } catch (e) { ok = false; }
+    if (ok) {
+      var st = tk.stars(f) || 1;
+      if (tk.guess && tk._guessOk && st < 3) st = 3;
+      if (!solved[taskIndex]) {
+        solved[taskIndex] = true;
+        tk._stars = st;
+        log('ok', 'Задание выполнено: ' + tk.t + ' (' + st + '★)');
+      }
+      if (showResult) renderTask();
+    } else if (showResult) {
+      var out = $('checkOut');
+      if (out) out.innerHTML = '<div class="result bad">Пока не выполнено. ' + missingText(tk, f) + '</div>';
+    }
+    if (!showResult && ok && !wasSolved) renderTask();
+    return ok;
+  }
+  function missingText(tk, f) {
+    if (tk.t.indexOf('Зажечь') === 0) return 'Проверьте: цепь замкнута (' + (f.closed ? 'да' : 'нет') + '), лампа горит (' + (f.lampsOn ? 'да' : 'нет') + ').';
+    if (tk.t.indexOf('ВАХ') === 0) return 'Точек с резистора: ' + f.resistorMeasurements + ' из 5, разброс токов: ' + fmt(f.resistorSpread, 1) + ' (нужно > 1,6).';
+    if (tk.t.indexOf('Нелинейность') === 0) return 'Точек с лампы: ' + f.lampMeasurements + ' из 4, отношение R: ' + fmt(f.lampRratio, 1) + ' (нужно ≥ 2).';
+    if (tk.t.indexOf('Резистор') === 0) return 'Ток через диод: ' + fmt(f.ledCurrentMa, 1) + ' мА (нужно 10–20), диод ' + (f.ledIntact ? 'цел' : 'сгорел') + '.';
+    if (tk.t.indexOf('Короткое') === 0) return 'Предохранитель: ' + (f.fuseBlown ? 'сработал' : 'не срабатывал') + ', КЗ зафиксировано: ' + f.shortCircuit + '.';
+    if (tk.t.indexOf('Две лампы') === 0) return 'Лампы: ' + f.lampsOn + ' из 2 горят, цепь ' + (f.closed ? 'замкнута' : 'разомкнута') + '.';
+    return '';
+  }
+  function checkAll() {
+    if (mode !== 'task') return;
+    var was = !!solved[taskIndex];
+    checkTask(false);
+    if (!was && solved[taskIndex]) renderTask();
+  }
+
+  /* ================= факты ================= */
+  var lastFacts = null;
+  function currentFacts() { return lastFacts || Lab.facts(world, Lab.analyze(world)); }
+
+  /* ================= цикл ================= */
+  var sparkBuf = { I: [], U: [], P: [] };
+
+  function frame(now) {
+    var dtReal = Math.min(0.1, (now - lastTick) / 1000);
+    lastTick = now;
+    if (running) {
+      acc += dtReal * speed;
+      var steps = 0;
+      while (acc > 1 / 240 && steps < 60) {
+        var res = Lab.step(world, 1 / 240);
+        acc -= 1 / 240;
+        steps++;
+        if (res.events.length) res.events.forEach(onEvent);
+      }
+      if (acc > 0.5) acc = 0;
+    } else {
+      var res0 = Lab.step(world, 0);
+      if (res0.events.length) res0.events.forEach(onEvent);
+    }
+
+    var sol = Lab.analyze(world);
+    var f = Lab.facts(world, sol);
+    lastFacts = f;
+
+    // токи на деталях и проводах — для отрисовки
+    var maxI = 0;
+    world.parts.forEach(function (p) {
+      var i = sol.parts[p.id] || { I: 0, U: 0, P: 0 };
+      p._I = i.I || 0; p._U = i.U || 0; p._P = (i.P || 0);
+      maxI = Math.max(maxI, Math.abs(p._I));
+    });
+    // токи в проводах: приблизительно по узлам — упрощённо, по средней нагрузке
+    world.wires.forEach(function (w) {
+      var pa = parseTerm(w.a), pb = parseTerm(w.b);
+      var a = pa && Lab.getPart(world, pa.id), b = pb && Lab.getPart(world, pb.id);
+      var ia = a ? Math.abs(a._I || 0) : 0, ib = b ? Math.abs(b._I || 0) : 0;
+      w._I = Math.max(ia, ib);
+    });
+
+    paint();
+    updateMeters(f, sol);
+    pushSpark(f);
+    drawSparks();
+    $('clock').textContent = fmt(world.t, 1);
+    renderWires();
+    if (mode === 'task') {
+      taskTick = (taskTick || 0) + dtReal;
+      if (taskTick > 0.25) { taskTick = 0; checkTask(false); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function onEvent(e) {
+    if (e.kind === 'fuse') log('err', e.text);
+    else if (e.kind === 'short') log('err', e.text);
+    else if (e.kind === 'tripped') log('err', e.text);
+    else if (e.kind === 'burned') log('err', e.text);
+    renderParts();
+    if (e.kind === 'burned' || e.kind === 'fuse' || e.kind === 'tripped' || e.kind === 'short') {
+      toast(e.text);
+      var src = world.parts.find(function (p) { return p.type === 'source'; });
+      if (src) src.state.over = 0;
+    }
+  }
+
+  /* ================= приборы ================= */
+  function updateMeters(f, sol) {
+    var lampP = 0, lamp = null;
+    world.parts.forEach(function (p) {
+      if (p.type === 'lamp' && !p.state.burned) {
+        var pp = Math.abs(p._P || 0);
+        if (!lamp || pp > lampP) { lamp = p; lampP = pp; }
+      }
+    });
+    var loadP = Math.abs(f.loadPower || 0);
+    var U = lamp ? Math.abs(lamp._U || 0) : Math.abs(f.loadVoltage || 0);
+    var I = lamp ? Math.abs(lamp._I || 0) : Math.abs(f.loadCurrent || 0);
+    var P = lamp ? Math.abs(lamp._P || 0) : loadP;
+
+    $('mI').innerHTML = fmt(I, I < 1 ? 3 : 2) + ' <small>А</small>';
+    $('mU').innerHTML = fmt(U, 2) + ' <small>В</small>';
+    $('mP').innerHTML = fmt(P, 2) + ' <small>Вт</small>';
+    $('mE').innerHTML = fmt(world.energyLoadWh, world.energyLoadWh < 1 ? 3 : 2) + ' <small>Вт·ч</small>';
+
+    var bright = lamp ? Lab.lampBrightness(lamp) : 0;
+    $('mB').innerHTML = Math.round(Math.min(1, bright) * 100) + ' <small>%</small>';
+    $('brightBar').style.width = Math.round(Math.min(1, bright) * 100) + '%';
+    $('mLamp').classList.toggle('hot', Math.abs(I) > 0.5);
+    var T = lamp ? Math.round((lamp.state.T || Lab.AMB) - 273.15) : 20;
+    $('mT').textContent = (lamp ? T : '—') + (lamp ? ' °C' : '');
+    $('mStateT').textContent = lamp ? (lamp.state.burned ? 'перегорела' : 'нить') : '—';
+
+    var modeTxt = 'нет тока';
+    if (f.shortCircuit > 0 && Math.abs(f.sourceCurrent) > 3 && Math.abs(f.loadR || 0) < 2) {
+      // это уже история; текущий режим смотрим по току
+    }
+    if (Math.abs(f.sourceCurrent) > 1e-4) {
+      modeTxt = (f.sourceCurrent > 0 ? 'источник разряжается' : 'заряд');
+      if (f.fuseBlown) modeTxt = 'предохранитель сработал';
+      if (Math.abs(f.sourceCurrent) > 3) modeTxt = 'перегрузка';
+    } else if (world.sourceTripped) modeTxt = 'защита источника';
+    else if (world.parts.some(function (p) { return p.state.burned; })) modeTxt = 'обрыв (сгорел элемент)';
+    $('mMode').textContent = modeTxt;
+    updateLive();
+    updateInspectorLive();
+  }
+
+  function updateLive() {
+    world.parts.forEach(function (p) {
+      var el = stage.querySelector('.part[data-id="' + p.id + '"]');
+      if (!el) return;
+      var lbl = el.querySelector('.lbl');
+      if (lbl) lbl.textContent = labelText(p);
+      var svg = el.querySelector('svg');
+      if (!svg) return;
+      // динамические состояния — лампа и светодиод
+      var bright = p.type === 'lamp' ? Lab.lampBrightness(p) : 0;
+      var g = svg.querySelector('.glow');
+      if (p.type === 'lamp') {
+        if (!g) {
+          g = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          g.setAttribute('class', 'glow'); g.setAttribute('cx', 38); g.setAttribute('cy', 28);
+          g.setAttribute('fill', 'url(#lampGlow)');
+          svg.insertBefore(g, svg.firstChild);
+        }
+        g.setAttribute('r', 16 + bright * 12);
+        g.setAttribute('opacity', Math.min(0.9, bright));
+      }
+      if (p.type === 'led') {
+        var ledGlow = svg.querySelector('.ledglow');
+        if (!ledGlow) {
+          ledGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          ledGlow.setAttribute('class', 'ledglow'); ledGlow.setAttribute('cx', 38); ledGlow.setAttribute('cy', 28);
+          ledGlow.setAttribute('fill', '#ff5a5a');
+          svg.insertBefore(ledGlow, svg.firstChild);
+        }
+        var on = !p.state.burned && Math.abs(p._I || 0) > 0.001;
+        ledGlow.setAttribute('r', on ? 24 : 0);
+        ledGlow.setAttribute('opacity', on ? Math.min(0.6, Math.abs(p._I || 0) * 16) : 0);
+      }
+    });
+  }
+
+  function paint() {
+    // подсветка выбранного и «сгоревших» бейджей
+    world.parts.forEach(function (p) {
+      var el = stage.querySelector('.part[data-id="' + p.id + '"]');
+      if (!el) return;
+      el.classList.toggle('selected', selected === p.id);
+    });
+  }
+
+  function pushSpark(f) {
+    var lamp = world.parts.find(function (p) { return p.type === 'lamp'; });
+    var U = lamp ? Math.abs(lamp._U || 0) : Math.abs(f.loadVoltage || 0);
+    var I = lamp ? Math.abs(lamp._I || 0) : Math.abs(f.loadCurrent || 0);
+    var P = lamp ? Math.abs(lamp._P || 0) : Math.abs(f.loadPower || 0);
+    sparkBuf.I.push(I); sparkBuf.U.push(U); sparkBuf.P.push(P);
+    ['I', 'U', 'P'].forEach(function (k) { if (sparkBuf[k].length > 90) sparkBuf[k].shift(); });
+  }
+
+  function drawSparks() {
+    ['I', 'U', 'P'].forEach(function (k) {
+      var arr = sparkBuf[k];
+      var svg = $('s' + k);
+      if (!arr.length) { svg.innerHTML = ''; return; }
+      var max = Math.max.apply(null, arr) || 1;
+      var pts = arr.map(function (v, i) {
+        return (i / (arr.length - 1 || 1) * 100).toFixed(1) + ',' + (16 - (v / max) * 14).toFixed(1);
+      }).join(' ');
+      var col = k === 'I' ? '#0b6e99' : k === 'U' ? '#1f9d6b' : '#f28c28';
+      svg.innerHTML = '<polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="1.4" opacity=".9"/>';
+    });
+  }
+
+  /* ================= сервисные кнопки ================= */
+  $('btnPlay').onclick = function () {
+    running = !running;
+    this.textContent = running ? '⏸' : '▶';
+    log('ok', running ? 'Модель запущена' : 'Пауза');
+  };
+  [].forEach.call(document.querySelectorAll('[data-speed]'), function (b) {
+    b.onclick = function () {
+      speed = +b.dataset.speed;
+      [].forEach.call(document.querySelectorAll('[data-speed]'), function (x) { x.classList.toggle('active', x === b); });
+      log('ok', 'Множитель времени ×' + speed);
+    };
+  });
+  $('btnMeasure').onclick = measure;
+  $('btnMeasure2').onclick = measure;
+  $('btnCsv').onclick = exportCsv;
+  $('btnPrint').onclick = function () { window.print(); };
+  $('btnClear').onclick = function () {
+    world = Lab.createWorld();
+    selected = null; pendingTerm = null; solved = {}; TASKS.forEach(function (t) { t._hints = []; });
+    world.journal = [];
+    log('warn', 'Стол очищен');
+    renderParts(); renderMeasurements(); renderJournal();
+    if (mode === 'task') renderTask();
+    sparkBuf = { I: [], U: [], P: [] };
+  };
+  $('btnDemo').onclick = function () {
+    world = Lab.createWorld();
+    selected = null; pendingTerm = null;
+    var w = stage.clientWidth, h = stage.clientHeight;
+    var cx = Math.max(230, Math.min(Math.max(230, w - 230), w / 2));
+    var top = Math.max(70, Math.min(h - 200, h * 0.26));
+    var bot = Math.max(top + 130, Math.min(h - 70, h * 0.6));
+    var spread = Math.min(250, Math.max(150, (w - 260) / 2));
+    var s = Lab.addPart(world, 'source', Math.max(16, cx - spread), bot - 28);
+    var k = Lab.addPart(world, 'key', cx - 38, top - 28);
+    var l = Lab.addPart(world, 'lamp', Math.min(w - 92, cx + spread - 76), bot - 28);
+    Lab.addWire(world, s.id + ':1', k.id + ':0');
+    Lab.addWire(world, k.id + ':1', l.id + ':0');
+    Lab.addWire(world, l.id + ':1', s.id + ':0');
+    world.journal = [];
+    log('ok', 'Собрана демонстрационная цепь: батарея → ключ → лампа');
+    log('ok', 'Ключ разомкнут. Двойной щелчок по ключу (или кнопка в инспекторе) замкнёт цепь.');
+    renderParts(); renderMeasurements(); renderJournal();
+    if (mode === 'task') renderTask();
+  };
+  $('btnZoomIn').onclick = function () { setZoom(zoom + 0.1); };
+  $('btnZoomOut').onclick = function () { setZoom(zoom - 0.1); };
+  function setZoom(z) {
+    zoom = Math.max(0.7, Math.min(1.5, z));
+    stage.style.backgroundSize = (22 * zoom) + 'px ' + (22 * zoom) + 'px';
+    var parts = stage.querySelector('.part');
+    if (parts) { parts.style.transformOrigin = '0 0'; }
+    toast('Масштаб ' + Math.round(zoom * 100) + ' %');
+  }
+
+  $('btnHelp').onclick = function () { $('help').classList.add('open'); };
+  $('btnCloseHelp').onclick = function () { $('help').classList.remove('open'); };
+  $('help').addEventListener('click', function (e) { if (e.target === $('help')) $('help').classList.remove('open'); });
+
+  // вкладки
+  [].forEach.call(document.querySelectorAll('.tabs button[data-tab]'), function (b) {
+    b.onclick = function () {
+      [].forEach.call(document.querySelectorAll('.tabs button[data-tab]'), function (x) { x.classList.toggle('active', x === b); });
+      $('tabJournal').hidden = b.dataset.tab !== 'journal';
+      $('tabMeas').hidden = b.dataset.tab !== 'meas';
+    };
+  });
+
+  // клавиатура
+  document.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'Escape') { pendingTerm = null; selected = null; $('help').classList.remove('open'); renderParts(); }
+    if (e.key === 'Delete' || e.key === 'Backspace') { if (selected) { deleteSelected(); e.preventDefault(); } }
+    if (e.code === 'Space') { $('btnPlay').click(); e.preventDefault(); }
+    if (e.key === 'm' || e.key === 'M' || e.key === 'ь') { measure(); }
+    if (e.key === 'Tab') {
+      var ids = world.parts.map(function (p) { return p.id; });
+      if (!ids.length) return;
+      var i = ids.indexOf(selected);
+      var next = (e.shiftKey ? i - 1 : i + 1 + ids.length) % ids.length;
+      if (i === -1) next = 0;
+      select(ids[e.ctrlKey || e.metaKey ? 0 : next]);
+      e.preventDefault();
+    }
+  });
+
+  window.addEventListener('resize', function () { syncTerms(); renderWires(); });
+
+  /* ================= переключение стендов ================= */
+  var bench = 'circuits';
+  window.__bench = 'circuits';
+  function setBench(name) {
+    bench = name;
+    window.__bench = name;
+    document.body.classList.toggle('renew', name === 'renew');
+    $('benchCircuits').hidden = name !== 'circuits';
+    $('benchRenew').hidden = name !== 'renew';
+    [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
+      b.classList.toggle('active', b.dataset.bench === name);
+    });
+    if (name === 'renew' && !window.__renewReady) {
+      window.__renewReady = true;
+      if (typeof window.__renInit === 'function') window.__renInit();
+    }
+    if (name === 'renew') {
+      // синхронизация размеров сцены после показа
+      window.dispatchEvent(new Event('resize'));
+    }
+  }
+  [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
+    b.onclick = function () {
+      if (b.disabled) return;
+      setBench(b.dataset.bench);
+      if (mode === 'task' && b.dataset.bench === 'renew') setMode('free');
+    };
+  });
+  window.__setBench = setBench;
+
+  /* ================= старт ================= */
+  renderPalette();
+  renderParts();
+  renderMeasurements();
+  renderJournal();
+  log('ok', 'Лаборатория открыта. Стенд «Электрические цепи».');
+  setMode('free');
+  requestAnimationFrame(function (t) { lastTick = t; frame(t); });
+
+  // небольшая демонстрация при первом запуске — пустой стол с подсказкой
+  window.__lab = { world: function () { return world; }, Lab: Lab, measure: measure, TASKS: TASKS, solved: function () { return solved; }, pending: function () { return pendingTerm; } };
+})();
+</script>
+</body>
+</html>
