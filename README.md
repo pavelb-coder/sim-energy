@@ -10,23 +10,20 @@
 
 ## Живая версия
 
-Сейчас (до включения CI) готовый файл лежит в репозитории — `dist/lab.html`:
-его можно скачать и открыть двойным кликом, интернет не нужен.
+Работает: **https://pavelb-coder.github.io/sim-energy/** (GitHub Pages, публикация из ветки `main`).
 
-**Как включить автопубликацию** (GitHub Pages, 20 секунд):
+Как это устроено: `index.html` в корне — это собранный стенд (`dist/lab.html`).
+После изменений в `src/` нужно обновить публикацию:
 
 ```bash
-mkdir -p .github/workflows
-git mv workflow-pages.template.yml .github/workflows/pages.yml
-git commit -m "CI: сборка и публикация на GitHub Pages"
-git push
+npm run build && cp dist/lab.html index.html && ./sync.sh -m "публикация"
 ```
 
-Затем один раз: **Settings → Pages → Source: GitHub Actions**.
-Страница появится по адресу `https://pavelb-coder.github.io/sim-energy/`.
+Хотите автоматическую сборку при каждом пуше — добавьте CI-файл
+`workflow-pages.template.yml` в `.github/workflows/pages.yml` (нужен токен со scope `workflow`)
+и переключите Pages на **Source: GitHub Actions**.
 
-Шаблон лежит в корне, потому что токен, которым залит проект, не имеет scope `workflow` —
-GitHub не принимает пуш файлов в `.github/workflows/` от такого токена.
+Офлайн-вариант: `dist/lab.html` можно скачать и открыть двойным кликом — сервер не нужен.
 
 ## Что уже работает
 
