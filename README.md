@@ -10,13 +10,23 @@
 
 ## Живая версия
 
-После первого пуша в `main` GitHub Actions соберёт и опубликует страницу:
+Сейчас (до включения CI) готовый файл лежит в репозитории — `dist/lab.html`:
+его можно скачать и открыть двойным кликом, интернет не нужен.
 
-```
-https://pavelb-coder.github.io/sim-energy/
+**Как включить автопубликацию** (GitHub Pages, 20 секунд):
+
+```bash
+mkdir -p .github/workflows
+git mv workflow-pages.template.yml .github/workflows/pages.yml
+git commit -m "CI: сборка и публикация на GitHub Pages"
+git push
 ```
 
-(в настройках репозитория нужно один раз выбрать **Settings → Pages → Source: GitHub Actions**)
+Затем один раз: **Settings → Pages → Source: GitHub Actions**.
+Страница появится по адресу `https://pavelb-coder.github.io/sim-energy/`.
+
+Шаблон лежит в корне, потому что токен, которым залит проект, не имеет scope `workflow` —
+GitHub не принимает пуш файлов в `.github/workflows/` от такого токена.
 
 ## Что уже работает
 
