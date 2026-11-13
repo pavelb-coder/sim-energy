@@ -29,11 +29,41 @@ npm run build && cp dist/lab.html index.html && ./sync.sh -m "публикаци
 ## Локальный запуск (порт 8082)
 
 Как в `sim-chemistry`: тот же лёгкий сервер на Node без зависимостей.
+Готовые скрипты лежат в корне проекта — они сами находят Node.js, а если его нет,
+переключаются на Python или открывают готовую сборку.
+
+### Windows
+
+| Способ | Что делать |
+|---|---|
+| Двойной клик | `start.bat` — запускает сервер и печатает адрес |
+| PowerShell | `powershell -ExecutionPolicy Bypass -File .\start.ps1` |
+| Командная строка | `npm start` (нужен установленный [Node.js](https://nodejs.org), LTS) |
+
+Откройте в браузере **http://localhost:8082** (адрес печатается в консоли). Порт можно поменять:
+`set PORT=9000 && start.bat`. Остановка — `Ctrl+C` в окне консоли.
+
+### Ubuntu / Linux / macOS
 
 ```bash
-npm start                # или: node server.js
-# открыть http://localhost:8082
+chmod +x start.sh      # один раз
+./start.sh             # или PORT=9000 ./start.sh
 ```
+
+Если Node.js не установлен:
+
+```bash
+sudo apt update && sudo apt install -y nodejs     # Ubuntu 22.04+
+# либо без Node вовсе:
+./start.sh --python                                # нужен python3
+```
+
+Проверка версий: `node -v` (нужен 18+), `python3 -V` (любой 3.x).
+
+### Если сервер не нужен
+
+`dist/lab.html` — полностью автономный файл: его можно скопировать на флешку и открыть
+двойным кликом в любом браузере, интернет и установка чего-либо не требуются.
 
 - Порт меняется переменной: `PORT=9000 npm start`.
 - Адреса-псевдонимы: `/`, `/lab`, `/lab.html`, `/sim` → собранный стенд, `/dist` → `dist/lab.html`.
@@ -119,6 +149,9 @@ src/smoke_renew.py   сквозные проверки стенда ВИЭ
 src/smoke_all.py     сквозные проверки всех четырёх стендов
 src/ui.js            хелперы записи в DOM с кэшем (text/html/attr/cls) — меньше перерисовок
 server.js            локальный сервер статики (порт 8082, brotli/gzip, без зависимостей)
+start.bat            запуск на Windows двойным кликом (CMD)
+start.ps1            запуск на Windows в PowerShell
+start.sh             запуск на Ubuntu/Linux/macOS (+ режим --python без Node)
 tools/build.mjs      сборка src/* -> dist/lab.html (единый файл, офлайн)
 docs/                техническое задание
 ```

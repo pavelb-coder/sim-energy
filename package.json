@@ -8,7 +8,8 @@
     "serve": "node server.js",
     "build": "node tools/build.mjs",
     "test": "node src/test_engine.js && node src/test_renew.js && node src/test_storage.js && node src/test_efficiency.js",
-    "test:renew": "node src/test_renew.js"
+    "test:renew": "node src/test_renew.js",
+    "start:win": "node server.js"
   },
   "license": "MIT",
   "main": "server.js",
