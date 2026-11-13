@@ -96,7 +96,7 @@
       <div class="sstage" id="stStage">
         <svg class="scene" viewBox="0 0 760 380" preserveAspectRatio="xMidYMid meet">
           <defs>
-            <linearGradient id="cellFill" x1="0" y1="1" x2="0" y2="0">
+            <linearGradient id="cellFillG" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stop-color="#8fe0b8"/><stop offset="100%" stop-color="#1f9d6b"/>
             </linearGradient>
             <linearGradient id="cellWarm" x1="0" y1="1" x2="0" y2="0">
@@ -108,7 +108,7 @@
           <g id="gCell" transform="translate(120,190)">
             <rect x="-62" y="-96" width="124" height="192" rx="14" fill="#fff" stroke="#7a8fa0" stroke-width="2.5"/>
             <rect x="-20" y="-108" width="40" height="14" rx="4" fill="#7a8fa0"/>
-            <rect id="cellFill" x="-56" y="90" width="112" height="0" rx="8" fill="url(#cellFill)" style="transition:height .12s,y .12s"/>
+            <rect id="cellFill" x="-56" y="90" width="112" height="0" rx="8" fill="url(#cellFillG)" style="transition:height .12s,y .12s"/>
             <g id="cellBolt" opacity="0">
               <path d="M-4 -44 L12 -44 L-2 -12 L12 -12 L-12 34 L-4 -6 L-16 -6 Z" fill="#ffd166" stroke="#e8a93a"/>
             </g>
@@ -412,7 +412,7 @@
     var fill = $('cellFill');
     UI.attr(fill, 'height', h.toFixed(1));;
     UI.attr(fill, 'y', (90 - h).toFixed(1));;
-    UI.attr(fill, 'fill', st.storage === 'cap' ? 'url(#cellWarm)' : (st.soc < 0.2 ? 'url(#cellWarm)' : 'url(#cellFill)'));;
+    UI.attr(fill, 'fill', st.storage === 'cap' ? 'url(#cellWarm)' : (st.soc < 0.2 ? 'url(#cellWarm)' : 'url(#cellFillG)'));;
     UI.text($('cellPct'), Math.round(socPct * 100) + ' %');
     UI.text($('cellType'), st.storage === 'cap' ? 'Ионистор 10 Ф' : T.name);
     UI.text($('cellTemp'), Math.round(st.temp) + ' °C' + (st.temp > T.tempMax ? ' · перегрев' : ''));

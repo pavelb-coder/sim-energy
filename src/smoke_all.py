@@ -54,7 +54,29 @@ async def main():
         print('цепи живы:', await pg.evaluate("()=>window.__lab.world().parts.length"))
         await pg.click('.benchnav button[data-bench="renew"]'); await pg.wait_for_timeout(600)
         print('ВИЭ живы:', await pg.evaluate("()=>+window.__renew.facts().pv.toFixed(1)"), 'Вт')
+
+        # --- регресс-проверка: нет дублей id и индикаторы АКБ обновляются ---
+        dups = await pg.evaluate("""()=>{
+          const m={}; document.querySelectorAll('[id]').forEach(e=>{m[e.id]=(m[e.id]||0)+1;});
+          return Object.entries(m).filter(([k,v])=>v>1);
+        }""")
+        print('дубликаты id:', dups or 'нет')
+        batt = await pg.evaluate("""async()=>{
+          const st=window.__renew.state();
+          const el=()=>document.querySelector('rect#battFill');
+          st.soc=1; await new Promise(r=>setTimeout(r,350));
+          const full=[el().getAttribute('width'), el().getAttribute('fill')];
+          st.soc=0.05; await new Promise(r=>setTimeout(r,350));
+          const low=[el().getAttribute('width'), el().getAttribute('fill')];
+          st.soc=0.5; await new Promise(r=>setTimeout(r,200));
+          return {full, low, hue:full[1]!==low[1] && Number(full[0])>Number(low[0])};
+        }""")
+        print('индикатор АКБ ВИЭ:', batt)
+        if dups or not batt['hue']:
+            errs.append('АКБ/иконки: индикатор не обновляется или есть дубли id')
         print('ОШИБКИ:', errs[:8])
+        if errs:
+            raise SystemExit(1)
         await b.close()
 
 asyncio.run(main())

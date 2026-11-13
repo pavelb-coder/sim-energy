@@ -287,7 +287,7 @@
       <line x1="10" y1="28" x2="24" y2="28"/><line x1="52" y1="28" x2="66" y2="28"/>
       <circle cx="38" cy="28" r="14" fill="#fff"/>
       <text x="38" y="33" text-anchor="middle" font-size="14" fill="#33475a" stroke="none" font-family="sans-serif">W</text></g></symbol>
-    <radialGradient id="lampGlow"><stop offset="0%" stop-color="#ffd479" stop-opacity=".95"/><stop offset="100%" stop-color="#ffb347" stop-opacity="0"/></radialGradient>
+    <radialGradient id="lampGlowG"><stop offset="0%" stop-color="#ffd479" stop-opacity=".95"/><stop offset="100%" stop-color="#ffb347" stop-opacity="0"/></radialGradient>
   </defs>
 </svg>
 <div class="app">
@@ -658,7 +658,7 @@
       var bright = p.type === 'lamp' ? Lab.lampBrightness(p) : 0;
       var glow = '';
       if (p.type === 'lamp' && bright > 0.02) {
-        glow = '<circle cx="38" cy="28" r="' + (16 + bright * 10) + '" fill="url(#lampGlow)" opacity="' + Math.min(0.85, bright) + '"/>';
+        glow = '<circle cx="38" cy="28" r="' + (16 + bright * 10) + '" fill="url(#lampGlowG)" opacity="' + Math.min(0.85, bright) + '"/>';
       }
       var extra = '';
       if (p.type === 'lamp' && p.state.burned) extra = '<path d="M31 21 L45 35 M45 21 L31 35" stroke="#d64545" stroke-width="2.4"/>';
@@ -1520,7 +1520,7 @@
         if (!g) {
           g = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
           UI.attr(g, 'class', 'glow');; UI.attr(g, 'cx', 38);; UI.attr(g, 'cy', 28);;
-          UI.attr(g, 'fill', 'url(#lampGlow)');;
+          UI.attr(g, 'fill', 'url(#lampGlowG)');;
           svg.insertBefore(g, svg.firstChild);
         }
         UI.attr(g, 'r', 16 + bright * 12);;
