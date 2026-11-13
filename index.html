@@ -13,6 +13,7 @@
     --r:10px;
   }
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   html,body{height:100%}
   body{
     margin:0;background:var(--bg);color:var(--ink);
@@ -255,8 +256,8 @@
     <nav class="benchnav" aria-label="Стенды">
       <button class="active" data-bench="circuits">Электрические цепи</button>
       <button data-bench="renew">Возобновляемая энергетика</button>
-      <button disabled title="Стенд следующей версии">Накопители <em>v3</em></button>
-      <button disabled title="Стенд следующей версии">Эффективность <em>v3</em></button>
+      <button data-bench="storage">Накопители</button>
+      <button data-bench="efficiency">Эффективность</button>
     </nav>
     <div class="grow"></div>
     <div class="modes" role="tablist" aria-label="Режим работы">
@@ -377,6 +378,8 @@
   </div>
 
   <main id="benchRenew" hidden></main>
+  <main id="benchStorage" hidden></main>
+  <main id="benchEfficiency" hidden></main>
 </div>
 
 <div class="modal" id="help">
@@ -1294,7 +1297,8 @@
   'use strict';
   var R = window.Renew;
   if (!R || !document.getElementById('benchRenew')) return;
-  window.__renInit = function () { init(); };
+  var inited = false;
+  window.__renInit = function () { if (inited) return; inited = true; init(); };
   function init() {
 
   var $ = function (id) { return document.getElementById(id); };
@@ -1941,6 +1945,1637 @@
     setHour: function (h) { st.hour = h; $('sHour').value = h; renderControls(); renderChart(); }
   };
   }   // init
+})();
+</script>
+<script>/* ============================================================
+   Энерджиквантум · storage.js
+   Модель стенда «Накопители и преобразователи»
+   Не зависит от DOM — тестируется в Node.
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  // Параметры накопителей: напряжение, ёмкость, внутреннее сопротивление, пределы
+  const TYPES = {
+    liion: {
+      name: 'Li-ion 18650', short: 'Li-ion', nominal: 3.7, full: 4.2, empty: 3.0,
+      capAh: 2.6, rInt: 0.08, maxC: 1.0, maxChargeC: 1.0, eff: 0.95, tempMax: 45, cycles: 500
+    },
+    lifepo4: {
+      name: 'LiFePO₄ 6 А·ч', short: 'LiFePO₄', nominal: 3.2, full: 3.65, empty: 2.8,
+      capAh: 6, rInt: 0.05, maxC: 1.0, maxChargeC: 1.0, eff: 0.96, tempMax: 45, cycles: 2000
+    },
+    lead: {
+      name: 'Свинцовый 12 В · 7 А·ч', short: 'Pb', nominal: 12, full: 13.8, empty: 11.0,
+      capAh: 7, rInt: 0.03, maxC: 0.5, maxChargeC: 0.25, eff: 0.85, tempMax: 40, cycles: 300
+    }
+  };
+
+  const LOADS = {
+    lamp: { name: 'Лампа 5 Вт', power: 5, kind: 'dc' },
+    motor: { name: 'Двигатель 20 Вт', power: 20, kind: 'dc' },
+    impulse: { name: 'Импульсная нагрузка 50 Вт', power: 50, kind: 'impulse', duty: 0.1 },
+    inverter: { name: 'Инвертор 220 В · 60 Вт', power: 60, kind: 'ac' }
+  };
+
+  const CAP = { C: 10, name: 'Ионистор 10 Ф' };   // суперконденсатор
+
+  function createState() {
+    return {
+      type: 'liion',
+      soc: 0.5,
+      temp: 25,
+      chargeOn: false,
+      chargeC: 0.5,            // ток заряда в долях ёмкости (C-rate)
+      load: 'lamp',
+      loadOn: true,
+      converter: 'buck',       // buck | boost | none
+      duty: 0.42,              // скважность ШИМ
+      inverterOn: false,
+      storage: 'battery',      // battery | cap
+      capVoltage: 12,
+      t: 0,
+      energyIn: 0, energyOut: 0,
+      measures: [],
+      log: [],
+      i: 0, u: 0, p: 0, loadP: 0,
+      eff: 0,
+      warn: [],
+      wave: []
+    };
+  }
+
+  function typeOf(st) { return TYPES[st.type]; }
+
+  /* ---------- кривая напряжения от SoC (кусочно-линейная) ---------- */
+
+  function openCircuitVoltage(st) {
+    const T = typeOf(st);
+    const soc = Math.max(0, Math.min(1, st.soc));
+    // характерная «полка» литиевых и линейный участок свинцовых
+    const pts = st.type === 'lead'
+      ? [[0, 11.0], [0.2, 11.8], [0.5, 12.2], [0.8, 12.6], [1.0, 12.9]]
+      : [[0, T.empty], [0.1, T.empty + 0.25], [0.5, T.nominal + 0.05], [0.9, T.nominal + 0.3], [1.0, T.full]];
+    for (let i = 1; i < pts.length; i++) {
+      if (soc <= pts[i][0]) {
+        const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+        const k = (soc - x0) / (x1 - x0);
+        return y0 + k * (y1 - y0);
+      }
+    }
+    return pts[pts.length - 1][1];
+  }
+
+  function capacityWh(st) { return typeOf(st).capAh * typeOf(st).nominal; }
+
+  function storedWh(st) { return capacityWh(st) * st.soc; }
+
+  /* ---------- преобразователи ---------- */
+
+  function buckVoltage(st) { return openCircuitVoltage(st) * st.duty; }
+
+  function converterEfficiency(st) {
+    // buck/boost: КПД зависит от тока; инвертор — от загрузки
+    if (st.load === 'inverter') {
+      const P = LOADS.inverter.power;
+      const load = Math.max(0.05, st.loadP / P);
+      return 0.72 + 0.22 * Math.min(1, load) - 0.06 * Math.max(0, load - 0.8);  // 72 % при малой, до 94 %
+    }
+    const P = loadPower(st);
+    const nominal = 20;
+    const ratio = Math.min(1.5, P / nominal);
+    return 0.82 + 0.12 * Math.min(1, ratio);   // 82…94 %
+  }
+
+  function loadPower(st) {
+    if (st.storage === 'cap') return LOADS[st.load].power;
+    const L = LOADS[st.load];
+    return st.loadOn ? L.power * (L.duty || 1) : 0;
+  }
+
+  /* ---------- заряд CC/CV ---------- */
+
+  function chargeCurrent(st) {
+    const T = typeOf(st);
+    const iMax = T.capAh * st.chargeC;
+    const v = openCircuitVoltage(st);
+    if (!st.chargeOn) return 0;
+    if (v >= T.full - 0.001) return 0;                 // отсечка по напряжению
+    // CV-режим: чем ближе к полному, тем меньше ток
+    if (st.soc < 0.8) return iMax;                       // CC: постоянный ток
+    const k = Math.max(0, 1 - (st.soc - 0.8) / 0.2);      // CV: ток линейно падает
+    return iMax * k;
+  }
+
+  /* ---------- шаг модели ---------- */
+
+  function step(st, dtReal, speed) {
+    // 1 модельная минута за 1 реальную секунду при ×1
+    const dMin = dtReal * speed * 1;
+    const dtH = dMin / 60;   // модельные часы за шаг
+    st.t += dtReal;
+    const T = typeOf(st);
+
+    // 1. нагрев от протекающего тока и охлаждение
+    let iNow = 0;
+
+    // 2. заряд
+    const iC = chargeCurrent(st);
+    if (iC > 0 && st.storage === 'battery') {
+      const add = iC * dtH * 0.95 / T.capAh;            // прирост SoC
+      st.soc = Math.min(1, st.soc + add);
+      iNow = iC;
+      st.energyIn += iC * T.nominal * dtH;
+    }
+
+    // 3. разряд под нагрузкой
+    const Pout = loadPower(st);
+    st.loadP = Pout;
+    if (Pout > 0) {
+      if (st.storage === 'cap') {
+        // ионистор: E = ½CU², разряд линейно по энергии
+        const E = 0.5 * CAP.C * st.capVoltage * st.capVoltage;   // Дж
+        const used = Pout * dtReal * speed * 0.25;               // ускоренная шкала
+        const Enew = Math.max(0, E - used);
+        st.capVoltage = Math.sqrt(2 * Enew / CAP.C);
+        st.i = Pout / Math.max(1, st.capVoltage);
+        st.u = st.capVoltage;
+        st.p = Pout;
+        st.energyOut += used / 3600;
+        st.soc = Enew / (0.5 * CAP.C * 12 * 12);
+        st.loadP = Enew > 0.5 ? Pout : 0;
+        return st;
+      }
+      const eff = converterEfficiency(st);
+      st.eff = eff;
+      const v = openCircuitVoltage(st);
+      const iLoad = Pout / eff / Math.max(0.5, v);   // ток из накопителя
+      iNow = Math.max(iNow, iLoad);
+      const drop = iLoad * dtH / 0.95 / T.capAh;
+      st.soc = Math.max(0, st.soc - drop);
+      st.energyOut += Pout * dtH;
+    } else {
+      st.eff = converterEfficiency(st);
+    }
+
+    // 4. температура: нагрев I²R + саморазогрев при заряде, охлаждение к среде
+    const heat = iNow * iNow * T.rInt;                        // Вт тепла на внутреннем сопротивлении
+    const dTemp = (heat * 1.6 * dMin - (st.temp - 25) * 0.35 * dMin);   // нагрев/охлаждение за модельную минуту
+    st.temp = Math.max(25, Math.min(80, st.temp + dTemp));
+
+    // 5. мгновенные показания
+    const vNow = openCircuitVoltage(st);
+    st.i = iNow;
+    st.u = st.storage === 'cap' ? st.capVoltage : vNow - iNow * T.rInt;
+    st.p = st.u * iNow;
+
+    // 6. предупреждения BMS
+    st.warn = [];
+    if (iNow > T.capAh * T.maxC) st.warn.push('ток разряда выше ' + T.maxC + 'C');
+    if (iC > T.capAh * T.maxChargeC) st.warn.push('ток заряда выше ' + T.maxChargeC + 'C');
+    if (st.temp > T.tempMax) st.warn.push('перегрев: ' + Math.round(st.temp) + ' °C');
+    if (st.soc <= 0.02 && Pout > 0) st.warn.push('глубокий разряд');
+
+    return st;
+  }
+
+  /* ---------- формы сигналов для осциллографа ---------- */
+
+  function waveform(st, points) {
+    const n = points || 120;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const phase = i / n;
+      let v = 0;
+      if (st.load === 'inverter' && st.inverterOn) {
+        // чистая синусоида 50 Гц (на экране — 2 периода)
+        v = Math.sin(phase * 4 * Math.PI) * 230 * Math.sqrt(2) * 0.5;
+      } else if (st.converter !== 'none') {
+        // ШИМ: меандр со скважностью D
+        v = (phase % 1) < st.duty ? openCircuitVoltage(st) : 0;
+      }
+      out.push(v);
+    }
+    return out;
+  }
+
+  /* ---------- факты для заданий ---------- */
+
+  function facts(st) {
+    const T = typeOf(st);
+    const Pout = loadPower(st);
+    const eff = converterEfficiency(st);
+    const f = {
+      type: st.type,
+      soc: st.soc,
+      volt: openCircuitVoltage(st),
+      terminal: st.u,
+      temp: st.temp,
+      current: st.i,
+      power: st.p,
+      loadP: Pout,
+      eff: eff,
+      buckV: buckVoltage(st),
+      duty: st.duty,
+      capacityWh: capacityWh(st),
+      storedWh: storedWh(st),
+      energyIn: st.energyIn,
+      energyOut: st.energyOut,
+      autonomyH: Pout > 0 ? storedWh(st) / (Pout / eff) : 0,
+      warnings: st.warn.slice(),
+      measures: st.measures.slice(),
+      chargeMeasures: st.measures.filter(function (m) { return m.kind === 'charge'; }),
+      dischargeRuns: st.measures.filter(function (m) { return m.kind === 'discharge'; }),
+      effMeasures: st.measures.filter(function (m) { return m.kind === 'eff'; }),
+      capMeasures: st.measures.filter(function (m) { return m.kind === 'cap'; }),
+      lampRuns: st.measures.filter(function (m) { return m.kind === 'autonomy' && m.load === 'lamp'; }),
+      maxTemp: st.measures.reduce(function (a, m) { return Math.max(a, m.temp || 0); }, st.temp),
+      capEnergyJ: 0.5 * CAP.C * st.capVoltage * st.capVoltage
+    };
+    // разброс отданной ёмкости при разных токах
+    const d = f.dischargeRuns;
+    if (d.length >= 2) {
+      const a = d.reduce(function (x, m) { return m.cRate > x.cRate ? m : x; }, d[0]);
+      const b = d.reduce(function (x, m) { return m.cRate < x.cRate ? m : x; }, d[0]);
+      f.dischargeRatio = b.wh > 0 ? a.wh / b.wh : 0;
+      f.dischargeDelta = b.wh - a.wh;
+    }
+    return f;
+  }
+
+  /* ---------- задания ---------- */
+
+  const TASKS = [
+    {
+      t: 'Полный заряд без перегрева',
+      goal: 'Зарядите аккумулятор с 50 % до 100 % так, чтобы температура не превысила 45 °C, а ток заряда — 1C.',
+      steps: ['Включите заряд и задайте ток.', 'Следите за температурой и током.', 'Дождитесь полного заряда.'],
+      hints: ['Ток заряда задаётся в долях ёмкости: 1C для Li-ion 2,6 А·ч — это 2,6 А.',
+              'Чем больше ток, тем сильнее нагрев: Q = I²·Rвн.',
+              'Свинцовый аккумулятор не любит быстрый заряд — не больше 0,25C.'],
+      check: function (f) { return f.soc >= 0.99 && f.maxTemp <= 45 && f.warnings.length === 0; },
+      stars: function (f) { return f.maxTemp <= 35 ? 3 : (f.maxTemp <= 45 ? 2 : 1); },
+      why: 'Заряд идёт в два этапа: сначала постоянным током (CC), затем при постоянном напряжении (CV) ток сам падает. Перегрев выше 45 °C ускоряет износ и опасен.'
+    },
+    {
+      t: 'Кривая разряда при разных токах',
+      goal: 'Разрядите аккумулятор дважды: при 0,5C и при 1C. При большем токе отданная энергия должна быть меньше.',
+      steps: ['Включите нагрузку «лампа» и снимите точку разряда.', 'Увеличьте ток (нагрузка мощнее) и повторите.', 'Сравните отданную энергию.'],
+      hints: ['Нагрузка «лампа 5 Вт» — это примерно 0,5C для элемента 2,6 А·ч.',
+              'Кнопка «Снять точку» пишет ток, напряжение, температуру и отданную энергию.',
+              'Разница появляется из-за внутреннего сопротивления: часть энергии уходит в тепло.'],
+      check: function (f) { return f.dischargeRuns.length >= 2 && f.dischargeRatio < 0.97; },
+      stars: function (f) {
+        if (!(f.dischargeRuns.length >= 2 && f.dischargeRatio < 0.97)) return 1;
+        return f.dischargeRuns.length >= 3 ? 3 : 2;
+      },
+      why: 'При большем токе часть энергии теряется на внутреннем сопротивлении (I²R) и напряжение проседает быстрее — отданная ёмкость падает.'
+    },
+    {
+      t: 'Время автономии',
+      goal: 'Рассчитайте и измерьте время работы лампы 5 Вт от полностью заряженного аккумулятора. Расхождение — не более 10 %.',
+      steps: ['Зарядите аккумулятор до 100 %.', 'Включите лампу и заметьте время.', 'Сравните с расчётом E/(P/КПД).'],
+      hints: ['Энергия = ёмкость (А·ч) × напряжение (В). Для Li-ion 2,6 А·ч это 9,6 Вт·ч.',
+              'Учитывайте КПД преобразователя — он ниже 100 %.',
+              'Кнопка «Снять точку» фиксирует расчётное время автономии.'],
+      check: function (f) { return f.lampRuns.length >= 1 && f.lampRuns.some(function (m) { return m.autonomyH > 0; }); },
+      stars: function (f) {
+        const m = f.lampRuns[f.lampRuns.length - 1];
+        if (!m) return 1;
+        const err = Math.abs(m.autonomyH - m.autonomyCalc) / Math.max(m.autonomyCalc, 0.01);
+        return err <= 0.05 ? 3 : (err <= 0.1 ? 2 : 1);
+      },
+      why: 'Время автономии = запас энергии × КПД / мощность нагрузки. Реальная ёмкость всегда меньше паспортной, поэтому расчёт — это верхняя оценка.'
+    },
+    {
+      t: 'Импульсная нагрузка: батарея или ионистор',
+      goal: 'Снимите точку с батареи и с ионистора при импульсной нагрузке. Сравните просадку напряжения.',
+      steps: ['Выберите нагрузку «импульсная».', 'Снимите точку с аккумулятором.', 'Переключитесь на ионистор и повторите.'],
+      hints: ['Ионистор держит большие токи: E = ½·C·U².',
+              'У батареи напряжение проседает на I·Rвн — это и есть просадка.',
+              'Кнопка «Снять точку» записывает выбранный накопитель.'],
+      check: function (f) { return f.capMeasures.length >= 1 && f.measures.some(function (m) { return m.kind === 'discharge' && m.load === 'impulse'; }); },
+      stars: function (f) { return (f.capMeasures.length >= 1 && f.dischargeRuns.some(function (m) { return m.load === 'impulse'; })) ? 3 : 1; },
+      why: 'Батарея оптимизирована под энергию, ионистор — под мощность. Для коротких импульсов ионистор отдаёт ток без глубокой просадки и не изнашивается.'
+    },
+    {
+      t: 'Настроить понижающий преобразователь',
+      goal: 'Настройте buck так, чтобы получить 5,0 В от свинцового аккумулятора 12 В, и снимите КПД.',
+      steps: ['Выберите свинцовый аккумулятор.', 'Подберите скважность ШИМ.', 'Снимите точку КПД.'],
+      hints: ['Buck: Uвых = D · Uвх, значит D = 5 / 12 ≈ 0,42.',
+              'КПД buck — 82…94 % в зависимости от тока нагрузки.',
+              'Проверьте выходное напряжение в индикаторе преобразователя.'],
+      check: function (f) { return f.type === 'lead' && f.buckV >= 4.75 && f.buckV <= 5.25 && f.effMeasures.length >= 1; },
+      stars: function (f) {
+        if (!(f.type === 'lead' && f.buckV >= 4.75 && f.buckV <= 5.25 && f.effMeasures.length >= 1)) return 1;
+        return (f.buckV >= 4.9 && f.buckV <= 5.1) ? 3 : 2;
+      },
+      why: 'Понижающий преобразователь «рубит» входное напряжение ключом: среднее на выходе равно U·D. КПД определяется потерями в ключе и дросселе.'
+    },
+    {
+      t: 'КПД инвертора',
+      goal: 'Снимите КПД инвертора при трёх уровнях нагрузки: лампа, двигатель, импульсная. Найдите, где КПД выше.',
+      steps: ['Включите инвертор и нагрузку «лампа».', 'Снимите точку.', 'Повторите с двигателем и импульсной нагрузкой.'],
+      hints: ['КПД инвертора зависит от загрузки: на малой мощности он низкий.',
+              'Три точки — три разных нагрузки.',
+              'Кнопка «Снять точку» пишет КПД в протокол.'],
+      check: function (f) { return f.effMeasures.length >= 3; },
+      stars: function (f) { return f.effMeasures.length >= 3 && f.effMeasures.some(function (m) { return m.eff >= 0.88; }) ? 3 : 2; },
+      why: 'У инвертора есть «холостой ход»: собственное потребление 3–8 Вт. На малой нагрузке оно съедает большую долю, поэтому КПД растёт с загрузкой.'
+    }
+  ];
+
+  const API = {
+    TYPES: TYPES, LOADS: LOADS, CAP: CAP, TASKS: TASKS,
+    createState: createState, step: step, facts: facts,
+    openCircuitVoltage: openCircuitVoltage, capacityWh: capacityWh, storedWh: storedWh,
+    chargeCurrent: chargeCurrent, loadPower: loadPower, converterEfficiency: converterEfficiency,
+    buckVoltage: buckVoltage, waveform: waveform
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.Storage = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* ============================================================
+   Энерджиквантум · storage.ui.js
+   Интерфейс стенда «Накопители и преобразователи»
+   ============================================================ */
+(function () {
+  'use strict';
+  var S = window.Storage;
+  if (!S || !document.getElementById('benchStorage')) return;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var st = S.createState();
+  var run = { playing: true, speed: 1 };
+  var solved = {}, taskIndex = 0, lastFacts = null, lastTick = 0, taskTick = 0;
+  var waveT = 0;
+
+  var css = document.createElement('style');
+  css.textContent = `
+  .stor main{display:grid;grid-template-columns:238px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
+  .stor .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .stor .seg button{flex:1;padding:4px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
+  .stor .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .stor .fld{margin-bottom:9px}
+  .stor .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:2px}
+  .stor .fld .top b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .stor input[type=range]{width:100%}
+  .stor .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:4px 0}
+  .stor .chk input{width:15px;height:15px;accent-color:var(--accent)}
+  .sstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#fbfdfe;overflow:hidden}
+  .sstage svg.scene{width:100%;height:100%;display:block}
+  .scope{padding:6px 9px 9px}
+  .scope canvas{width:100%;height:104px;display:block;background:#f7fafc;border:1px solid var(--line);border-radius:8px}
+  .warnchip{display:inline-block;background:#fdecec;border:1px solid #f3bcbc;color:#a02020;border-radius:6px;padding:1px 6px;font-size:10.5px;margin:2px 3px 0 0}
+  @media (max-width:980px){.stor main{grid-template-columns:1fr}.sstage{min-height:380px}}
+  `;
+  document.head.appendChild(css);
+
+  var main = $('benchStorage');
+  main.className = 'stor';
+  main.innerHTML = `
+    <aside class="panel rctl">
+      <h2>Накопитель</h2>
+      <div class="grp">
+        <div class="fld"><span class="top"><span>Тип</span></span>
+          <div class="seg" id="segType">
+            <button data-type="liion" class="active">Li-ion</button>
+            <button data-type="lifepo4">LiFePO₄</button>
+            <button data-type="lead">Pb</button>
+            <button data-type="cap">Ионистор</button>
+          </div></div>
+        <div class="fld"><span class="top"><span>Заряд</span><b id="vSoc">50 %</b></span>
+          <div class="bar" style="margin-bottom:6px"><i id="socBar" style="width:50%"></i></div>
+          <button class="btn tiny" id="btnFull" style="width:100%">Поставить заряд 100 %</button></div>
+        <label class="chk"><input type="checkbox" id="chargeOn">Заряд включён (CC/CV)</label>
+        <div class="fld"><span class="top"><span>Ток заряда</span><b id="vChargeC">0,5C</b></span>
+          <input type="range" id="sChargeC" min="0.1" max="1.5" step="0.1" value="0.5"></div>
+      </div>
+      <div class="grp">
+        <div class="gl" style="font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;font-weight:600">Нагрузка и преобразователь</div>
+        <div class="fld"><span class="top"><span>Нагрузка</span></span>
+          <div class="seg" id="segLoad" style="flex-wrap:wrap">
+            <button data-load="lamp" class="active">Лампа</button>
+            <button data-load="motor">Двигатель</button>
+            <button data-load="impulse">Импульс</button>
+            <button data-load="inverter">Инвертор</button>
+          </div></div>
+        <label class="chk"><input type="checkbox" id="loadOn" checked>Нагрузка подключена</label>
+        <div class="fld"><span class="top"><span>Преобразователь</span></span>
+          <div class="seg" id="segConv">
+            <button data-conv="none">нет</button>
+            <button data-conv="buck" class="active">buck</button>
+            <button data-conv="boost">boost</button>
+          </div></div>
+        <div class="fld"><span class="top"><span>Скважность D</span><b id="vDuty">0,42</b></span>
+          <input type="range" id="sDuty" min="0.05" max="0.95" step="0.01" value="0.42"></div>
+        <label class="chk"><input type="checkbox" id="invOn">Инвертор 220 В включён</label>
+      </div>
+      <div class="grp">
+        <button class="btn primary" id="btnDischarge" style="width:100%;margin-bottom:6px">Прогнать полный разряд</button>
+        <button class="btn" id="btnReset" style="width:100%">Сбросить опыт</button>
+      </div>
+    </aside>
+
+    <section class="stagewrap">
+      <div class="timebar panel">
+        <div class="grp">
+          <button id="stPlay" title="Пауза / пуск">⏸</button>
+          <button data-sspeed="1" class="active">×1</button>
+          <button data-sspeed="2">×2</button>
+          <button data-sspeed="4">×4</button>
+        </div>
+        <div class="clock">модельное время: <b id="stClock">0 мин</b></div>
+        <div class="grow"></div>
+        <button class="btn primary" id="stSample">＋ Снять точку</button>
+      </div>
+
+      <div class="sstage" id="stStage">
+        <svg class="scene" viewBox="0 0 760 380" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="cellFill" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#8fe0b8"/><stop offset="100%" stop-color="#1f9d6b"/>
+            </linearGradient>
+            <linearGradient id="cellWarm" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#ffd08a"/><stop offset="100%" stop-color="#e8850c"/>
+            </linearGradient>
+          </defs>
+
+          <!-- накопитель -->
+          <g id="gCell" transform="translate(120,190)">
+            <rect x="-62" y="-96" width="124" height="192" rx="14" fill="#fff" stroke="#7a8fa0" stroke-width="2.5"/>
+            <rect x="-20" y="-108" width="40" height="14" rx="4" fill="#7a8fa0"/>
+            <rect id="cellFill" x="-56" y="90" width="112" height="0" rx="8" fill="url(#cellFill)" style="transition:height .12s,y .12s"/>
+            <g id="cellBolt" opacity="0">
+              <path d="M-4 -44 L12 -44 L-2 -12 L12 -12 L-12 34 L-4 -6 L-16 -6 Z" fill="#ffd166" stroke="#e8a93a"/>
+            </g>
+            <text id="cellPct" x="0" y="-64" text-anchor="middle" font-size="26" font-weight="700" fill="#1f2a36" font-family="sans-serif">50 %</text>
+            <text id="cellType" x="0" y="118" text-anchor="middle" font-size="11.5" fill="#5a6772" font-family="sans-serif">Li-ion 18650</text>
+            <text id="cellTemp" x="0" y="134" text-anchor="middle" font-size="11" fill="#8a97a3" font-family="sans-serif">25 °C</text>
+          </g>
+
+          <!-- провода и преобразователь -->
+          <path d="M182 190 L246 190" stroke="#8fa3b3" stroke-width="3" fill="none"/>
+          <g id="gConv" transform="translate(300,190)">
+            <rect x="-54" y="-50" width="108" height="100" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
+            <text x="0" y="-30" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif" id="convName">buck</text>
+            <text id="convOut" x="0" y="4" text-anchor="middle" font-size="19" font-weight="700" fill="#0b6e99" font-family="sans-serif">5,0 В</text>
+            <text id="convEff" x="0" y="24" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif">КПД 85 %</text>
+            <text id="convD" x="0" y="40" text-anchor="middle" font-size="10" fill="#8a97a3" font-family="sans-serif">D = 0,42</text>
+          </g>
+          <path d="M354 190 L418 190" stroke="#8fa3b3" stroke-width="3" fill="none"/>
+
+          <!-- нагрузка -->
+          <g id="gLoad" transform="translate(486,190)">
+            <rect x="-56" y="-46" width="112" height="92" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
+            <circle id="loadBulb" cx="0" cy="-12" r="15" fill="#e9eff4" stroke="#a9bcc9" stroke-width="2"/>
+            <text id="loadName" x="0" y="20" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">Лампа 5 Вт</text>
+            <text id="loadP" x="0" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2a36" font-family="sans-serif">5 Вт</text>
+          </g>
+
+          <!-- инвертор -->
+          <g id="gInv" transform="translate(620,190)" opacity="0.35">
+            <rect x="-50" y="-40" width="100" height="80" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
+            <path d="M-26 8 q13 -26 26 0 q13 26 26 0" fill="none" stroke="#8f6bd0" stroke-width="2.4"/>
+            <text x="0" y="28" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif">220 В · 50 Гц</text>
+          </g>
+
+          <!-- поток -->
+          <path id="stFlow" d="M182 160 L418 160" stroke="#7ed0ff" stroke-width="3" stroke-dasharray="5 12" opacity="0" fill="none"/>
+
+          <!-- предупреждения -->
+          <g id="stWarn" opacity="0">
+            <rect x="180" y="16" width="400" height="30" rx="8" fill="#fff4e5" stroke="#f2cf9e"/>
+            <text id="stWarnText" x="380" y="36" text-anchor="middle" font-size="12" fill="#8a5a00" font-family="sans-serif"></text>
+          </g>
+          <line x1="40" y1="300" x2="720" y2="300" stroke="#dbe6ee" stroke-width="2"/>
+        </svg>
+      </div>
+
+      <div class="panel scope">
+        <div class="row" style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 4px">
+          <span class="tiny muted" style="font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;font-weight:600">Осциллограф</span>
+          <span class="tiny muted" id="scopeLabel">ШИМ на нагрузке</span>
+        </div>
+        <canvas id="scope" width="900" height="208"></canvas>
+      </div>
+
+      <div class="bottombar panel" style="height:132px">
+        <div class="tabs">
+          <button class="active" data-sttab="journal">Журнал</button>
+          <button data-sttab="meas">Протокол <span id="stMeasCount" class="badge"></span></button>
+          <div class="grow"></div>
+          <button class="btn ghost tiny" id="stCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+        </div>
+        <div class="tabbody" id="stTabJournal"><div class="journal" id="stJournal"></div></div>
+        <div class="tabbody" id="stTabMeas" hidden></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card task">
+        <h2>Задание <span class="badge" id="stTaskId">1 / 6</span></h2>
+        <div class="body" id="stTaskBody"></div>
+        <div class="tasklist" id="stTaskList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Показания</h2>
+        <div class="meters">
+          <div class="meter accent"><div class="k"><span>Напряжение</span><span>U</span></div>
+            <div class="v" id="stU">3,75 <small>В</small></div></div>
+          <div class="meter"><div class="k"><span>Ток</span><span>I</span></div>
+            <div class="v" id="stI">0 <small>А</small></div></div>
+          <div class="meter"><div class="k"><span>Мощность</span><span>P</span></div>
+            <div class="v" id="stP">0 <small>Вт</small></div></div>
+          <div class="meter" id="stTempBox"><div class="k"><span>Температура</span><span>T</span></div>
+            <div class="v" id="stT">25 <small>°C</small></div></div>
+          <div class="meter wide"><div class="k"><span>Заряд</span><span id="stSocState">—</span></div>
+            <div class="v" id="stSoc">50 <small>%</small></div>
+            <div class="bar"><i id="stSocBar" style="width:50%"></i></div></div>
+        </div>
+        <div class="aux"><span>КПД: <b id="stEff">—</b></span><span>Автономия: <b id="stAuto">—</b></span></div>
+        <div class="aux" style="padding-top:0"><span>Энергия: <b id="stEnergy">0 Вт·ч</b></span><span id="stWarnChip"></span></div>
+      </div>
+    </aside>`;
+
+  /* ---------- управление ---------- */
+  function pct(v, d) { return v.toFixed(d === undefined ? 1 : d).replace('.', ','); }
+  function log(kind, text) {
+    st.log.push({ t: st.t, kind: kind, text: text });
+    if (st.log.length > 300) st.log.shift();
+    renderJournal();
+  }
+  function renderJournal() {
+    var box = $('stJournal');
+    if (!st.log.length) { box.innerHTML = '<div class="empty-note">Действия появятся здесь.</div>'; return; }
+    box.innerHTML = st.log.slice(-80).map(function (r) {
+      return '<div class="jrow ' + r.kind + '"><span class="tm">' + pct(r.t / 60, 1) + ' мин</span><span class="dot"></span><span class="tx">' +
+        String(r.text).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</span></div>';
+    }).join('');
+    box.parentElement.scrollTop = box.parentElement.scrollHeight;
+  }
+
+  function renderControls() {
+    $('vSoc').textContent = Math.round(st.soc * 100) + ' %';
+    $('socBar').style.width = Math.round(st.soc * 100) + '%';
+    $('vChargeC').textContent = pct(st.chargeC, 1) + 'C';
+    $('vDuty').textContent = pct(st.duty, 2);
+    $('chargeOn').checked = st.chargeOn;
+    $('loadOn').checked = st.loadOn;
+    $('invOn').checked = st.inverterOn;
+    [].forEach.call($('segType').children, function (b) { b.classList.toggle('active', b.dataset.type === st.type); });
+    [].forEach.call($('segLoad').children, function (b) { b.classList.toggle('active', b.dataset.load === st.load); });
+    [].forEach.call($('segConv').children, function (b) { b.classList.toggle('active', b.dataset.conv === st.converter); });
+  }
+
+  $('segType').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.type === 'cap') {
+      st.storage = 'cap'; st.type = 'liion'; st.capVoltage = 12;
+    } else {
+      st.storage = 'battery'; st.type = b.dataset.type;
+    }
+    st.temp = 25; renderControls();
+    log('ok', 'Накопитель: ' + (st.storage === 'cap' ? 'ионистор 10 Ф' : S.TYPES[st.type].name));
+    drawScene();
+  });
+  $('segLoad').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    st.load = b.dataset.load; st.loadOn = true; renderControls();
+    log('ok', 'Нагрузка: ' + S.LOADS[st.load].name);
+  });
+  $('segConv').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    st.converter = b.dataset.conv; renderControls();
+    log('ok', 'Преобразователь: ' + (st.converter === 'none' ? 'без преобразователя' : st.converter));
+  });
+  $('sChargeC').addEventListener('input', function (e) {
+    st.chargeC = parseFloat(e.target.value);
+    $('vChargeC').textContent = pct(st.chargeC, 1) + 'C';
+  });
+  $('sDuty').addEventListener('input', function (e) {
+    st.duty = parseFloat(e.target.value);
+    $('vDuty').textContent = pct(st.duty, 2);
+  });
+  $('chargeOn').addEventListener('change', function (e) {
+    st.chargeOn = e.target.checked;
+    log(e.target.checked ? 'ok' : 'warn', 'Заряд ' + (e.target.checked ? 'включён' : 'выключен'));
+  });
+  $('loadOn').addEventListener('change', function (e) {
+    st.loadOn = e.target.checked;
+    log(e.target.checked ? 'ok' : 'warn', 'Нагрузка ' + (e.target.checked ? 'подключена' : 'отключена'));
+  });
+  $('invOn').addEventListener('change', function (e) {
+    st.inverterOn = e.target.checked;
+    log(e.target.checked ? 'ok' : 'warn', 'Инвертор ' + (e.target.checked ? 'включён' : 'выключен'));
+  });
+  $('btnFull').onclick = function () { st.soc = 1; st.temp = 25; log('ok', 'Накопитель заряжен до 100 %'); renderControls(); };
+  $('stPlay').onclick = function () { run.playing = !run.playing; this.textContent = run.playing ? '⏸' : '▶'; };
+  [].forEach.call(document.querySelectorAll('[data-sspeed]'), function (b) {
+    b.onclick = function () {
+      run.speed = +b.dataset.sspeed;
+      [].forEach.call(document.querySelectorAll('[data-sspeed]'), function (x) { x.classList.toggle('active', x === b); });
+    };
+  });
+  $('btnReset').onclick = function () {
+    var keepType = st.type;
+    st = S.createState(); st.type = keepType;
+    solved = {}; lastFacts = null;
+    log('warn', 'Опыт сброшен');
+    renderControls(); renderMeasurements(); renderTask(); drawScene();
+  };
+  $('btnDischarge').onclick = function () {
+    st.loadOn = true;
+    if (st.soc < 0.2) { st.soc = 1; log('ok', 'Накопитель заряжен до 100 % перед разрядом'); }
+    var start = st.soc, t0 = st.t, guard = 0;
+    while (st.soc > 0.02 && guard < 20000) { S.step(st, 0.1, 1); guard++; }
+    var wh = st.energyOut;
+    st.measures.push({
+      kind: 'discharge', t: st.t, cRate: (S.loadPower(st) / (S.capacityWh(st) || 1)).toFixed(2) * 1,
+      load: st.load, wh: wh, socStart: start, temp: st.temp, minutes: st.t - t0
+    });
+    log('ok', 'Полный разряд: ' + (start * 100).toFixed(0) + ' % → 2 %, отдано ' + pct(wh, 2) + ' Вт·ч, нагрев до ' + Math.round(st.temp) + ' °C');
+    renderMeasurements(); checkTask(false);
+    toast('Разряд завершён: отдано ' + pct(wh, 2) + ' Вт·ч');
+  };
+
+  /* ---------- протокол ---------- */
+  function sample() {
+    var f = S.facts(st);
+    var rec = {
+      t: st.t, kind: st.chargeOn ? 'charge' : 'discharge', type: st.storage === 'cap' ? 'cap' : st.type,
+      load: st.load, soc: st.soc, volt: f.volt, current: f.current, power: f.power,
+      temp: st.temp, eff: f.eff, autonomyH: f.autonomyH,
+      autonomyCalc: (f.capacityWh * st.soc) / Math.max(0.01, f.loadP / Math.max(0.5, f.eff)),
+      wh: st.energyOut, buckV: f.buckV
+    };
+    if (st.converter !== 'none') st.measures.push(Object.assign({ kind: 'eff' }, rec));
+    if (st.storage === 'cap') st.measures.push(Object.assign({ kind: 'cap' }, rec));
+    if (st.load === 'lamp' && !st.chargeOn) st.measures.push(Object.assign({ kind: 'autonomy' }, rec));
+    st.measures.push(rec);
+    log('ok', 'Точка: U = ' + pct(f.volt, 2) + ' В · I = ' + pct(f.current, 2) + ' А · ' +
+      Math.round(st.soc * 100) + ' % · ' + Math.round(st.temp) + ' °C · КПД ' + Math.round(f.eff * 100) + ' %');
+    renderMeasurements(); checkTask(false);
+  }
+  function renderMeasurements() {
+    var box = $('stTabMeas');
+    $('stMeasCount').textContent = st.measures.length || '';
+    if (!st.measures.length) { box.innerHTML = '<div class="empty-note">Нажмите «Снять точку» — запись попадёт в протокол.</div>'; return; }
+    box.innerHTML = '<table class="mtable"><thead><tr><th>Тип</th><th>Накопитель</th><th>Нагрузка</th><th>U, В</th>' +
+      '<th>I, А</th><th>SoC, %</th><th>T, °C</th><th>КПД</th><th>Отдано, Вт·ч</th></tr></thead><tbody>' +
+      st.measures.slice(-60).reverse().map(function (m) {
+        return '<tr><td>' + (m.kind === 'eff' ? 'КПД' : m.kind === 'cap' ? 'ионистор' : m.kind === 'autonomy' ? 'автономия' : m.kind === 'charge' ? 'заряд' : 'разряд') +
+          '</td><td style="text-align:left">' + (m.type === 'cap' ? 'ионистор' : (S.TYPES[m.type] || {}).short || '—') +
+          '</td><td style="text-align:left">' + (S.LOADS[m.load] || {}).name + '</td><td>' + pct(m.volt || 0, 2) +
+          '</td><td>' + pct(m.current || 0, 2) + '</td><td>' + Math.round((m.soc || 0) * 100) + '</td><td>' +
+          Math.round(m.temp || 0) + '</td><td>' + Math.round((m.eff || 0) * 100) + ' %</td><td>' + pct(m.wh || 0, 2) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  function exportCsv() {
+    if (!st.measures.length) { toast('Протокол пуст'); return; }
+    var lines = ['Тип;Накопитель;Нагрузка;U,В;I,А;SoC,%;T,°C;КПД;Отдано,Вт·ч;Uвых,В'];
+    st.measures.forEach(function (m) {
+      lines.push([m.kind || '', m.type === 'cap' ? 'ионистор' : ((S.TYPES[m.type] || {}).short || ''),
+        (S.LOADS[m.load] || {}).name || '', pct(m.volt || 0, 3), pct(m.current || 0, 3),
+        Math.round((m.soc || 0) * 100), Math.round(m.temp || 0), Math.round((m.eff || 0) * 100),
+        pct(m.wh || 0, 3), pct(m.buckV || 0, 2)].join(';'));
+    });
+    var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'протокол-накопители.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    log('ok', 'Протокол выгружен в CSV');
+  }
+  [].forEach.call(document.querySelectorAll('.tabs button[data-sttab]'), function (b) {
+    b.onclick = function () {
+      [].forEach.call(document.querySelectorAll('.tabs button[data-sttab]'), function (x) { x.classList.toggle('active', x === b); });
+      $('stTabJournal').hidden = b.dataset.sttab !== 'journal';
+      $('stTabMeas').hidden = b.dataset.sttab !== 'meas';
+    };
+  });
+
+  /* ---------- задания ---------- */
+  function facts() { return lastFacts || S.facts(st); }
+  function renderTask() {
+    var tk = S.TASKS[taskIndex], done = solved[taskIndex];
+    $('stTaskId').textContent = (taskIndex + 1) + ' / ' + S.TASKS.length;
+    $('stTaskBody').innerHTML =
+      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+      '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
+      (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, done) + '</span><br>' + tk.why + '</div>' : '') +
+      '<div class="hints">' + (tk._hints || []).map(function (h, i) { return '<div class="hint">Подсказка ' + (i + 1) + ': ' + h + '</div>'; }).join('') + '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:9px"><button class="btn" id="stHint">Подсказка</button>' +
+      '<button class="btn primary" id="stCheck">Проверить</button></div><div id="stCheckOut"></div>';
+    $('stTaskList').innerHTML = S.TASKS.map(function (t, i) {
+      return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
+        '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
+    }).join('');
+    [].forEach.call($('stTaskList').children, function (b) { b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); }; });
+    $('stHint').onclick = function () {
+      var t2 = S.TASKS[taskIndex]; t2._hints = t2._hints || [];
+      if (t2._hints.length < t2.hints.length) { t2._hints.push(t2.hints[t2._hints.length]); renderTask(); } else toast('Подсказки закончились');
+    };
+    $('stCheck').onclick = function () {
+      if (!checkTask(true)) {
+        var f = facts();
+        $('stCheckOut').innerHTML = '<div class="result bad">Пока не выполнено: SoC ' +
+          Math.round(f.soc * 100) + ' %, максимум температуры ' + Math.round(f.maxTemp) + ' °C, точек в протоколе ' +
+          f.measures.length + ', предупреждений ' + f.warnings.length + '.</div>';
+      }
+    };
+  }
+  function checkTask(show) {
+    var tk = S.TASKS[taskIndex], f = facts(), was = !!solved[taskIndex];
+    var ok = false;
+    try { ok = tk.check(f); } catch (e) { ok = false; }
+    if (ok && !was) {
+      var stars = 1;
+      try { stars = tk.stars(f) || 1; } catch (e) {}
+      solved[taskIndex] = stars;
+      log('ok', 'Задание выполнено: ' + tk.t + ' (' + stars + '★)');
+      renderTask();
+    } else if (ok && show) renderTask();
+    return ok;
+  }
+
+  /* ---------- сцена ---------- */
+  function drawScene() {
+    var f = S.facts(st);
+    var T = S.TYPES[st.type];
+    var socPct = st.storage === 'cap' ? Math.min(1, st.capVoltage / 12) : st.soc;
+    // заливка ячейки
+    var hMax = 176, h = Math.max(0, Math.min(1, socPct)) * hMax;
+    var fill = $('cellFill');
+    fill.setAttribute('height', h.toFixed(1));
+    fill.setAttribute('y', (90 - h).toFixed(1));
+    fill.setAttribute('fill', st.storage === 'cap' ? 'url(#cellWarm)' : (st.soc < 0.2 ? 'url(#cellWarm)' : 'url(#cellFill)'));
+    $('cellPct').textContent = Math.round(socPct * 100) + ' %';
+    $('cellType').textContent = st.storage === 'cap' ? 'Ионистор 10 Ф' : T.name;
+    $('cellTemp').textContent = Math.round(st.temp) + ' °C' + (st.temp > T.tempMax ? ' · перегрев' : '');
+    $('cellBolt').setAttribute('opacity', st.chargeOn && st.soc < 1 ? 1 : 0);
+    // преобразователь
+    var convName = st.converter === 'none' ? 'без DC-DC' : (st.converter === 'buck' ? 'buck (понижающий)' : 'boost (повышающий)');
+    $('convName').textContent = convName;
+    var out = st.converter === 'buck' ? f.buckV : (st.converter === 'boost' ? f.volt / Math.max(0.1, (1 - st.duty)) : f.volt);
+    $('convOut').textContent = pct(out, 2) + ' В';
+    $('convEff').textContent = 'КПД ' + Math.round(f.eff * 100) + ' %';
+    $('convD').textContent = st.converter === 'none' ? '' : 'D = ' + pct(st.duty, 2);
+    // нагрузка
+    $('loadName').textContent = S.LOADS[st.load].name;
+    $('loadP').textContent = pct(f.loadP, 0) + ' Вт';
+    var lit = f.loadP > 0 && st.loadOn;
+    $('loadBulb').setAttribute('fill', lit ? '#ffe9a8' : '#e9eff4');
+    $('loadBulb').setAttribute('r', lit ? 15 + Math.min(6, f.loadP / 12) : 15);
+    $('gInv').setAttribute('opacity', st.inverterOn ? 1 : 0.35);
+    // поток
+    $('stFlow').setAttribute('opacity', (st.chargeOn || lit) ? 0.9 : 0);
+    // предупреждения
+    var w = (f.warnings || []).join(' · ');
+    $('stWarn').setAttribute('opacity', w ? 1 : 0);
+    $('stWarnText').textContent = w;
+    $('scopeLabel').textContent = st.load === 'inverter' && st.inverterOn ? 'Синусоида 50 Гц на выходе инвертора' :
+      (st.converter === 'none' ? 'Постоянное напряжение' : 'ШИМ (скважность ' + pct(st.duty, 2) + ')');
+  }
+
+  function drawScope() {
+    var c = $('scope'), ctx = c.getContext('2d');
+    var W = c.width, H = c.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = '#e7eef4'; ctx.lineWidth = 1;
+    for (var i = 1; i < 8; i++) { ctx.beginPath(); ctx.moveTo(i * W / 8, 0); ctx.lineTo(i * W / 8, H); ctx.stroke(); }
+    for (var j = 1; j < 4; j++) { ctx.beginPath(); ctx.moveTo(0, j * H / 4); ctx.lineTo(W, j * H / 4); ctx.stroke(); }
+    var wf = S.waveform(st, 240);
+    var maxV = Math.max(1, Math.max.apply(null, wf.map(Math.abs)));
+    ctx.beginPath();
+    wf.forEach(function (v, i) {
+      var x = i / (wf.length - 1) * W;
+      var y = H / 2 - (v / maxV) * (H / 2 - 12);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.strokeStyle = st.load === 'inverter' && st.inverterOn ? '#8f6bd0' : '#0b6e99';
+    ctx.lineWidth = 2.2; ctx.stroke();
+    ctx.fillStyle = '#8a97a3'; ctx.font = '18px sans-serif';
+    ctx.fillText(Math.round(maxV) + ' В', 8, 22);
+    ctx.fillText(st.load === 'inverter' && st.inverterOn ? '50 Гц' : (st.converter === 'none' ? 'DC' : 'PWM'), W - 74, H - 12);
+  }
+
+  /* ---------- приборы ---------- */
+  function renderMeters(f) {
+    $('stU').innerHTML = pct(f.volt, 2) + ' <small>В</small>';
+    $('stI').innerHTML = pct(f.current, 2) + ' <small>А</small>';
+    $('stP').innerHTML = pct(f.power, 1) + ' <small>Вт</small>';
+    $('stT').innerHTML = Math.round(st.temp) + ' <small>°C</small>';
+    $('stTempBox').classList.toggle('hot', st.temp > S.TYPES[st.type].tempMax);
+    var socPct = st.storage === 'cap' ? st.capVoltage / 12 : st.soc;
+    $('stSoc').innerHTML = Math.round(socPct * 100) + ' <small>%</small>';
+    $('stSocBar').style.width = Math.round(socPct * 100) + '%';
+    $('stSocState').textContent = st.chargeOn ? 'заряд' : (f.loadP > 0 ? 'разряд' : 'покой');
+    $('stEff').textContent = Math.round(f.eff * 100) + ' %';
+    $('stAuto').textContent = f.autonomyH > 0 ? pct(f.autonomyH, 1) + ' ч' : '—';
+    $('stEnergy').textContent = pct(st.energyOut, 2) + ' Вт·ч';
+    $('stWarnChip').innerHTML = (f.warnings || []).map(function (w) { return '<span class="warnchip">' + w + '</span>'; }).join('');
+    $('stClock').textContent = Math.round(st.t / 60) + ' мин';
+    $('vSoc').textContent = Math.round(st.soc * 100) + ' %';
+    $('socBar').style.width = Math.round(st.soc * 100) + '%';
+  }
+
+  /* ---------- цикл ---------- */
+  function frame(now) {
+    var dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
+    lastTick = now;
+    if (window.__bench === 'storage') {
+      if (run.playing && dt > 0) S.step(st, dt, run.speed);
+      lastFacts = S.facts(st);
+      drawScene();
+      renderMeters(lastFacts);
+      drawScope();
+      taskTick += dt;
+      if (taskTick > 0.4) { taskTick = 0; checkTask(false); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function toast(text) {
+    var t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = text; t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove('show'); }, 2400);
+  }
+
+  $('stSample').onclick = sample;
+  $('stCsv').onclick = exportCsv;
+
+  renderControls(); renderJournal(); renderMeasurements(); renderTask(); drawScene(); drawScope();
+  log('ok', 'Стенд «Накопители»: Li-ion 18650, заряд 50 %, нагрузка — лампа 5 Вт.');
+  requestAnimationFrame(frame);
+
+  window.__storage = {
+    state: function () { return st; }, facts: function () { return S.facts(st); },
+    sample: sample, solved: function () { return solved; }, S: S
+  };
+})();
+</script>
+<script>/* ============================================================
+   Энерджиквантум · efficiency.js
+   Модель стенда «Энергоэффективность и умный дом»
+   Не зависит от DOM — тестируется в Node.
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  const LAMPS = {
+    incandescent: { name: 'Накаливания', power: 60, flux: 700, life: 1000, price: 60 },
+    cfl: { name: 'Люминесцентная', power: 15, flux: 750, life: 8000, price: 250 },
+    led: { name: 'Светодиодная', power: 9, flux: 800, life: 25000, price: 400 }
+  };
+
+  const ROOMS = [
+    { id: 'class', name: 'Кабинет', area: 24, lamps: 6, norm: 400 },
+    { id: 'hall', name: 'Коридор', area: 12, lamps: 3, norm: 150 },
+    { id: 'lab', name: 'Лаборатория', area: 18, lamps: 6, norm: 500 }
+  ];
+
+  const APPLIANCES = {
+    kettle: { name: 'Чайник', power: 2000, hours: 0.3, standby: 0 },
+    fridge: { name: 'Холодильник', power: 150, hours: 8, standby: 0 },   // цикл компрессора
+    pc: { name: 'Компьютер', power: 180, hours: 6, standby: 3 },
+    charger: { name: 'Зарядка без устройства', power: 0, hours: 0, standby: 0.5 },
+    tv: { name: 'Телевизор', power: 90, hours: 4, standby: 8 }
+  };
+
+  const TARIFF = { day: 3.2, night: 1.9, nightFrom: 23, nightTo: 7 };   // ₽/кВт·ч
+
+  function createState() {
+    return {
+      lampType: 'incandescent',
+      sensors: { motion: false, light: false, schedule: false },
+      appliances: { kettle: true, fridge: true, pc: true, charger: true, tv: true },
+      t: 0,
+      hour: 8,
+      speed: 1,
+      measures: [],
+      log: [],
+      day: null,
+      totalW: 0
+    };
+  }
+
+  /* ---------- освещение ---------- */
+
+  function lampPower(st) { return LAMPS[st.lampType].power * ROOMS.reduce(function (a, r) { return a + r.lamps; }, 0); }
+
+  function lightingHours(st) {
+    const base = 10;                       // часы работы освещения в сутки
+    let k = 1;
+    if (st.sensors.motion) k -= 0.35;      // свет только при движении
+    if (st.sensors.light) k -= 0.15;       // сумеречное реле
+    if (st.sensors.schedule) k -= 0.05;    // расписание
+    return base * Math.max(0.3, k);
+  }
+
+  function lightingEnergy(st) { return lampPower(st) * lightingHours(st) / 1000; }   // кВт·ч/сутки
+
+  function illuminance(st) {
+    // освещённость в помещении от числа ламп и типа источника
+    const L = LAMPS[st.lampType];
+    return ROOMS.map(function (r) {
+      const fluxTotal = r.lamps * L.flux;
+      const lux = fluxTotal * 0.5 / r.area * 4.0;   // коэффициент использования с учётом переотражений
+      return { id: r.id, name: r.name, lux: lux, norm: r.norm, ok: lux >= r.norm };
+    });
+  }
+
+  /* ---------- приборы ---------- */
+
+  function applianceEnergy(st, dayNight) {
+    let e = 0;
+    Object.keys(APPLIANCES).forEach(function (k) {
+      if (!st.appliances[k]) return;
+      const a = APPLIANCES[k];
+      e += a.power * a.hours / 1000;
+      // режим ожидания — только если не отключён «умной розеткой»
+      if (!st.sensors.schedule) e += a.standby * 20 / 1000;
+    });
+    return e;
+  }
+
+  function totalEnergy(st) {
+    const light = lightingEnergy(st);
+    const appl = applianceEnergy(st);
+    return {
+      light: light,
+      appliances: appl,
+      total: light + appl,
+      cost: (light + appl) * TARIFF.day,
+      standby: Object.keys(APPLIANCES).reduce(function (a, k) {
+        return a + (st.appliances[k] ? APPLIANCES[k].standby * (st.sensors.schedule ? 0 : 20) / 1000 : 0);
+      }, 0)
+    };
+  }
+
+  function baseline(st) {
+    // «до»: лампы накаливания, все приборы включены, никаких датчиков
+    const s = Object.assign({}, st, {
+      lampType: 'incandescent',
+      sensors: { motion: false, light: false, schedule: false },
+      appliances: { kettle: true, fridge: true, pc: true, charger: true, tv: true }
+    });
+    return totalEnergy(s);
+  }
+
+  function savings(st) {
+    const now = totalEnergy(st), base = baseline(st);
+    return {
+      now: now, base: base,
+      savedKwh: base.total - now.total,
+      savedRub: base.cost - now.cost,
+      percent: base.total > 0 ? (base.total - now.total) / base.total : 0
+    };
+  }
+
+  /* ---------- замена ламп: окупаемость ---------- */
+
+  function retrofit(st, toType) {
+    const count = ROOMS.reduce(function (a, r) { return a + r.lamps; }, 0);
+    const from = LAMPS[st.lampType], to = LAMPS[toType];
+    const cost = count * to.price;
+    const hoursPerYear = 10 * 365;
+    const savedPerYear = (from.power - to.power) * count * hoursPerYear / 1000 * TARIFF.day;   // ₽/год
+    const months = savedPerYear > 0 ? cost / savedPerYear * 12 : Infinity;
+    return { count: count, cost: cost, savedPerYear: savedPerYear, paybackMonths: months };
+  }
+
+  /* ---------- суточный профиль ---------- */
+
+  function dayProfile(st) {
+    const out = [];
+    for (let h = 0; h <= 24; h++) {
+      let w = 0;
+      // освещение: утро 7-9 и вечер 17-22 (или по датчикам — меньше часов)
+      const lit = (h >= 7 && h <= 9) || (h >= 17 && h <= 22);
+      const lightFactor = st.sensors.motion ? 0.55 : (st.sensors.light ? 0.8 : 1);
+      if (lit) w += lampPower(st) * lightFactor;
+      Object.keys(APPLIANCES).forEach(function (k) {
+        if (!st.appliances[k]) return;
+        const a = APPLIANCES[k];
+        if (k === 'fridge') { if (h % 3 === 0) w += a.power; return; }
+        if (k === 'kettle' && (h === 8 || h === 18)) { w += a.power; return; }
+        if (k === 'pc' && h >= 9 && h <= 17) { w += a.power; return; }
+        if (k === 'tv' && h >= 19 && h <= 22) { w += a.power; return; }
+        if (k === 'charger') w += st.sensors.schedule ? 0 : a.standby;
+        w += st.sensors.schedule ? 0 : a.standby;
+      });
+      out.push({ h: h, w: w });
+    }
+    return out;
+  }
+
+  function dayTotals(st) {
+    const p = dayProfile(st);
+    let e = 0;
+    for (let i = 1; i < p.length; i++) e += (p[i].w + p[i - 1].w) / 2 / 1000;   // кВт·ч (шаг 1 ч)
+    return { kwh: e, cost: e * TARIFF.day, peak: Math.max.apply(null, p.map(function (x) { return x.w; })) };
+  }
+
+  /* ---------- шаг модельного времени ---------- */
+
+  function step(st, dtReal, speed) {
+    st.t += dtReal;
+    st.hour = (st.hour + dtReal * speed * 1.5) % 24;   // 1 модельный час за 40 с при ×1
+    const prof = dayProfile(st);
+    const idx = Math.round(st.hour) % 24;
+    st.totalW = prof[idx] ? prof[idx].w : 0;
+    return st;
+  }
+
+  /* ---------- факты ---------- */
+
+  function facts(st) {
+    const s = savings(st);
+    const d = dayTotals(st);
+    return {
+      lampType: st.lampType,
+      sensors: Object.assign({}, st.sensors),
+      appliances: Object.assign({}, st.appliances),
+      lightKwh: s.now.light,
+      totalKwh: s.now.total,
+      baseKwh: s.base.total,
+      savedKwh: s.savedKwh,
+      savedRub: s.savedRub,
+      percent: s.percent,
+      standbyKwh: s.now.standby,
+      dayKwh: d.kwh,
+      dayCost: d.cost,
+      peakW: d.peak,
+      lux: illuminance(st),
+      allNorm: illuminance(st).every(function (r) { return r.ok; }),
+      retrofit: retrofit(st, 'led'),
+      measures: st.measures.slice(),
+      dayRuns: st.measures.filter(function (m) { return m.kind === 'day'; }),
+      sensorRuns: st.measures.filter(function (m) { return m.kind === 'smart'; }),
+      savingsRuns: st.measures.filter(function (m) { return m.kind === 'saving'; }),
+      tariff: TARIFF
+    };
+  }
+
+  /* ---------- задания ---------- */
+
+  const TASKS = [
+    {
+      t: 'Снизить потребление на 30 %',
+      goal: 'Снизьте суточное потребление кабинета на 30 % относительно исходного, не опустив освещённость ниже нормы во всех помещениях.',
+      steps: ['Посмотрите исходное потребление и нормы освещённости.', 'Замените лампы и включите датчики.', 'Проверьте процент экономии.'],
+      hints: ['Лампа накаливания 60 Вт и светодиодная 9 Вт дают примерно одинаковый поток.',
+              'Датчик движения сокращает часы работы освещения на треть.',
+              'Норма: кабинет 400 лк, лаборатория 500 лк, коридор 150 лк.'],
+      check: function (f) { return f.percent >= 0.3 && f.allNorm; },
+      stars: function (f) { return f.percent >= 0.45 && f.allNorm ? 3 : (f.percent >= 0.3 && f.allNorm ? 2 : 1); },
+      why: 'Освещение — самая «дешёвая» экономия: современные лампы дают тот же световой поток при мощности в 6–7 раз меньше.'
+    },
+    {
+      t: 'Три лампы при равном свете',
+      goal: 'Снимите в протокол три точки — для каждого типа лампы — при сохранении нормы освещённости.',
+      steps: ['Переключите тип лампы.', 'Снимите точку в протокол.', 'Повторите для всех трёх типов.'],
+      hints: ['Сравнивайте не мощность, а мощность при одинаковом световом потоке.',
+              'Светодиодная лампа: 9 Вт ≈ 800 лм ≈ 60 Вт накаливания.',
+              'Кнопка «Снять точку» пишет тип лампы, мощность и освещённость.'],
+      check: function (f) {
+        const types = {};
+        f.measures.forEach(function (m) { if (m.lampType) types[m.lampType] = 1; });
+        return Object.keys(types).length >= 3;
+      },
+      stars: function (f) {
+        const types = {};
+        f.measures.forEach(function (m) { if (m.lampType) types[m.lampType] = 1; });
+        return Object.keys(types).length >= 3 ? 3 : 1;
+      },
+      why: 'Светоотдача: накаливания ~12 лм/Вт, люминесцентная ~50 лм/Вт, светодиодная ~90 лм/Вт. Отсюда и разница в счетах.'
+    },
+    {
+      t: 'Окупаемость замены',
+      goal: 'Рассчитайте окупаемость замены всех ламп на светодиодные и зафиксируйте точку с расчётом.',
+      steps: ['Выберите светодиодные лампы.', 'Снимите точку с расчётом окупаемости.', 'Сравните срок окупаемости с ресурсом лампы.'],
+      hints: ['Окупаемость = стоимость замены / годовая экономия.',
+              'Считайте по 10 часам работы в сутки и тарифу 3,2 ₽/кВт·ч.',
+              'Если окупаемость меньше года — решение почти всегда выгодно.'],
+      check: function (f) { return f.lampType === 'led' && f.savingsRuns.length >= 1; },
+      stars: function (f) {
+        if (!(f.lampType === 'led' && f.savingsRuns.length >= 1)) return 1;
+        return f.retrofit.paybackMonths <= 12 ? 3 : 2;
+      },
+      why: 'Светодиод дороже при покупке, но потребляет в 6 раз меньше и живёт 25 000 часов. Окупаемость обычно 6–14 месяцев.'
+    },
+    {
+      t: 'Найти «вампиров»',
+      goal: 'Определите суммарное потребление в режиме ожидания и снизьте его до нуля умной розеткой.',
+      steps: ['Посмотрите вклад standby в протоколе.', 'Включите «умное расписание».', 'Снимите точку с нулевым standby.'],
+      hints: ['Даже выключенный телевизор потребляет 8 Вт — это 58 кВт·ч в год.',
+              'Умная розетка обесточивает приборы полностью.',
+              'Кнопка «Снять точку» пишет вклад ожидания.'],
+      check: function (f) { return f.sensors.schedule && f.standbyKwh < 0.01; },
+      stars: function (f) { return f.sensors.schedule && f.standbyKwh < 0.01 ? 3 : 1; },
+      why: 'Режим ожидания незаметен, но в сумме по квартире даёт 200–400 кВт·ч в год. Умная розетка или выключатель на блоке питания решает вопрос.'
+    },
+    {
+      t: 'Сценарий «умный дом»',
+      goal: 'Включите датчики движения и освещённости и снизьте потребление на освещение не менее чем на 35 % при сохранении норм.',
+      steps: ['Зафиксируйте исходное потребление освещения.', 'Включите датчики.', 'Снимите точку с новой цифрой.'],
+      hints: ['Датчик движения убирает свет там, где никого нет.',
+              'Сумеречное реле не даёт светить днём.',
+              'Экономия идёт не за счёт лампы, а за счёт часов работы.'],
+      check: function (f) { return f.sensors.motion && f.sensors.light && f.allNorm && f.percent >= 0.35; },
+      stars: function (f) { return f.percent >= 0.5 && f.allNorm ? 3 : (f.percent >= 0.35 ? 2 : 1); },
+      why: 'Автоматика не меняет мощность, она меняет время работы. Датчики и реле — самый дешёвый способ сэкономить без потери комфорта.'
+    },
+    {
+      t: 'Протокол энергоаудита',
+      goal: 'Соберите полный протокол: три точки по лампам, две точки по экономии и один прогон суток.',
+      steps: ['Снимите точки с разными лампами.', 'Снимите точки с разными настройками экономии.', 'Прогоните сутки и добавьте результат.'],
+      hints: ['Протокол — основа защиты проекта: данные, а не ощущения.',
+              'Минимум 6 записей разного типа.',
+              'Выгрузите CSV и вставьте в отчёт.'],
+      check: function (f) { return f.measures.length >= 6 && f.dayRuns.length >= 1; },
+      stars: function (f) { return f.measures.length >= 8 && f.dayRuns.length >= 2 ? 3 : 2; },
+      why: 'Энергоаудит всегда начинается с измерений: без цифр «до» невозможно доказать эффект «после».'
+    }
+  ];
+
+  const API = {
+    LAMPS: LAMPS, ROOMS: ROOMS, APPLIANCES: APPLIANCES, TARIFF: TARIFF, TASKS: TASKS,
+    createState: createState, step: step, facts: facts,
+    lampPower: lampPower, lightingHours: lightingHours, lightingEnergy: lightingEnergy,
+    illuminance: illuminance, totalEnergy: totalEnergy, baseline: baseline, savings: savings,
+    retrofit: retrofit, dayProfile: dayProfile, dayTotals: dayTotals, applianceEnergy: applianceEnergy
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.Efficiency = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* ============================================================
+   Энерджиквантум · efficiency.ui.js
+   Интерфейс стенда «Энергоэффективность и умный дом»
+   ============================================================ */
+(function () {
+  'use strict';
+  var E = window.Efficiency;
+  if (!E || !document.getElementById('benchEfficiency')) return;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var st = E.createState();
+  var solved = {}, taskIndex = 0, lastFacts = null, lastTick = 0, taskTick = 0;
+  var playing = true;
+
+  var css = document.createElement('style');
+  css.textContent = `
+  .eff main{display:grid;grid-template-columns:246px minmax(420px,1fr) 330px;gap:10px;padding:10px;min-height:0}
+  .eff .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px;flex-wrap:wrap}
+  .eff .seg button{flex:1;padding:4px 2px;font-size:11px;border-radius:5px;color:var(--muted)}
+  .eff .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .eff .fld{margin-bottom:8px}
+  .eff .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .eff .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 0}
+  .eff .chk input{width:15px;height:15px;accent-color:var(--accent)}
+  .eff .chk span.pw{margin-left:auto;color:var(--muted);font-size:11px}
+  .estage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#f7fafc;overflow:hidden}
+  .estage svg{width:100%;height:100%;display:block}
+  .houseroom{cursor:pointer}
+  .houseroom:hover rect{stroke:var(--accent)}
+  .efftable{width:100%;border-collapse:collapse;font-size:11px}
+  .efftable th,.efftable td{padding:3px 8px;text-align:right;border-bottom:1px solid #eef2f6}
+  .efftable th{color:var(--muted);font-weight:600;text-align:right;position:sticky;top:0;background:#fff}
+  .efftable th:first-child,.efftable td:first-child{text-align:left}
+  .ok-lux{color:#146c4b;font-weight:600}
+  .bad-lux{color:#a02020;font-weight:600}
+  @media (max-width:980px){.eff main{grid-template-columns:1fr}.estage{min-height:360px}}
+  `;
+  document.head.appendChild(css);
+
+  var main = $('benchEfficiency');
+  main.className = 'eff';
+  main.innerHTML = `
+    <aside class="panel rctl">
+      <h2>Настройка кабинета</h2>
+      <div class="grp">
+        <div class="gl">Тип ламп (15 шт)</div>
+        <div class="seg" id="segLamp">
+          <button data-lamp="incandescent" class="active">Накаливания</button>
+          <button data-lamp="cfl">Люминесц.</button>
+          <button data-lamp="led">Светодиод</button>
+        </div>
+      </div>
+      <div class="grp">
+        <div class="gl">Автоматика</div>
+        <label class="chk"><input type="checkbox" id="senMotion">Датчик движения</label>
+        <label class="chk"><input type="checkbox" id="senLight">Сумеречное реле</label>
+        <label class="chk"><input type="checkbox" id="senSched">Умная розетка / расписание</label>
+      </div>
+      <div class="grp">
+        <div class="gl">Приборы</div>
+        <label class="chk"><input type="checkbox" id="apKettle" checked>Чайник<span class="pw">2000 Вт</span></label>
+        <label class="chk"><input type="checkbox" id="apFridge" checked>Холодильник<span class="pw">150 Вт</span></label>
+        <label class="chk"><input type="checkbox" id="apPc" checked>Компьютер<span class="pw">180 Вт</span></label>
+        <label class="chk"><input type="checkbox" id="apTv" checked>Телевизор<span class="pw">90 Вт</span></label>
+        <label class="chk"><input type="checkbox" id="apCharger" checked>Зарядка в розетке<span class="pw">0,5 Вт</span></label>
+      </div>
+      <div class="grp">
+        <button class="btn primary" id="efDay" style="width:100%;margin-bottom:6px">Прогнать сутки</button>
+        <button class="btn" id="efReset" style="width:100%">Исходные настройки</button>
+      </div>
+    </aside>
+
+    <section class="stagewrap">
+      <div class="timebar panel">
+        <div class="grp">
+          <button id="efPlay" title="Пауза / пуск">⏸</button>
+          <button data-efspeed="1" class="active">×1</button>
+          <button data-efspeed="2">×2</button>
+          <button data-efspeed="4">×4</button>
+        </div>
+        <div class="clock">время: <b id="efClock">08:00</b></div>
+        <div class="grow"></div>
+        <button class="btn primary" id="efSample">＋ Снять точку</button>
+      </div>
+
+      <div class="estage" id="efStage">
+        <svg viewBox="0 0 760 400" preserveAspectRatio="xMidYMid meet">
+          <rect x="0" y="0" width="760" height="400" fill="#f7fafc"/>
+          <!-- кабинет -->
+          <g class="houseroom" id="roomClass">
+            <rect x="30" y="40" width="330" height="230" rx="8" fill="#ffffff" stroke="#cbd9e4" stroke-width="2"/>
+            <text x="46" y="66" font-size="12" fill="#5a6772" font-family="sans-serif">Кабинет · 24 м² · 6 ламп</text>
+            <g id="lampsClass"></g>
+            <text id="luxClass" x="195" y="252" text-anchor="middle" font-size="12" font-weight="700" fill="#1f2a36" font-family="sans-serif">— лк</text>
+          </g>
+          <!-- коридор -->
+          <g class="houseroom" id="roomHall">
+            <rect x="380" y="40" width="150" height="230" rx="8" fill="#ffffff" stroke="#cbd9e4" stroke-width="2"/>
+            <text x="392" y="66" font-size="11" fill="#5a6772" font-family="sans-serif">Коридор · 12 м²</text>
+            <g id="lampsHall"></g>
+            <text id="luxHall" x="455" y="252" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2a36" font-family="sans-serif">— лк</text>
+          </g>
+          <!-- лаборатория -->
+          <g class="houseroom" id="roomLab">
+            <rect x="550" y="40" width="180" height="230" rx="8" fill="#ffffff" stroke="#cbd9e4" stroke-width="2"/>
+            <text x="562" y="66" font-size="11" fill="#5a6772" font-family="sans-serif">Лаборатория · 18 м²</text>
+            <g id="lampsLab"></g>
+            <text id="luxLab" x="640" y="252" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1f2a36" font-family="sans-serif">— лк</text>
+          </g>
+          <!-- приборы -->
+          <g id="gAppl" transform="translate(30,300)">
+            <rect x="0" y="0" width="700" height="72" rx="8" fill="#fff" stroke="#cbd9e4" stroke-width="2"/>
+            <text x="14" y="18" font-size="11" fill="#5a6772" font-family="sans-serif">Бытовые приборы</text>
+            <g id="applIcons"></g>
+          </g>
+          <!-- счётчик -->
+          <g id="gMeter" transform="translate(742,364)">
+            <rect x="-52" y="-16" width="104" height="34" rx="7" fill="#1f2a36"/>
+            <text id="meterW" x="0" y="7" text-anchor="middle" font-size="14" font-weight="700" fill="#8fe0b8" font-family="sans-serif">0 Вт</text>
+          </g>
+          <!-- солнце/время -->
+          <g id="gDay" transform="translate(700,20)"></g>
+        </svg>
+      </div>
+
+      <div class="panel" style="padding:6px 9px 9px">
+        <div class="row" style="display:flex;justify-content:space-between;padding:0 2px 4px">
+          <span class="tiny muted" style="font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;font-weight:600">Профиль потребления за сутки</span>
+          <span class="tiny muted" id="efPeak">пик —</span>
+        </div>
+        <svg id="efChart" viewBox="0 0 800 120" preserveAspectRatio="none" style="width:100%;height:120px;display:block"></svg>
+      </div>
+
+      <div class="bottombar panel" style="height:132px">
+        <div class="tabs">
+          <button class="active" data-eftab="journal">Журнал</button>
+          <button data-eftab="meas">Протокол <span id="efMeasCount" class="badge"></span></button>
+          <div class="grow"></div>
+          <button class="btn ghost tiny" id="efCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+        </div>
+        <div class="tabbody" id="efTabJournal"><div class="journal" id="efJournal"></div></div>
+        <div class="tabbody" id="efTabMeas" hidden></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card task">
+        <h2>Задание <span class="badge" id="efTaskId">1 / 6</span></h2>
+        <div class="body" id="efTaskBody"></div>
+        <div class="tasklist" id="efTaskList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Энергия и деньги</h2>
+        <div class="meters">
+          <div class="meter accent"><div class="k"><span>За сутки</span><span>кВт·ч</span></div>
+            <div class="v" id="efKwh">0 <small>кВт·ч</small></div></div>
+          <div class="meter"><div class="k"><span>Стоимость</span><span>₽</span></div>
+            <div class="v" id="efRub">0 <small>₽</small></div></div>
+          <div class="meter"><div class="k"><span>Экономия</span><span>%</span></div>
+            <div class="v" id="efSave">0 <small>%</small></div></div>
+          <div class="meter"><div class="k"><span>Ожидание</span><span>кВт·ч</span></div>
+            <div class="v" id="efStandby">0 <small>кВт·ч</small></div></div>
+        </div>
+        <div class="aux"><span>Исходно: <b id="efBase">—</b></span><span>Экономия: <b id="efSavedRub">—</b></span></div>
+        <div class="aux" style="padding-top:0"><span>Окупаемость LED: <b id="efPayback">—</b></span></div>
+      </div>
+
+      <div class="card">
+        <h2>Освещённость и нормы</h2>
+        <div style="padding:4px 0">
+          <table class="efftable" id="efLuxTable"></table>
+        </div>
+      </div>
+    </aside>`;
+
+  function pct(v, d) { return v.toFixed(d === undefined ? 1 : d).replace('.', ','); }
+
+  /* ---------- журнал ---------- */
+  function log(kind, text) {
+    st.log.push({ t: st.t, hour: st.hour, kind: kind, text: text });
+    if (st.log.length > 300) st.log.shift();
+    renderJournal();
+  }
+  function renderJournal() {
+    var box = $('efJournal');
+    if (!st.log.length) { box.innerHTML = '<div class="empty-note">Меняйте настройки слева — всё попадёт в журнал.</div>'; return; }
+    box.innerHTML = st.log.slice(-80).map(function (r) {
+      return '<div class="jrow ' + r.kind + '"><span class="tm">' + timeText(r.hour) + '</span><span class="dot"></span><span class="tx">' +
+        String(r.text).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</span></div>';
+    }).join('');
+    box.parentElement.scrollTop = box.parentElement.scrollHeight;
+  }
+  function timeText(h) {
+    var hh = Math.floor(h) % 24, mm = Math.round((h - Math.floor(h)) * 60);
+    return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+
+  /* ---------- управление ---------- */
+  function renderControls() {
+    [].forEach.call($('segLamp').children, function (b) { b.classList.toggle('active', b.dataset.lamp === st.lampType); });
+    $('senMotion').checked = st.sensors.motion;
+    $('senLight').checked = st.sensors.light;
+    $('senSched').checked = st.sensors.schedule;
+    $('apKettle').checked = st.appliances.kettle;
+    $('apFridge').checked = st.appliances.fridge;
+    $('apPc').checked = st.appliances.pc;
+    $('apTv').checked = st.appliances.tv;
+    $('apCharger').checked = st.appliances.charger;
+  }
+  $('segLamp').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    st.lampType = b.dataset.lamp;
+    log('ok', 'Лампы: ' + E.LAMPS[st.lampType].name + ' · ' + E.lampPower(st) + ' Вт на весь кабинет');
+    renderControls(); checkTask(false);
+  });
+  [['senMotion', 'motion', 'Датчик движения'], ['senLight', 'light', 'Сумеречное реле'], ['senSched', 'schedule', 'Умная розетка / расписание']].forEach(function (p) {
+    $(p[0]).addEventListener('change', function (e) {
+      st.sensors[p[1]] = e.target.checked;
+      log(e.target.checked ? 'ok' : 'warn', p[2] + (e.target.checked ? ' включён' : ' выключен'));
+      checkTask(false);
+    });
+  });
+  [['apKettle', 'kettle'], ['apFridge', 'fridge'], ['apPc', 'pc'], ['apTv', 'tv'], ['apCharger', 'charger']].forEach(function (p) {
+    $(p[0]).addEventListener('change', function (e) {
+      st.appliances[p[1]] = e.target.checked;
+      log(e.target.checked ? 'ok' : 'warn', E.APPLIANCES[p[1]].name + (e.target.checked ? ' в работе' : ' отключён'));
+      checkTask(false);
+    });
+  });
+  $('efPlay').onclick = function () { playing = !playing; this.textContent = playing ? '⏸' : '▶'; };
+  var speed = 1;
+  [].forEach.call(document.querySelectorAll('[data-efspeed]'), function (b) {
+    b.onclick = function () {
+      speed = +b.dataset.efspeed;
+      [].forEach.call(document.querySelectorAll('[data-efspeed]'), function (x) { x.classList.toggle('active', x === b); });
+    };
+  });
+  $('efDay').onclick = function () {
+    var d = E.dayTotals(st), sv = E.savings(st);
+    st.measures.push({ kind: 'day', t: st.t, kwh: d.kwh, cost: d.cost, peak: d.peak, lampType: st.lampType,
+      percent: sv.percent, sensors: Object.assign({}, st.sensors) });
+    log(d.kwh <= sv.base.total ? 'ok' : 'warn', 'Прогон суток: ' + pct(d.kwh, 2) + ' кВт·ч, ' + pct(d.cost, 1) +
+      ' ₽, пик ' + Math.round(d.peak) + ' Вт');
+    renderMeasurements(); checkTask(false);
+    toast('Сутки: ' + pct(d.kwh, 2) + ' кВт·ч · ' + pct(d.cost, 1) + ' ₽');
+  };
+  $('efReset').onclick = function () {
+    st = E.createState(); solved = {}; lastFacts = null;
+    log('warn', 'Исходные настройки: лампы накаливания, датчики выключены');
+    renderControls(); renderMeasurements(); renderTask();
+  };
+
+  /* ---------- протокол ---------- */
+  function sample() {
+    var f = E.facts(st), s = E.savings(st);
+    var rec = {
+      t: st.t, kind: 'saving', lampType: st.lampType, lightKwh: s.now.light, totalKwh: s.now.total,
+      baseKwh: s.base.total, percent: s.percent, savedRub: s.savedRub, standbyKwh: s.now.standby,
+      lux: f.lux.map(function (r) { return Math.round(r.lux); }), allNorm: f.allNorm,
+      payback: f.retrofit.paybackMonths, sensors: Object.assign({}, st.sensors)
+    };
+    st.measures.push(rec);
+    if (st.sensors.motion || st.sensors.light) st.measures.push(Object.assign({ kind: 'smart' }, rec));
+    log('ok', 'Точка: ' + pct(s.now.total, 2) + ' кВт·ч/сутки, экономия ' + Math.round(s.percent * 100) +
+      ' %, standby ' + pct(s.now.standby, 2) + ' кВт·ч');
+    renderMeasurements(); checkTask(false);
+  }
+  function renderMeasurements() {
+    var box = $('efTabMeas');
+    $('efMeasCount').textContent = st.measures.length || '';
+    if (!st.measures.length) { box.innerHTML = '<div class="empty-note">Нажмите «Снять точку» или «Прогнать сутки».</div>'; return; }
+    box.innerHTML = '<table class="mtable"><thead><tr><th>Что</th><th>Лампы</th><th>Свет, кВт·ч</th><th>Всего, кВт·ч</th>' +
+      '<th>Экономия, %</th><th>Ожидание, кВт·ч</th><th>лк (каб./кор./лаб.)</th></tr></thead><tbody>' +
+      st.measures.slice(-50).reverse().map(function (m) {
+        return '<tr><td>' + (m.kind === 'day' ? 'сутки' : m.kind === 'smart' ? 'автоматика' : 'точка') +
+          '</td><td style="text-align:left">' + (E.LAMPS[m.lampType] || {}).name + '</td><td>' +
+          pct(m.lightKwh || 0, 2) + '</td><td>' + pct(m.kind === 'day' ? m.kwh : (m.totalKwh || 0), 2) + '</td><td>' +
+          Math.round((m.percent || 0) * 100) + '</td><td>' + pct(m.standbyKwh || 0, 2) + '</td><td style="text-align:left">' +
+          (m.lux ? m.lux.join(' / ') : '—') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  function exportCsv() {
+    if (!st.measures.length) { toast('Протокол пуст'); return; }
+    var lines = ['Тип;Лампы;Свет,кВт·ч;Всего,кВт·ч;Экономия,%;Ожидание,кВт·ч;лк кабинет;лк коридор;лк лаборатория;Окупаемость,мес'];
+    st.measures.forEach(function (m) {
+      lines.push([m.kind, (E.LAMPS[m.lampType] || {}).name, pct(m.lightKwh || 0, 3),
+        pct(m.kind === 'day' ? m.kwh : (m.totalKwh || 0), 3), Math.round((m.percent || 0) * 100),
+        pct(m.standbyKwh || 0, 3)].concat(m.lux || ['', '', '']).concat([pct(m.payback || 0, 1)]).join(';'));
+    });
+    var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'протокол-энергоаудит.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    log('ok', 'Протокол выгружен в CSV');
+  }
+  [].forEach.call(document.querySelectorAll('.tabs button[data-eftab]'), function (b) {
+    b.onclick = function () {
+      [].forEach.call(document.querySelectorAll('.tabs button[data-eftab]'), function (x) { x.classList.toggle('active', x === b); });
+      $('efTabJournal').hidden = b.dataset.eftab !== 'journal';
+      $('efTabMeas').hidden = b.dataset.eftab !== 'meas';
+    };
+  });
+
+  /* ---------- задания ---------- */
+  function facts() { return lastFacts || E.facts(st); }
+  function renderTask() {
+    var tk = E.TASKS[taskIndex], done = solved[taskIndex];
+    $('efTaskId').textContent = (taskIndex + 1) + ' / ' + E.TASKS.length;
+    $('efTaskBody').innerHTML =
+      '<div class="goal"><b>' + tk.t + '</b><br>' + tk.goal + '</div>' +
+      '<ol>' + tk.steps.map(function (s) { return '<li>' + s + '</li>'; }).join('') + '</ol>' +
+      (done ? '<div class="result ok"><span class="stars">' + '★★★'.slice(0, done) + '</span><br>' + tk.why + '</div>' : '') +
+      '<div class="hints">' + (tk._hints || []).map(function (h, i) { return '<div class="hint">Подсказка ' + (i + 1) + ': ' + h + '</div>'; }).join('') + '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:9px"><button class="btn" id="efHint">Подсказка</button>' +
+      '<button class="btn primary" id="efCheck">Проверить</button></div><div id="efCheckOut"></div>';
+    $('efTaskList').innerHTML = E.TASKS.map(function (t, i) {
+      return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
+        '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + t.t + '</span></button>';
+    }).join('');
+    [].forEach.call($('efTaskList').children, function (b) { b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); }; });
+    $('efHint').onclick = function () {
+      var t2 = E.TASKS[taskIndex]; t2._hints = t2._hints || [];
+      if (t2._hints.length < t2.hints.length) { t2._hints.push(t2.hints[t2._hints.length]); renderTask(); } else toast('Подсказки закончились');
+    };
+    $('efCheck').onclick = function () {
+      if (!checkTask(true)) {
+        var f = facts();
+        $('efCheckOut').innerHTML = '<div class="result bad">Пока не выполнено: экономия ' + Math.round(f.percent * 100) +
+          ' %, нормы ' + (f.allNorm ? 'соблюдены' : 'НАРУШЕНЫ') + ', точек в протоколе ' + f.measures.length + '.</div>';
+      }
+    };
+  }
+  function checkTask(show) {
+    var tk = E.TASKS[taskIndex], f = facts(), was = !!solved[taskIndex];
+    var ok = false;
+    try { ok = tk.check(f); } catch (e) { ok = false; }
+    if (ok && !was) {
+      var stars = 1;
+      try { stars = tk.stars(f) || 1; } catch (e) {}
+      solved[taskIndex] = stars;
+      log('ok', 'Задание выполнено: ' + tk.t + ' (' + stars + '★)');
+      renderTask();
+    } else if (ok && show) renderTask();
+    return ok;
+  }
+
+  /* ---------- сцена ---------- */
+  function drawLamps(container, count, room) {
+    var s = '';
+    for (var i = 0; i < count; i++) {
+      var x = 52 + (i % 3) * 90, y = 96 + Math.floor(i / 3) * 60;
+      var on = st.totalW > 0;
+      s += '<g transform="translate(' + x + ',' + y + ')">' +
+        '<circle r="13" fill="' + (on ? '#ffe9a8' : '#eef3f7') + '" stroke="#cbd9e4" stroke-width="1.6"/>' +
+        '<path d="M-6 -1 L-2 -1 L-4 5 L2 5 L-1 -5 L-5 -5 Z" fill="' + (on ? '#e8a93a' : '#b9c7d2') + '"/></g>';
+    }
+    container.innerHTML = s;
+  }
+  function drawScene(f) {
+    drawLamps($('lampsClass'), 6);
+    drawLamps($('lampsHall'), 3);
+    drawLamps($('lampsLab'), 6);
+    // «горит» только та комната, где сейчас есть люди/свет
+    var litNow = (st.hour >= 7 && st.hour <= 9) || (st.hour >= 17 && st.hour <= 22);
+    [['lampsClass', 'roomClass'], ['lampsHall', 'roomHall'], ['lampsLab', 'roomLab']].forEach(function (pair) {
+      $(pair[0]).parentElement.setAttribute('opacity', litNow || !st.sensors.motion ? 1 : 0.45);
+    });
+    $('luxClass').textContent = Math.round(f.lux[0].lux) + ' лк' + (f.lux[0].ok ? '' : ' · ниже нормы');
+    $('luxHall').textContent = Math.round(f.lux[1].lux) + ' лк';
+    $('luxLab').textContent = Math.round(f.lux[2].lux) + ' лк';
+    $('luxClass').setAttribute('fill', f.lux[0].ok ? '#146c4b' : '#a02020');
+    $('luxHall').setAttribute('fill', f.lux[1].ok ? '#146c4b' : '#a02020');
+    $('luxLab').setAttribute('fill', f.lux[2].ok ? '#146c4b' : '#a02020');
+    // иконки приборов
+    var keys = Object.keys(E.APPLIANCES);
+    $('applIcons').innerHTML = keys.map(function (k, i) {
+      var a = E.APPLIANCES[k], on = st.appliances[k];
+      var x = 14 + i * 132;
+      return '<g transform="translate(' + x + ',26)">' +
+        '<rect width="118" height="36" rx="7" fill="' + (on ? '#eaf7f1' : '#f4f7fa') + '" stroke="' + (on ? '#b8e2ce' : '#e0e8ef') + '"/>' +
+        '<text x="8" y="15" font-size="10" fill="#1f2a36" font-family="sans-serif">' + a.name + '</text>' +
+        '<text x="8" y="29" font-size="9.5" fill="#7a8a97" font-family="sans-serif">' + (on ? a.power + ' Вт' : 'выключен') + '</text></g>';
+    }).join('');
+    $('meterW').textContent = Math.round(st.totalW) + ' Вт';
+    // солнце / время суток
+    var night = st.hour < 6 || st.hour > 20;
+    $('gDay').innerHTML = '<circle cx="0" cy="0" r="16" fill="' + (night ? '#2f4a63' : '#ffd166') + '"/>';
+  }
+
+  function renderChart() {
+    var prof = E.dayProfile(st);
+    var maxV = Math.max.apply(null, prof.map(function (p) { return p.w; })) || 1;
+    var W = 800, H = 120, pad = 24;
+    function x(h) { return pad + (h / 24) * (W - pad - 8); }
+    function y(v) { return H - 18 - (v / maxV) * (H - 30); }
+    var grid = '';
+    for (var h = 0; h <= 24; h += 3) {
+      grid += '<line x1="' + x(h) + '" y1="' + y(0) + '" x2="' + x(h) + '" y2="6" stroke="#e7eef4"/>' +
+        '<text x="' + x(h) + '" y="' + (H - 5) + '" font-size="8" fill="#9aabb8" text-anchor="middle" font-family="sans-serif">' + h + '</text>';
+    }
+    var area = prof.map(function (p, i) { return (i ? 'L' : 'M') + x(p.h).toFixed(1) + ',' + y(p.w).toFixed(1); }).join(' ') +
+      ' L' + x(24).toFixed(1) + ',' + y(0).toFixed(1) + ' L' + x(0).toFixed(1) + ',' + y(0).toFixed(1) + ' Z';
+    var nowX = x(st.hour);
+    $('efChart').innerHTML = grid +
+      '<path d="' + area + '" fill="#e6f2f8" stroke="#0b6e99" stroke-width="1.6"/>' +
+      '<line x1="' + nowX + '" y1="6" x2="' + nowX + '" y2="' + y(0) + '" stroke="#f28c28" stroke-width="1.4"/>';
+    $('efPeak').textContent = 'пик ' + Math.round(maxV) + ' Вт';
+  }
+
+  function renderMeters(f) {
+    var s = E.savings(st);
+    $('efKwh').innerHTML = pct(s.now.total, 2) + ' <small>кВт·ч</small>';
+    $('efRub').innerHTML = pct(s.now.cost, 1) + ' <small>₽</small>';
+    $('efSave').innerHTML = Math.round(s.percent * 100) + ' <small>%</small>';
+    $('efStandby').innerHTML = pct(s.now.standby, 2) + ' <small>кВт·ч</small>';
+    $('efBase').textContent = pct(s.base.total, 2) + ' кВт·ч · ' + pct(s.base.cost, 1) + ' ₽';
+    $('efSavedRub').textContent = pct(s.savedRub, 1) + ' ₽/сутки';
+    $('efPayback').textContent = f.retrofit.paybackMonths === Infinity ? '—' :
+      pct(f.retrofit.paybackMonths, 1) + ' мес';
+    $('efClock').textContent = timeText(st.hour);
+    $('efLuxTable').innerHTML = '<thead><tr><th>Помещение</th><th>Сейчас, лк</th><th>Норма, лк</th><th></th></tr></thead><tbody>' +
+      f.lux.map(function (r) {
+        return '<tr><td>' + r.name + '</td><td>' + Math.round(r.lux) + '</td><td>' + r.norm + '</td><td class="' +
+          (r.ok ? 'ok-lux' : 'bad-lux') + '">' + (r.ok ? '✓' : '✕') + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  function frame(now) {
+    var dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
+    lastTick = now;
+    if (window.__bench === 'efficiency') {
+      if (playing && dt > 0) E.step(st, dt, speed);
+      lastFacts = E.facts(st);
+      drawScene(lastFacts);
+      renderMeters(lastFacts);
+      if (Math.abs(st.hour - (frame._lastHour || -1)) > 0.5) { frame._lastHour = st.hour; renderChart(); }
+      taskTick += dt;
+      if (taskTick > 0.5) { taskTick = 0; checkTask(false); }
+    }
+    requestAnimationFrame(frame);
+  }
+  function toast(text) {
+    var t = document.getElementById('toast'); if (!t) return;
+    t.textContent = text; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove('show'); }, 2400);
+  }
+
+  $('efSample').onclick = sample;
+  $('efCsv').onclick = exportCsv;
+
+  renderControls(); renderJournal(); renderMeasurements(); renderTask(); renderChart();
+  st.totalW = 0;
+  log('ok', 'Стенд «Энергоэффективность»: кабинет 15 ламп накаливания, приборы включены.');
+  requestAnimationFrame(frame);
+
+  window.__eff = {
+    state: function () { return st; }, facts: function () { return E.facts(st); },
+    sample: sample, solved: function () { return solved; }, E: E
+  };
 })();
 </script>
 <script>
@@ -3172,23 +4807,21 @@
   /* ================= переключение стендов ================= */
   var bench = 'circuits';
   window.__bench = 'circuits';
+  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff' };
+  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency' };
   function setBench(name) {
     bench = name;
     window.__bench = name;
-    document.body.classList.toggle('renew', name === 'renew');
-    $('benchCircuits').hidden = name !== 'circuits';
-    $('benchRenew').hidden = name !== 'renew';
+    Object.keys(BENCH_CLASS).forEach(function (k) {
+      document.body.classList.toggle(BENCH_CLASS[k] || 'circuits-mode', k === name);
+      var el = $(BENCH_EL[k]);
+      if (el) el.hidden = k !== name;
+    });
     [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
       b.classList.toggle('active', b.dataset.bench === name);
     });
-    if (name === 'renew' && !window.__renewReady) {
-      window.__renewReady = true;
-      if (typeof window.__renInit === 'function') window.__renInit();
-    }
-    if (name === 'renew') {
-      // синхронизация размеров сцены после показа
-      window.dispatchEvent(new Event('resize'));
-    }
+    if (typeof window.__renInit === 'function') window.__renInit();   // ленивая инициализация стенда ВИЭ
+    window.dispatchEvent(new Event('resize'));
   }
   [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
     b.onclick = function () {

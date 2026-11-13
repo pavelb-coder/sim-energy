@@ -13,6 +13,7 @@
     --r:10px;
   }
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   html,body{height:100%}
   body{
     margin:0;background:var(--bg);color:var(--ink);
@@ -255,8 +256,8 @@
     <nav class="benchnav" aria-label="Стенды">
       <button class="active" data-bench="circuits">Электрические цепи</button>
       <button data-bench="renew">Возобновляемая энергетика</button>
-      <button disabled title="Стенд следующей версии">Накопители <em>v3</em></button>
-      <button disabled title="Стенд следующей версии">Эффективность <em>v3</em></button>
+      <button data-bench="storage">Накопители</button>
+      <button data-bench="efficiency">Эффективность</button>
     </nav>
     <div class="grow"></div>
     <div class="modes" role="tablist" aria-label="Режим работы">
@@ -377,6 +378,8 @@
   </div>
 
   <main id="benchRenew" hidden></main>
+  <main id="benchStorage" hidden></main>
+  <main id="benchEfficiency" hidden></main>
 </div>
 
 <div class="modal" id="help">
@@ -430,6 +433,10 @@
 <script>/*__ENGINE__*/</script>
 <script>/*__RENEW__*/</script>
 <script>/*__RENEW_UI__*/</script>
+<script>/*__STORAGE__*/</script>
+<script>/*__STORAGE_UI__*/</script>
+<script>/*__EFFICIENCY__*/</script>
+<script>/*__EFFICIENCY_UI__*/</script>
 <script>
 (function () {
   'use strict';
@@ -1659,23 +1666,21 @@
   /* ================= переключение стендов ================= */
   var bench = 'circuits';
   window.__bench = 'circuits';
+  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff' };
+  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency' };
   function setBench(name) {
     bench = name;
     window.__bench = name;
-    document.body.classList.toggle('renew', name === 'renew');
-    $('benchCircuits').hidden = name !== 'circuits';
-    $('benchRenew').hidden = name !== 'renew';
+    Object.keys(BENCH_CLASS).forEach(function (k) {
+      document.body.classList.toggle(BENCH_CLASS[k] || 'circuits-mode', k === name);
+      var el = $(BENCH_EL[k]);
+      if (el) el.hidden = k !== name;
+    });
     [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
       b.classList.toggle('active', b.dataset.bench === name);
     });
-    if (name === 'renew' && !window.__renewReady) {
-      window.__renewReady = true;
-      if (typeof window.__renInit === 'function') window.__renInit();
-    }
-    if (name === 'renew') {
-      // синхронизация размеров сцены после показа
-      window.dispatchEvent(new Event('resize'));
-    }
+    if (typeof window.__renInit === 'function') window.__renInit();   // ленивая инициализация стенда ВИЭ
+    window.dispatchEvent(new Event('resize'));
   }
   [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {
     b.onclick = function () {

@@ -6,7 +6,8 @@
   'use strict';
   var R = window.Renew;
   if (!R || !document.getElementById('benchRenew')) return;
-  window.__renInit = function () { init(); };
+  var inited = false;
+  window.__renInit = function () { if (inited) return; inited = true; init(); };
   function init() {
 
   var $ = function (id) { return document.getElementById(id); };
