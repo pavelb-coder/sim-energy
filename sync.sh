@@ -88,6 +88,12 @@ sync_moodle() {
 
   echo "== обновляю ветку moodle-plugin под main"
   git fetch origin moodle-plugin >/dev/null 2>&1 || true
+  # запоминаем состояние удалённой ветки: rebase переписывает коммиты,
+  # поэтому пуш идёт с force-with-lease именно на это состояние
+  local remote_sha=""
+  if git show-ref --verify --quiet refs/remotes/origin/moodle-plugin; then
+    remote_sha="$(git rev-parse origin/moodle-plugin)"
+  fi
 
   if git show-ref --verify --quiet refs/remotes/origin/moodle-plugin; then
     git checkout -q -B moodle-plugin origin/moodle-plugin
@@ -127,7 +133,12 @@ sync_moodle() {
     ahead=1
   fi
   if [ "$ahead" != "0" ]; then
-    git -c credential.helper= -c "http.extraheader=$(remote_auth)" push origin HEAD:moodle-plugin >/dev/null
+    if [ -n "$remote_sha" ]; then
+      git -c credential.helper= -c "http.extraheader=$(remote_auth)" \
+        push --force-with-lease=refs/heads/moodle-plugin:"$remote_sha" origin HEAD:moodle-plugin >/dev/null
+    else
+      git -c credential.helper= -c "http.extraheader=$(remote_auth)" push origin HEAD:moodle-plugin >/dev/null
+    fi
     echo "  ветка moodle-plugin обновлена"
   else
     echo "  ветка moodle-plugin уже актуальна"
