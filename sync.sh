@@ -33,54 +33,6 @@ remote_auth() {
 }
 
 
-case "${1:-}" in
-  --status)
-    git fetch origin main >/dev/null 2>&1 || true
-    echo "== локально не закоммичено:"; git status --short || true
-    echo "== расхождение с origin/main:"; git log --oneline origin/main..HEAD 2>/dev/null | sed 's/^/  впереди: /' || true
-    git log --oneline HEAD..origin/main 2>/dev/null | sed 's/^/  позади:  /' || true
-    exit 0
-    ;;
-  --pull)
-    git -c credential.helper= -c "http.extraheader=$(remote_auth)" pull --rebase origin main
-    exit $?
-    ;;
-esac
-
-MSG=""
-SYNC_MOODLE=1
-if [ "${1:-}" = "-m" ] && [ -n "${2:-}" ]; then MSG="$2"; shift 2; fi
-for arg in "$@"; do
-  [ "$arg" = "--no-moodle" ] && SYNC_MOODLE=0
-done
-
-# 1. синхронизируемся с удалённым репозиторием (на случай правок через веб-интерфейс)
-git -c credential.helper= -c "http.extraheader=$(remote_auth)" pull --rebase --autostash origin main || true
-
-# 2. сборка + тесты
-if command -v node >/dev/null 2>&1; then
-  node tools/build.mjs
-  node src/test_engine.js >/dev/null && echo "тесты физики: ок"
-  git add -A dist
-fi
-
-# 3. коммит, если есть что коммитить
-if [ -n "$(git status --porcelain)" ]; then
-  if [ -z "$MSG" ]; then
-    MSG="Синхронизация: $(date '+%d.%m.%Y %H:%M')"
-  fi
-  git add -A
-  git commit -q -m "$MSG"
-  echo "коммит: $MSG"
-else
-  echo "изменений нет — отправляю то, что уже закоммичено"
-fi
-
-# 4. пуш
-git -c credential.helper= -c "http.extraheader=$(remote_auth)" push origin main
-echo "готово: https://github.com/$REPO"
-
-# 5. ветка moodle-plugin всегда соответствует main
 sync_moodle() {
   local base_branch
   base_branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -95,12 +47,19 @@ sync_moodle() {
     remote_sha="$(git rev-parse origin/moodle-plugin)"
   fi
 
+  # незакоммиченные правки в рабочей папке прячем, чтобы не мешали переключению ветки
+  local stashed=0
+  if [ -n "$(git status --porcelain)" ]; then
+    git stash push -q -u -m "sync-moodle: временные правки" && stashed=1
+  fi
+
   if git show-ref --verify --quiet refs/remotes/origin/moodle-plugin; then
     git checkout -q -B moodle-plugin origin/moodle-plugin
     if ! git rebase -q origin/main; then
       echo "  ! конфликт при rebase — ветка не обновлена, разрешите вручную" >&2
       git rebase --abort || true
       git checkout -q "$base_branch"
+      [ "$stashed" = "1" ] && git stash pop -q || true
       return 1
     fi
   else
@@ -145,7 +104,67 @@ sync_moodle() {
   fi
 
   git checkout -q "$base_branch"
+  # возвращаем отложенные правки рабочей папки
+  if [ "$stashed" = "1" ]; then
+    git stash pop -q || echo "  ! отложенные правки вернулись с конфликтом — проверьте git status" >&2
+  fi
 }
+
+
+case "${1:-}" in
+  --status)
+    git fetch origin main >/dev/null 2>&1 || true
+    echo "== локально не закоммичено:"; git status --short || true
+    echo "== расхождение с origin/main:"; git log --oneline origin/main..HEAD 2>/dev/null | sed 's/^/  впереди: /' || true
+    git log --oneline HEAD..origin/main 2>/dev/null | sed 's/^/  позади:  /' || true
+    exit 0
+    ;;
+  --pull)
+    git -c credential.helper= -c "http.extraheader=$(remote_auth)" pull --rebase origin main
+    exit $?
+    ;;
+  --moodle)
+    # только привести ветку moodle-plugin к текущему main (без коммита в main)
+    git -c credential.helper= -c "http.extraheader=$(remote_auth)" fetch origin main >/dev/null 2>&1 || true
+    sync_moodle
+    exit $?
+    ;;
+esac
+
+MSG=""
+SYNC_MOODLE=1
+if [ "${1:-}" = "-m" ] && [ -n "${2:-}" ]; then MSG="$2"; shift 2; fi
+for arg in "$@"; do
+  [ "$arg" = "--no-moodle" ] && SYNC_MOODLE=0
+done
+
+# 1. синхронизируемся с удалённым репозиторием (на случай правок через веб-интерфейс)
+git -c credential.helper= -c "http.extraheader=$(remote_auth)" pull --rebase --autostash origin main || true
+
+# 2. сборка + тесты
+if command -v node >/dev/null 2>&1; then
+  node tools/build.mjs
+  node src/test_engine.js >/dev/null && echo "тесты физики: ок"
+  git add -A dist
+fi
+
+# 3. коммит, если есть что коммитить
+if [ -n "$(git status --porcelain)" ]; then
+  if [ -z "$MSG" ]; then
+    MSG="Синхронизация: $(date '+%d.%m.%Y %H:%M')"
+  fi
+  git add -A
+  git commit -q -m "$MSG"
+  echo "коммит: $MSG"
+else
+  echo "изменений нет — отправляю то, что уже закоммичено"
+fi
+
+# 4. пуш
+git -c credential.helper= -c "http.extraheader=$(remote_auth)" push origin main
+echo "готово: https://github.com/$REPO"
+
+# 5. ветка moodle-plugin всегда соответствует main
 
 if [ "$SYNC_MOODLE" = "1" ]; then
   sync_moodle || echo "  (ветку moodle-plugin обновлю через CI после пуша)" >&2

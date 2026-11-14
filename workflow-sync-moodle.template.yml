@@ -1,0 +1,110 @@
+# Шаблон CI-шага: держит ветку moodle-plugin актуальной при пуше в main.
+#
+# Как включить (нужен токен со scope `workflow`):
+#   mkdir -p .github/workflows
+#   cp workflow-sync-moodle.template.yml .github/workflows/sync-moodle.yml
+#   git add -f .github/workflows/sync-moodle.yml && git commit -m "CI: sync moodle-plugin" && git push
+#
+# Без CI то же самое делает локальный ./sync.sh (и ./sync.sh --moodle — только ветку).
+
+name: sync-moodle-branch
+
+# Держит ветку moodle-plugin в актуальном состоянии относительно main:
+#   • при каждом пуше в main переносит изменения в moodle-plugin;
+#   • заново собирает стенд внутри плагина (standalone/lab.html) и архив mod_energy.zip;
+#   • прогоняет проверки плагина (php tools_check.php) и физики;
+#   • если в main есть правки плагина — они сохраняются (rebase, а не перезапись).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-moodle-branch
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # ветка защищена от «мусорных» пушей: обновляется только этот workflow
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Проверки физики
+        run: node src/test_engine.js && node src/test_renew.js && node src/test_storage.js && node src/test_efficiency.js
+
+      - name: Сборка (обновляет и moodle/mod/energy/standalone/lab.html)
+        run: node tools/build.mjs
+
+      - name: Готовим ветку moodle-plugin
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin moodle-plugin >/dev/null 2>&1; then
+            # ветка есть: переносим на неё свежий main, сохраняя правки плагина
+            git fetch origin moodle-plugin
+            git checkout -B moodle-plugin origin/moodle-plugin
+            if ! git rebase origin/main; then
+              echo "::error::Конфликт при rebase moodle-plugin на main — нужно разрешить вручную"
+              git rebase --abort || true
+              exit 1
+            fi
+          else
+            # ветки нет: создаём от main, история общая
+            git checkout -B moodle-plugin origin/main
+          fi
+
+      - name: Пересборка плагина
+        run: |
+          set -euo pipefail
+          # стенд внутри плагина всегда соответствует текущему main
+          node tools/build.mjs
+          # архив для установки через «Установить плагин из ZIP»
+          (cd moodle && zip -qr mod_energy.zip mod/energy -x "*/.*")
+
+      - name: Проверки плагина
+        run: |
+          php -v
+          cd moodle/mod/energy
+          php tools_check.php
+
+      - name: Коммит и пуш
+        run: |
+          set -euo pipefail
+          git add -A moodle
+          if [ -z "$(git status --porcelain)" ] && [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main 2>/dev/null || echo none)" ]; then
+            # изменений в файлах нет, но ветка уже обновлена относительно main
+            :
+          fi
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -q -m "Moodle: сборка плагина под main $(git rev-parse --short origin/main) [skip ci]"
+            echo "есть коммит"
+          else
+            echo "изменений в файлах нет"
+          fi
+          # пуш только если ветка реально отличается
+          if git rev-parse --verify --quiet origin/moodle-plugin >/dev/null; then
+            AHEAD=$(git rev-list --count origin/moodle-plugin..HEAD)
+          else
+            AHEAD=1
+          fi
+          if [ "$AHEAD" != "0" ]; then
+            git push origin HEAD:moodle-plugin
+            echo "ветка moodle-plugin обновлена"
+          else
+            echo "moodle-plugin уже актуальна"
+          fi
