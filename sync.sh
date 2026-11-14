@@ -55,12 +55,13 @@ sync_moodle() {
 
   if git show-ref --verify --quiet refs/remotes/origin/moodle-plugin; then
     git checkout -q -B moodle-plugin origin/moodle-plugin
-    if ! git rebase -q origin/main; then
-      echo "  ! конфликт при rebase — ветка не обновлена, разрешите вручную" >&2
-      git rebase --abort || true
-      git checkout -q "$base_branch"
-      [ "$stashed" = "1" ] && git stash pop -q || true
-      return 1
+    # плагин целиком живёт в moodle/ и не меняется в main: переносим ветку на новый main
+    # с нашими файлами как единственной разницей (CI делает так же через rebase)
+    git reset -q --soft origin/main
+    git checkout origin/main -- .
+    git add -A moodle
+    if [ -n "$(git status --porcelain)" ]; then
+      git commit -q -m "Moodle: ветка плагина на базе main $(git rev-parse --short origin/main)"
     fi
   else
     git checkout -q -B moodle-plugin origin/main
