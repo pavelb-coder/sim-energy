@@ -5,6 +5,10 @@
 #   ./sync.sh -m "сообщение"  то же, но со своим текстом коммита
 #   ./sync.sh --pull          только забрать изменения из репозитория (rebase)
 #   ./sync.sh --status        показать, что расходится с репозиторием
+#   ./sync.sh --no-moodle     не обновлять ветку moodle-plugin
+#
+# После каждого обновления main ветка moodle-plugin приводится к его состоянию:
+# свежая сборка стенда внутри плагина, архив mod_energy.zip и проверки PHP.
 #
 # Токен берётся из ~/.gh_token (права 600) и на диск в репозиторий не попадает.
 set -euo pipefail
@@ -44,7 +48,11 @@ case "${1:-}" in
 esac
 
 MSG=""
+SYNC_MOODLE=1
 if [ "${1:-}" = "-m" ] && [ -n "${2:-}" ]; then MSG="$2"; shift 2; fi
+for arg in "$@"; do
+  [ "$arg" = "--no-moodle" ] && SYNC_MOODLE=0
+done
 
 # 1. синхронизируемся с удалённым репозиторием (на случай правок через веб-интерфейс)
 git -c credential.helper= -c "http.extraheader=$(remote_auth)" pull --rebase --autostash origin main || true
@@ -71,3 +79,63 @@ fi
 # 4. пуш
 git -c credential.helper= -c "http.extraheader=$(remote_auth)" push origin main
 echo "готово: https://github.com/$REPO"
+
+# 5. ветка moodle-plugin всегда соответствует main
+sync_moodle() {
+  local base_branch
+  base_branch="$(git rev-parse --abbrev-ref HEAD)"
+  [ "$base_branch" = "HEAD" ] && return 0
+
+  echo "== обновляю ветку moodle-plugin под main"
+  git fetch origin moodle-plugin >/dev/null 2>&1 || true
+
+  if git show-ref --verify --quiet refs/remotes/origin/moodle-plugin; then
+    git checkout -q -B moodle-plugin origin/moodle-plugin
+    if ! git rebase -q origin/main; then
+      echo "  ! конфликт при rebase — ветка не обновлена, разрешите вручную" >&2
+      git rebase --abort || true
+      git checkout -q "$base_branch"
+      return 1
+    fi
+  else
+    git checkout -q -B moodle-plugin origin/main
+  fi
+
+  # пересобираем стенд внутри плагина и архив для установки
+  if command -v node >/dev/null 2>&1; then
+    node tools/build.mjs >/dev/null
+  fi
+  if command -v zip >/dev/null 2>&1; then
+    (cd moodle && zip -qr mod_energy.zip mod/energy -x "*/.*")
+  fi
+
+  # проверки плагина
+  if command -v php >/dev/null 2>&1 && [ -f moodle/mod/energy/tools_check.php ]; then
+    (cd moodle/mod/energy && php tools_check.php >/dev/null) && echo "  проверки плагина: ок"
+  fi
+
+  if [ -n "$(git status --porcelain)" ]; then
+    git add -A moodle
+    git commit -q -m "Moodle: сборка плагина под main $(git rev-parse --short origin/main)"
+    echo "  коммит: сборка плагина под main"
+  fi
+
+  local ahead
+  if git show-ref --verify --quiet refs/remotes/origin/moodle-plugin; then
+    ahead="$(git rev-list --count origin/moodle-plugin..HEAD)"
+  else
+    ahead=1
+  fi
+  if [ "$ahead" != "0" ]; then
+    git -c credential.helper= -c "http.extraheader=$(remote_auth)" push origin HEAD:moodle-plugin >/dev/null
+    echo "  ветка moodle-plugin обновлена"
+  else
+    echo "  ветка moodle-plugin уже актуальна"
+  fi
+
+  git checkout -q "$base_branch"
+}
+
+if [ "$SYNC_MOODLE" = "1" ]; then
+  sync_moodle || echo "  (ветку moodle-plugin обновлю через CI после пуша)" >&2
+fi
