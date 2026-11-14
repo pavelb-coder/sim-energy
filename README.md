@@ -26,6 +26,30 @@ npm run build && cp dist/lab.html index.html && ./sync.sh -m "публикаци
 
 Офлайн-вариант: `dist/lab.html` можно скачать и открыть двойным кликом — сервер не нужен.
 
+## Moodle
+
+Для встраивания лаборатории в курс собран плагин-активность `mod_energy`
+(каталог `moodle/mod/energy`, ветка `moodle-plugin`): четыре стенда внутри Moodle,
+автоматическая оценка по выполненным заданиям, отчёт для преподавателя и CSV.
+Готовый архив — `moodle/mod_energy.zip`.
+
+```bash
+npm run build           # обновит и плагин: moodle/mod/energy/standalone/lab.html
+cd moodle && zip -r mod_energy.zip mod/energy -x "*/.*"
+```
+
+**Ветка `moodle-plugin` обновляется автоматически вместе с `main`:**
+
+- `./sync.sh` — в конце сам переводит `moodle-plugin` на свежий `main`, пересобирает стенд
+  внутри плагина, архив `mod_energy.zip` и прогоняет `php tools_check.php`;
+- `./sync.sh --moodle` — только обновить ветку плагина, без коммита в `main`;
+- `./sync.sh --no-moodle` — не трогать ветку плагина;
+- для CI есть шаблон `workflow-sync-moodle.template.yml`: при пуше в `main`
+  GitHub Actions сам переносит изменения в `moodle-plugin` и собирает плагин
+  (инструкция по включению — в первых строках файла).
+
+Подробности — [moodle/README.md](moodle/README.md).
+
 ## Локальный запуск (порт 8082)
 
 Как в `sim-chemistry`: тот же лёгкий сервер на Node без зависимостей.
