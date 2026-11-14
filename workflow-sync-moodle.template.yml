@@ -13,7 +13,7 @@ name: sync-moodle-branch
 #   • при каждом пуше в main переносит изменения в moodle-plugin;
 #   • заново собирает стенд внутри плагина (standalone/lab.html) и архив mod_energy.zip;
 #   • прогоняет проверки плагина (php tools_check.php) и физики;
-#   • если в main есть правки плагина — они сохраняются (rebase, а не перезапись).
+#   • файлы плагина (каталог moodle/) сохраняются при каждом переносе.
 
 on:
   push:
@@ -54,17 +54,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # плагин живёт только в moodle/ и в main не меняется, поэтому ветку
+          # не «ребейзим» (это даёт конфликты), а переносим на свежий main,
+          # сохраняя файлы плагина как единственную разницу.
           if git ls-remote --exit-code --heads origin moodle-plugin >/dev/null 2>&1; then
-            # ветка есть: переносим на неё свежий main, сохраняя правки плагина
             git fetch origin moodle-plugin
             git checkout -B moodle-plugin origin/moodle-plugin
-            if ! git rebase origin/main; then
-              echo "::error::Конфликт при rebase moodle-plugin на main — нужно разрешить вручную"
-              git rebase --abort || true
-              exit 1
+            git reset --soft origin/main
+            git checkout origin/main -- .
+            git add -A moodle
+            if [ -n "$(git status --porcelain)" ]; then
+              git commit -q -m "Moodle: ветка плагина на базе main $(git rev-parse --short origin/main) [skip ci]"
             fi
           else
-            # ветки нет: создаём от main, история общая
             git checkout -B moodle-plugin origin/main
           fi
 
