@@ -146,7 +146,7 @@
           <line x1="0" y1="330" x2="760" y2="330" stroke="#c6d3dd" stroke-width="2"/>
 
           <!-- дом с нагрузкой -->
-          <g id="gHouse" transform="translate(120,232)">
+          <g id="gGridHouse" transform="translate(120,232)">
             <rect x="-46" y="0" width="92" height="76" rx="6" fill="#ffffff" stroke="#c6d3dd" stroke-width="2"/>
             <path d="M-56 2 L0 -46 L56 2 Z" fill="#eef3f8" stroke="#c6d3dd" stroke-width="2"/>
             <rect id="gWin1" x="-32" y="16" width="26" height="22" rx="3" fill="#cfe3f2"/>
@@ -185,7 +185,7 @@
           </g>
 
           <!-- батарея -->
-          <g id="gBattG" transform="translate(520,236)">
+          <g id="gGridBatt" transform="translate(520,236)">
             <rect x="-34" y="0" width="68" height="78" rx="8" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
             <rect x="-12" y="-8" width="24" height="10" rx="3" fill="#dbe6ee" stroke="#c6d3dd" stroke-width="1.6"/>
             <rect id="gBattFill" x="-28" y="70" width="56" height="0" rx="6" fill="url(#gBattFill)" style="transition:height .2s,y .2s"/>
@@ -265,7 +265,7 @@
           <div class="meter accent"><div class="k"><span>Выработка</span><span>P</span></div>
             <div class="v" id="gGen">0 <small>кВт</small></div></div>
           <div class="meter"><div class="k"><span>Нагрузка</span><span>L</span></div>
-            <div class="v" id="gLoad">0 <small>кВт</small></div></div>
+            <div class="v" id="gLcdLoad">0 <small>кВт</small></div></div>
           <div class="meter"><div class="k"><span>Из сети</span><span>⇦</span></div>
             <div class="v" id="gImp">0 <small>кВт</small></div></div>
           <div class="meter"><div class="k"><span>В сеть</span><span>⇨</span></div>
@@ -553,7 +553,7 @@
     UI.text($('gLcdBal'), n(f.gen - f.load, 2));
     UI.text($('gLcdSoc'), String(Math.round(f.soc * 100)));
     UI.text($('gGen'), n(f.gen) + ' кВт');
-    UI.text($('gLoad'), n(f.load) + ' кВт');
+    UI.text($('gLcdLoad'), n(f.load) + ' кВт');
     UI.text($('gImp'), n(f.gridImport) + ' кВт');
     UI.text($('gExp'), n(f.gridExport) + ' кВт');
     UI.text($('gSoc'), Math.round(f.soc * 100) + ' %');
@@ -590,7 +590,7 @@
     var done = solved[taskIndex];
     UI.text($('gTaskId'), (taskIndex + 1) + ' / ' + G.TASKS.length);
     UI.html($('gTaskBody'),
-      '<div class="glyph">' + (done ? '★'.repeat(done) : '🎯') + '</div>' +
+      '<div class="glyph">' + (done ? '★'.repeat(done) : '◎') + '</div>' +
       '<div class="goal"><b>' + esc(tk.t) + '</b><br>' + esc(tk.goal) + '</div>' +
       '<ol class="steps">' + tk.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
       '<div class="row" style="gap:6px;margin-top:6px">' +

@@ -169,14 +169,14 @@
             <text x="0" y="88" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">ветрогенератор</text>
           </g>
 
-          <g id="gHouse" transform="translate(620,300)">
+          <g id="rHouse" transform="translate(620,300)">
             <path d="M-46 32 L-46 -12 L0 -48 L46 -12 L46 32 Z" fill="#f6f9fc" stroke="#c6d3dd" stroke-width="2"/>
             <rect id="win" x="-16" y="-6" width="32" height="24" rx="2" fill="#cfe3ee" stroke="#c6d3dd"/>
             <circle id="lampGlow" cx="0" cy="6" r="30" fill="#ffd166" opacity="0"/>
             <text x="0" y="56" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">потребители</text>
           </g>
 
-          <g id="gBatt" transform="translate(560,392)">
+          <g id="rBatt" transform="translate(560,392)">
             <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#b9c8d4" stroke-width="2"/>
             <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#b9c8d4"/>
             <rect id="battFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#battFillG)"/>

@@ -59,6 +59,9 @@ sync_moodle() {
     # с нашими файлами как единственной разницей (CI делает так же через rebase)
     git reset -q --soft origin/main
     git checkout origin/main -- .
+    # правки самого плагина (lib.php, языки, проверки) живут только в ветке moodle-plugin:
+    # возвращаем moodle/ из удалённой ветки, а встроенную сборку всё равно пересоберём ниже
+    git checkout origin/moodle-plugin -- moodle 2>/dev/null || true
     git add -A moodle
     if [ -n "$(git status --porcelain)" ]; then
       git commit -q -m "Moodle: ветка плагина на базе main $(git rev-parse --short origin/main)"

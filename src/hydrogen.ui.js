@@ -699,7 +699,7 @@
     var done = solved[taskIndex];
     UI.text($('hyTaskId'), (taskIndex + 1) + ' / ' + H.TASKS.length);
     UI.html($('hyTaskBody'),
-      '<div class="glyph">' + (done ? '★'.repeat(done) : '🎯') + '</div>' +
+      '<div class="glyph">' + (done ? '★'.repeat(done) : '◎') + '</div>' +
       '<div class="goal"><b>' + esc(tk.t) + '</b><br>' + esc(tk.goal) + '</div>' +
       '<ol class="steps">' + tk.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
       '<div class="row" style="gap:6px;margin-top:6px">' +

@@ -122,3 +122,24 @@ run('Лампа при 4.5 В (нить холоднее)', () => {
   console.log('  I = %s А, U1 = %s В, U2 = %s В',
     sol.sol.parts[map.s.id].I.toFixed(3), sol.sol.parts[map.l1.id].U.toFixed(2), sol.sol.parts[map.l2.id].U.toFixed(2));
 }
+
+// 9b. Параллельное соединение: две лампы 4.5В 1Вт параллельно на 9В
+{
+  const { w, map } = mk([['s', 'source', { emf: 9, r: 0.5 }], ['k', 'key', {}],
+    ['l1', 'lamp', { ratedU: 9, ratedP: 2 }], ['l2', 'lamp', { ratedU: 9, ratedP: 2 }]]);
+  Lab.addWire(w, map.s.id + ':1', map.k.id + ':0');
+  Lab.addWire(w, map.k.id + ':1', map.l1.id + ':0');
+  Lab.addWire(w, map.k.id + ':1', map.l2.id + ':0');
+  Lab.addWire(w, map.l1.id + ':1', map.s.id + ':0');
+  Lab.addWire(w, map.l2.id + ':1', map.s.id + ':0');
+  map.k.props.closed = true;
+  let sol;
+  for (let i = 0; i < 2400; i++) sol = Lab.step(w, 1 / 240);
+  const f = Lab.facts(w, sol.sol);
+  console.log('\n=== Две лампы параллельно на 9 В ===');
+  console.log('  U1 = %s В, U2 = %s В, I источника = %s А (сумма токов ламп %s А)',
+    f.lampVoltages[0].toFixed(2), f.lampVoltages[1].toFixed(2),
+    f.sourceCurrent.toFixed(3), f.lampCurrents.reduce(function (a, b) { return a + b; }, 0).toFixed(3));
+  console.log('  parallelLamps = %s, seriesLamps = %s, energyWh = %s',
+    f.parallelLamps, f.seriesLamps, f.energyWh.toFixed(2));
+}

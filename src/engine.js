@@ -349,7 +349,9 @@
       Math.abs(f.sourceCurrent) > Math.max.apply(null, f.lampCurrents) * 1.3;
     // последовательное включение: токи равны, напряжения разные
     const lc = f.lampCurrents.filter(function (v) { return v > 0.005; });
-    f.seriesLamps = lc.length >= 2 && Math.abs(lc[0] - lc[1]) / Math.max(lc[0], lc[1]) < 0.05;
+    // в последовательной цепи ток источника равен току каждой лампы (нет ветвления)
+    f.seriesLamps = lc.length >= 2 && Math.abs(lc[0] - lc[1]) / Math.max(lc[0], lc[1]) < 0.05 &&
+      Math.abs(f.sourceCurrent - lc[0]) / Math.max(f.sourceCurrent, 1e-6) < 0.15;
 
     const lampM = world.measurements.filter(function (m) { return m.kind === 'lamp'; });
     const rl = lampM.filter(function (m) { return m.R > 0; }).map(function (m) { return m.R; });
