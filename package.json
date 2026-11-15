@@ -7,7 +7,7 @@
     "start": "node server.js",
     "serve": "node server.js",
     "build": "node tools/build.mjs",
-    "test": "node src/test_engine.js && node src/test_renew.js && node src/test_storage.js && node src/test_efficiency.js",
+    "test": "node src/test_engine.js && node src/test_renew.js && node src/test_storage.js && node src/test_efficiency.js && node src/test_hydrogen.js",
     "test:renew": "node src/test_renew.js",
     "start:win": "node server.js"
   },

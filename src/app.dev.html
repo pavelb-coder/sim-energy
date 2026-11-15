@@ -307,6 +307,7 @@
       <button data-bench="renew">Возобновляемая энергетика</button>
       <button data-bench="storage">Накопители</button>
       <button data-bench="efficiency">Эффективность</button>
+      <button data-bench="hydrogen">Водородный контур</button>
     </nav>
     <div class="grow"></div>
     <div class="modes" role="tablist" aria-label="Режим работы">
@@ -429,6 +430,7 @@
   <main id="benchRenew" hidden></main>
   <main id="benchStorage" hidden></main>
   <main id="benchEfficiency" hidden></main>
+  <main id="benchHydrogen" data-bench-id="hydrogen" hidden></main>
 </div>
 
 <div class="modal" id="help">
@@ -487,6 +489,8 @@
 <script>/*__STORAGE_UI__*/</script>
 <script>/*__EFFICIENCY__*/</script>
 <script>/*__EFFICIENCY_UI__*/</script>
+<script>/*__HYDROGEN__*/</script>
+<script>/*__HYDROGEN_UI__*/</script>
 <script>
 (function () {
   'use strict';
@@ -1671,8 +1675,8 @@
   /* ================= переключение стендов ================= */
   var bench = 'circuits';
   window.__bench = 'circuits';
-  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff' };
-  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency' };
+  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd' };
+  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen' };
   function setBench(name) {
     bench = name;
     window.__bench = name;
