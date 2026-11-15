@@ -46,3 +46,11 @@ for (const f of indexFiles) {
   console.log(`${path.relative(root, f)} — ${(Buffer.byteLength(out) / 1024).toFixed(0)} КБ (обновлён)`);
 }
 console.log(`${path.relative(root, outPath)} — ${(Buffer.byteLength(out) / 1024).toFixed(0)} КБ`);
+
+// Стенд внутри плагина Moodle (ветка moodle-plugin) — та же сборка, чтобы в курсе
+// не оставалась старая версия лаборатории.
+const pluginLab = path.join(root, 'moodle/mod/energy/standalone/lab.html');
+if (fs.existsSync(path.dirname(pluginLab))) {
+  fs.writeFileSync(pluginLab, out);
+  console.log(`moodle/mod/energy/standalone/lab.html — ${(Buffer.byteLength(out) / 1024).toFixed(0)} КБ (обновлён)`);
+}
