@@ -342,6 +342,7 @@
       <button data-bench="storage">Накопители</button>
       <button data-bench="efficiency">Эффективность</button>
       <button data-bench="hydrogen">Водородный контур</button>
+      <button data-bench="grid">Микросеть</button>
     </nav>
     <div class="grow"></div>
     <div class="modes" role="tablist" aria-label="Режим работы">
@@ -473,6 +474,7 @@
 <main id="benchStorage" data-bench-id="storage" hidden></main>
 <main id="benchEfficiency" data-bench-id="efficiency" hidden></main>
 <main id="benchHydrogen" data-bench-id="hydrogen" hidden></main>
+<main id="benchGrid" data-bench-id="grid" hidden></main>
 
 <div class="modal" id="help">
   <div class="sheet">
@@ -890,6 +892,29 @@
     f.closed = Math.abs(f.sourceCurrent) > 1e-4;
 
     // нелинейность лампы по измерениям
+    // дополнительные величины для лабораторных работ
+    f.energyWh = world.energyLoadWh;
+    const kinds = {};
+    world.measurements.forEach(function (m) { kinds[m.kind] = (kinds[m.kind] || 0) + 1; });
+    f.measureKinds = kinds;
+    // параллельное соединение: две лампы с примерно равными напряжениями при одном источнике
+    const lamps = world.parts.filter(function (p) { return p.type === 'lamp'; });
+    f.lampVoltages = lamps.map(function (p) {
+      const i = sol.parts[p.id] || {};
+      return Math.abs(i.U || 0);
+    });
+    f.lampCurrents = lamps.map(function (p) {
+      const i = sol.parts[p.id] || {};
+      return Math.abs(i.I || 0);
+    });
+    // признак параллельного включения: напряжения близки, токи складываются
+    const lv = f.lampVoltages.filter(function (v) { return v > 0.2; });
+    f.parallelLamps = lv.length >= 2 && Math.abs(lv[0] - lv[1]) / Math.max(lv[0], lv[1]) < 0.08 &&
+      Math.abs(f.sourceCurrent) > Math.max.apply(null, f.lampCurrents) * 1.3;
+    // последовательное включение: токи равны, напряжения разные
+    const lc = f.lampCurrents.filter(function (v) { return v > 0.005; });
+    f.seriesLamps = lc.length >= 2 && Math.abs(lc[0] - lc[1]) / Math.max(lc[0], lc[1]) < 0.05;
+
     const lampM = world.measurements.filter(function (m) { return m.kind === 'lamp'; });
     const rl = lampM.filter(function (m) { return m.R > 0; }).map(function (m) { return m.R; });
     f.lampRratio = rl.length >= 2 ? Math.max.apply(null, rl) / Math.min.apply(null, rl) : 0;
@@ -1274,6 +1299,34 @@
       }
       if (pair) break;
     }
+    // разброс по наклону панели и по числу лопастей — для лабораторных работ
+    const pm = (st.measures || []).filter(function (m) { return m.kind === 'pv'; });
+    const tilts = {};
+    pm.forEach(function (m) { tilts[Math.round(m.tilt / 5) * 5] = 1; });
+    f.tiltPoints = Object.keys(tilts).length;
+    const tiltsPv = pm.map(function (m) { return { tilt: m.tilt, pv: m.pv }; });
+    if (tiltsPv.length >= 2) {
+      const hi = tiltsPv.reduce(function (a, b) { return b.pv > a.pv ? b : a; }, tiltsPv[0]);
+      const lo = tiltsPv.reduce(function (a, b) { return b.pv < a.pv ? b : a; }, tiltsPv[0]);
+      f.tiltBest = hi.tilt;
+      f.tiltWorst = lo.tilt;
+      f.tiltGain = lo.pv > 0.5 ? hi.pv / lo.pv : 0;
+    }
+    const wm = (st.measures || []).filter(function (m) { return m.kind === 'wind'; });
+    const bladeGroups = {};
+    wm.forEach(function (m) { bladeGroups[m.blades] = (bladeGroups[m.blades] || 0) + 1; });
+    f.bladeGroups = Object.keys(bladeGroups).length;
+    // средняя мощность при каждом числе лопастей
+    const byBlades = {};
+    wm.forEach(function (m) {
+      byBlades[m.blades] = byBlades[m.blades] || { sum: 0, n: 0 };
+      byBlades[m.blades].sum += m.p; byBlades[m.blades].n += 1;
+    });
+    f.bladeAvg = {};
+    Object.keys(byBlades).forEach(function (k) {
+      f.bladeAvg[k] = byBlades[k].sum / byBlades[k].n;
+    });
+
     if (pair) {
       f.windRatio = pair.hi.p / pair.lo.p;
       f.windRatioTheory = Math.pow(pair.ratio, 3);
@@ -1396,6 +1449,37 @@
       why: 'На широте Красноярска (56°) зимой солнце поднимается низко, а день короткий: суммарная выработка падает в 3–4 раза. Поэтому в автономных системах закладывают зимний расчёт.'
     }
   ];
+
+  TASKS.push({
+    t: 'Наклон панели',
+    goal: 'Снимите не меньше 3 точек при разном наклоне панели (например, 0°, 30°, 60°) и найдите наклон, при котором мощность максимальна.',
+    steps: ['Оставьте ясную погоду и полдень.', 'Меняйте наклон панели и снимайте показания.',
+      'Сравните мощность при разных углах.'],
+    hints: ['Летом в полдень солнце высоко, поэтому оптимальный наклон меньше 45°.',
+      'Разница между «плашмя» и оптимальным наклоном заметна на глаз — до 40 %.',
+      'На каждое значение наклона нужна своя точка в протоколе.'],
+    check: function (f) { return f.tiltPoints >= 3 && f.tiltGain >= 1.06; },
+    stars: function (f) { return f.tiltPoints >= 3 && f.tiltGain >= 1.06 ? (f.tiltGain >= 1.2 ? 3 : 2) : 0; },
+    why: 'Мощность панели зависит от угла падения света: оптимальный наклон — когда лучи перпендикулярны плоскости панели. Летом он меньше, зимой больше.'
+  });
+  TASKS.push({
+    t: 'Число лопастей',
+    goal: 'Снимите точки для двух разных чисел лопастей при одинаковом ветре и сравните мощность.',
+    steps: ['Задайте ветер 8 м/с.', 'Поставьте 3 лопасти и снимите точку.', 'Поставьте 5 лопастей и снимите ещё одну.'],
+    hints: ['Больше лопастей — больше ометаемая площадь и выше мощность при слабом ветре.',
+      'При сильном ветре разница меньше: генератор уже выходит на номинал.',
+      'Проверьте по протоколу, что точки отличаются только числом лопастей.'],
+    check: function (f) { return f.bladeGroups >= 2 && f.windMeasure.length >= 2; },
+    stars: function (f) {
+      const a = f.bladeAvg || {};
+      const k = Object.keys(a);
+      if (k.length < 2) return 0;
+      const max = Math.max.apply(null, k.map(function (x) { return a[x]; }));
+      const min = Math.min.apply(null, k.map(function (x) { return a[x]; }));
+      return min > 0.5 && max / min > 1.15 ? 3 : 2;
+    },
+    why: 'Мощность ветрогенератора пропорциональна ометаемой площади: пять лопастей при том же диаметре дают заметно больше, чем три.'
+  });
 
   const API = {
     LAT: LAT, PANEL_A: PANEL_A, TURB_D: TURB_D, LOADS: LOADS, TASKS: TASKS,
@@ -2352,6 +2436,16 @@
       maxTemp: st.measures.reduce(function (a, m) { return Math.max(a, m.temp || 0); }, st.temp),
       capEnergyJ: 0.5 * CAP.C * st.capVoltage * st.capVoltage
     };
+    // дополнительные величины для лабораторных работ
+    f.typesMeasured = {};
+    st.measures.forEach(function (m) { if (m.type) f.typesMeasured[m.type] = 1; });
+    f.typesCount = Object.keys(f.typesMeasured).length;
+    f.converterPoints = st.measures.filter(function (m) { return m.kind === 'eff'; }).map(function (m) { return m.eff; });
+    f.tempPoints = st.measures.map(function (m) { return m.temp || st.temp; });
+    f.tempSpread = f.tempPoints.length >= 2 ? Math.max.apply(null, f.tempPoints) - Math.min.apply(null, f.tempPoints) : 0;
+    f.chargeTempRise = st.measures.filter(function (m) { return m.kind === 'charge'; })
+      .reduce(function (a, m) { return Math.max(a, m.temp || 0); }, st.temp) - 25;
+
     // разброс отданной ёмкости при разных токах
     const d = f.dischargeRuns;
     if (d.length >= 2) {
@@ -2444,6 +2538,41 @@
       why: 'У инвертора есть «холостой ход»: собственное потребление 3–8 Вт. На малой нагрузке оно съедает большую долю, поэтому КПД растёт с загрузкой.'
     }
   ];
+
+  TASKS.push({
+    t: 'Сравнить два типа АКБ',
+    goal: 'Снимите хотя бы по одной точке для двух разных типов накопителей (например, Li-ion и свинцового) при одинаковом заряде.',
+    steps: ['Выберите Li-ion, поставьте заряд 60 %, снимите точку.', 'Смените тип на свинцовый при том же заряде.',
+      'Сравните напряжение и отданную энергию.'],
+    hints: ['У свинцового номинальное напряжение 12 В, у Li-ion — 3,7 В: это разные классы батарей.',
+      'Сравнивать нужно удельную энергию: Вт·ч на килограмм или на литр.',
+      'Плотность энергии Li-ion примерно втрое выше свинцовой.'],
+    check: function (f) { return f.typesCount >= 2; },
+    stars: function (f) { return f.typesCount >= 3 ? 3 : 2; },
+    why: 'Li-ion даёт больше энергии при меньшей массе и выдерживает больше циклов, свинцовый дешевле, но тяжелее и живёт меньше.'
+  });
+  TASKS.push({
+    t: 'Нагрев при заряде',
+    goal: 'Замерьте нагрев аккумулятора при заряде током 1C и при 0,5C — сравните прирост температуры.',
+    steps: ['Включите заряд и задайте 1C, снимите точку после прогрева.', 'Сбросьте опыт и повторите при 0,5C.',
+      'Сравните температуру в протоколе.'],
+    hints: ['Потери в внутреннем сопротивлении растут как I²·r — ток вдвое больше даёт вчетверо больше тепла.',
+      'Перегрев выше 45 °C ускоряет износ и опасен для Li-ion.',
+      'Температура видна в показаниях и в протоколе.'],
+    check: function (f) {
+      const charges = f.chargeMeasures;
+      const hot = charges.some(function (m) { return m.temp >= 30; });
+      return charges.length >= 2 && hot;
+    },
+    stars: function (f) {
+      const c = f.chargeMeasures;
+      if (c.length < 2) return 0;
+      const max = Math.max.apply(null, c.map(function (m) { return m.temp || 0; }));
+      const min = Math.min.apply(null, c.map(function (m) { return m.temp || 0; }));
+      return max - min >= 6 ? 3 : 2;
+    },
+    why: 'Нагрев батареи — это потери: Q = I²·r·t. Поэтому быстрый заряд всегда греет сильнее, и в BMS есть температурная защита.'
+  });
 
   const API = {
     TYPES: TYPES, LOADS: LOADS, CAP: CAP, TASKS: TASKS,
@@ -3279,6 +3408,33 @@
     }
   ];
 
+  TASKS.push({
+    t: 'Профиль нагрузки',
+    goal: 'Снимите точки в разное время суток (утро, день, вечер) и найдите час пикового потребления.',
+    steps: ['Запустите моделирование и снимите точку утром.', 'Повторите днём и вечером.',
+      'Сравните мощность в протоколе.'],
+    hints: ['Вечером включаются свет, телевизор и чайник — это пик.',
+      'Ночью остаются только холодильник и режим ожидания.',
+      'Ищите в протоколе строку с максимальным потреблением.'],
+    check: function (f) { return f.measures.length >= 3 && f.peak > 0; },
+    stars: function (f) { return f.measures.length >= 5 ? 3 : 2; },
+    why: 'Пиковое потребление определяет мощность вводного автомата и тариф: сглаживание пика часто выгоднее, чем экономия энергии.'
+  });
+  TASKS.push({
+    t: 'Датчик движения',
+    goal: 'Добейтесь экономии не меньше 25 % только за счёт датчиков, не меняя тип ламп.',
+    steps: ['Оставьте лампы накаливания.', 'Включите датчик движения и сумеречное реле.',
+      'Прогоните сутки и сравните с исходными.'],
+    hints: ['Датчик не снижает мощность лампы, а сокращает часы её работы.',
+      'В коридоре свет нужен не всегда, а в лаборатории — только когда там работают.',
+      'Экономия считается от исходного варианта «всё включено».'],
+    check: function (f) {
+      return f.lampType === 'incandescent' && f.sensors.motion && f.percent >= 0.25;
+    },
+    stars: function (f) { return f.percent >= 0.45 ? 3 : (f.percent >= 0.35 ? 2 : 1); },
+    why: 'Автоматика уменьшает не мощность, а время работы: экономия равна доле часов, когда свет не нужен.'
+  });
+
   const API = {
     LAMPS: LAMPS, ROOMS: ROOMS, APPLIANCES: APPLIANCES, TARIFF: TARIFF, TASKS: TASKS,
     createState: createState, step: step, facts: facts,
@@ -4080,6 +4236,9 @@
       chem: chem,
       // энергия для машинки: P/LED эквивалент
       carSpeed: carSpeed(st, fc, chem),
+      chemKind: st.cap,
+      chemV: chem.v,
+      chemP: chem.p,
     };
   }
 
@@ -4162,6 +4321,32 @@
 
   /* ---------- экспорт ---------- */
 
+  // Лабораторные работы (сверх базовых заданий стенда)
+  TASKS.push({
+    t: 'Сравнить источники',
+    goal: 'По очереди подключите все три химических элемента и снимите по точке: этаноловый, солевой, термоэлектрический.',
+    steps: ['Подключите этаноловый элемент и нажмите «Снять точку».', 'Повторите для солевого и термоэлектрического.',
+      'Сравните напряжения на панели химических источников.'],
+    hints: ['Солевой даёт около 1,1 В, этаноловый — около 0,5 В, термоэлемент зависит от разницы температур.',
+      'Термоэлемент: примерно 21 мВ на градус разницы.',
+      'Для зачёта нужны точки по всем трём элементам.'],
+    check: function (f) { return !!(f.chemKinds && f.chemKinds.ethanol && f.chemKinds.salt && f.chemKinds.thermal); },
+    stars: function (f) { return f.chemKinds && Object.keys(f.chemKinds).length >= 3 ? 3 : 2; },
+    why: 'Напряжение химического источника определяется реакцией (или разностью температур), а не размером элемента.'
+  });
+  TASKS.push({
+    t: 'Минимум разложения',
+    goal: 'Получите устойчивый электролиз при минимальном напряжении: ток не меньше 5 мА, напряжение 1,35–1,9 В.',
+    steps: ['Включите режим «Электролиз».', 'Подберите источник с напряжением чуть выше порога (кривошип, слабый ветер).',
+      'Добейтесь тока 5–20 мА.'],
+    hints: ['Порог разложения воды — около 1,48 В на ячейку.',
+      'Кривошип с малыми оборотами даёт меньше 1,5 В, при этом ток совсем мал.',
+      'Солнечная панель в тени тоже даёт низкое напряжение.'],
+    check: function (f) { return f.mode === 'electrolysis' && f.elecV >= 1.35 && f.elecV <= 1.9 && f.elecI >= 0.005; },
+    stars: function (f) { return f.elecI >= 0.02 ? 3 : 2; },
+    why: 'Разложение воды требует преодолеть ЭДС реакции: ниже 1,48 В ток через ячейку практически не идёт.'
+  });
+
   const api = {
     TASKS: TASKS,
     SOURCES: SOURCES,
@@ -4201,6 +4386,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var st = H.createState();
   var solved = {}, taskIndex = 0, lastFacts = null, taskTick = 0, meterTick = 0, playing = true;
+  var chemKinds = {};   // какие химические элементы уже снимали точку
   var lastKey = '';
 
   var css = document.createElement('style');
@@ -4531,6 +4717,7 @@
   var meas = [];
   function sample() {
     var f = H.facts(st);
+    if (st.cap && st.cap !== 'none') chemKinds[st.cap] = true;
     meas.push({
       t: st.t, mode: st.mode, src: f.sourceLabel,
       u: f.mode === 'electrolysis' ? f.elecV : f.fcV,
@@ -4916,6 +5103,7 @@
 
   function checkTask(show) {
     var tk = H.TASKS[taskIndex], f = H.facts(st), was = !!solved[taskIndex];
+    f.chemKinds = chemKinds;
     var ok = false;
     try { ok = tk.check(f); } catch (e) { ok = false; }
     if (ok && !was) {
@@ -5051,6 +5239,1087 @@
     sample: sample,
     solved: function () { return solved; },
     H: H,
+  };
+})();
+</script>
+<script>/* ============================================================
+   Энерджиквантум · grid.js
+   Модель стенда «Микросеть»: солнце + ветер + накопитель + сеть + зарядка EV.
+   Не зависит от DOM — тестируется в Node.
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  const LAT = 56.0;                 // Красноярск
+  const D2R = Math.PI / 180;
+
+  const PV = {
+    kwp: { min: 0.5, max: 8, step: 0.5 },
+    derate: 0.86,                   // инвертор + провода + загрязнение
+    tempCoeff: -0.004,              // −0,4 %/°C
+    noct: 45                        // °C при 800 Вт/м²
+  };
+
+  const WIND = {
+    cutIn: 3, cutOut: 22, rated: 11,
+    shear: 0.14,                    // показатель степени профиля ветра
+    refHeight: 10
+  };
+
+  const BATTERY = {
+    eff: 0.95,                      // КПД заряда/разряда
+    minSoc: 0.05,                   // нижняя граница, чтобы не гробить АКБ
+    maxSoc: 1.0
+  };
+
+  const TARIFF = { day: 5.2, night: 2.6, feedIn: 2.2, dayStart: 7, dayEnd: 23 };
+  const CO2 = { grid: 0.42, gas: 0.20 };   // кг CO₂ на кВт·ч
+
+  const GAS = { kw: 1.0, eff: 0.28, fuelCost: 0.09 };  // ₽ за кВт·ч электричества от ДГУ
+
+  function createState() {
+    return {
+      t: 0,
+      hour: 12,                    // модельный час суток
+      dayOfYear: 172,              // 21 июня
+      cloud: 0.2,                  // 0 — ясно, 1 — сплошная облачность
+      pvKwp: 3,
+      tilt: 40,
+      azimuth: 0,                  // 0 — на юг, «−» на восток, «+» на запад
+      pvTemp: 25,
+      windRated: 2,                // номинальная мощность ветрогенератора, кВт
+      windHub: 12,                 // высота оси, м
+      windRef: 6,                  // скорость ветра на 10 м, м/с
+      batteryKwh: 5,
+      batteryMaxP: 2.5,            // кВт
+      soc: 0.5,
+      baseLoad: 1.2,               // кВт (бытовой профиль)
+      evOn: false,
+      evPower: 7,                  // кВт (зарядка электромобиля)
+      evStart: 19,
+      evEnd: 23,
+      island: false,               // островной режим (сеть отключена)
+      gasOn: false,                // резервный генератор
+      // накопленные за модель значения
+      energyGen: 0, energyLoad: 0, energyImport: 0, energyExport: 0,
+      energyUnserved: 0, energyCurtailed: 0, cost: 0,
+      log: []
+    };
+  }
+
+  /* ---------------- солнце ---------------- */
+  function declination(dayOfYear) {
+    return 23.44 * Math.sin(D2R * 360 * (284 + dayOfYear) / 365);
+  }
+
+  function sunPosition(dayOfYear, hour) {
+    const dec = declination(dayOfYear) * D2R;
+    const hourAngle = (hour - 12) * 15 * D2R;
+    const lat = LAT * D2R;
+    const sinElev = Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(hourAngle);
+    const elev = Math.asin(Math.max(-1, Math.min(1, sinElev)));
+    const cosAz = (Math.sin(dec) - Math.sin(elev) * Math.sin(lat)) /
+      (Math.cos(elev) * Math.cos(lat) || 1e-6);
+    const acosAz = Math.acos(Math.max(-1, Math.min(1, cosAz))) / D2R;    // 0…180
+    // до полудня солнце на востоке, после — на западе
+    const azNorth = hourAngle > 0 ? 360 - acosAz : acosAz;               // от севера
+    // азимут: 0 — юг, отрицательный — восток, положительный — запад
+    const az = azNorth - 180;
+    return { elev: elev, elevDeg: elev / D2R, azimuth: az };
+  }
+
+  // освещённость на горизонтальной площадке, Вт/м²
+  function irradiance(st) {
+    const s = sunPosition(st.dayOfYear, st.hour);
+    const clear = 1000 * Math.max(0, Math.sin(s.elev));
+    const cloudy = clear * (1 - 0.72 * Math.pow(Math.max(0, Math.min(1, st.cloud)), 1.4));
+    return { G: cloudy, clearG: clear, sun: s };
+  }
+
+  // мощность солнечной панели с учётом наклона, азимута и нагрева
+  function pvPower(st) {
+    const ir = irradiance(st);
+    if (ir.G <= 1) return 0;
+    const s = ir.sun;
+    const tilt = st.tilt * D2R;
+    const panelAz = st.azimuth;
+    // косинус угла падения через разность азимутов
+    const azDiff = (s.azimuth - panelAz) * D2R;
+    const cosInc = Math.cos(s.elev) * Math.sin(tilt) * Math.cos(azDiff) +
+      Math.sin(s.elev) * Math.cos(tilt);
+    // освещённость на плоскости панели: без деления на синус (иначе при низком солнце она завышается)
+    const poa = ir.G * Math.max(0, cosInc);
+    const G = Math.min(ir.clearG * 1.1, Math.max(0, poa));
+    const cellT = st.pvTemp + (PV.noct - 20) / 800 * G;
+    const fTemp = 1 + PV.tempCoeff * (cellT - 25);
+    return Math.max(0, st.pvKwp * (G / 1000) * PV.derate * fTemp);
+  }
+
+  /* ---------------- ветер ---------------- */
+  function windSpeed(st) {
+    const h = Math.max(2, st.windHub);
+    return Math.max(0, st.windRef) * Math.pow(h / WIND.refHeight, WIND.shear);
+  }
+
+  function windPower(st) {
+    const v = windSpeed(st);
+    if (v < WIND.cutIn || v > WIND.cutOut) return 0;
+    if (v >= WIND.rated) return st.windRated;
+    return st.windRated * Math.pow((v - WIND.cutIn) / (WIND.rated - WIND.cutIn), 3);
+  }
+
+  /* ---------------- нагрузка ---------------- */
+  function loadProfile(hour) {
+    const h = ((hour % 24) + 24) % 24;
+    // утренний и вечерний пики
+    const morning = Math.exp(-Math.pow((h - 8) / 1.9, 2)) * 0.75;
+    const evening = Math.exp(-Math.pow((h - 19.5) / 2.6, 2)) * 1.0;
+    const night = h < 6 ? 0.28 : 1;
+    const day = h >= 9 && h <= 17 ? 0.62 : 1;
+    return night * day + morning + evening;
+  }
+
+  function evActive(st) {
+    if (!st.evOn) return false;
+    const h = ((st.hour % 24) + 24) % 24;
+    const a = ((st.evStart % 24) + 24) % 24;
+    const b = ((st.evEnd % 24) + 24) % 24;
+    return a <= b ? (h >= a && h < b) : (h >= a || h < b);   // окно может переходить через полночь
+  }
+
+  function loadPower(st) {
+    const base = st.baseLoad * loadProfile(st.hour);
+    return base + (evActive(st) ? st.evPower : 0);
+  }
+
+  /* ---------------- диспетчеризация ---------------- */
+  function priceAt(hour) {
+    const h = ((hour % 24) + 24) % 24;
+    return (h >= TARIFF.dayStart && h < TARIFF.dayEnd) ? TARIFF.day : TARIFF.night;
+  }
+
+  // мгновенный баланс без изменения состояния
+  function balance(st) {
+    const pv = pvPower(st);
+    const wind = windPower(st);
+    const gen = pv + wind;
+    const load = loadPower(st);
+    const net = gen - load;
+    const capKwh = Math.max(0.1, st.batteryKwh);
+    const maxP = Math.max(0, st.batteryMaxP);
+    let batt = 0, gridImport = 0, gridExport = 0, curtail = 0, unserved = 0, gas = 0;
+
+    if (net >= 0) {
+      const room = (BATTERY.maxSoc - st.soc) * capKwh;         // сколько ещё влезет, кВт·ч
+      // при заряженной батарее излишек сразу уходит в сеть или ограничивается
+      batt = room < 1e-3 ? 0 : Math.min(net, maxP, room / 0.25);
+      const rest = net - batt;
+      if (st.island) curtail = rest;
+      else gridExport = rest;
+    } else {
+      const need = -net;
+      const avail = Math.max(0, (st.soc - BATTERY.minSoc)) * capKwh;
+      batt = avail < 1e-3 ? 0 : -Math.min(need, maxP, avail * 60);
+      const rest = need + batt;
+      if (st.gasOn) gas = Math.min(GAS.kw, rest);
+      const rest2 = rest - gas;
+      if (st.island) unserved = rest2;
+      else gridImport = rest2;
+    }
+    return {
+      pv: pv, wind: wind, gen: gen, load: load, net: net,
+      batt: batt, gridImport: gridImport, gridExport: gridExport,
+      curtail: curtail, unserved: unserved, gas: gas,
+      soc: st.soc, vWind: windSpeed(st), price: priceAt(st.hour)
+    };
+  }
+
+  function step(st, dtHours) {
+    const dt = Math.max(0, dtHours);
+    const b = balance(st);
+    st.t += dt * 3600;
+    st.hour += dt;
+    while (st.hour >= 24) st.hour -= 24;
+
+    const capKwh = Math.max(0.1, st.batteryKwh);
+    if (b.batt > 0) {
+      st.soc = Math.min(BATTERY.maxSoc, st.soc + b.batt * dt * BATTERY.eff / capKwh);
+    } else if (b.batt < 0) {
+      st.soc = Math.max(0, st.soc + b.batt * dt / BATTERY.eff / capKwh);
+    }
+
+    st.energyGen += b.gen * dt;
+    st.energyLoad += b.load * dt;
+    st.energyImport += b.gridImport * dt;
+    st.energyExport += b.gridExport * dt;
+    st.energyUnserved += b.unserved * dt;
+    st.energyCurtailed += b.curtail * dt;
+    st.cost += (b.gridImport * priceAt(st.hour) - b.gridExport * TARIFF.feedIn + b.gas * GAS.fuelCost) * dt;
+    return st;
+  }
+
+  /* ---------------- сутки целиком ---------------- */
+  function simulateDay(st, startHour, stepMin) {
+    const s = Object.assign({}, st);
+    s.hour = startHour === undefined ? 0 : startHour;
+    const dt = (stepMin || 15) / 60;
+    const out = {
+      pv: 0, wind: 0, load: 0, gen: 0, gridImport: 0, gridExport: 0,
+      unserved: 0, curtail: 0, gas: 0, cost: 0, co2: 0, socEnd: s.soc, minSoc: s.soc,
+      series: []
+    };
+    let socc = s.soc;
+    const capKwh = Math.max(0.1, s.batteryKwh);
+    for (let k = 0; k < Math.round(24 / dt); k++) {
+      s.hour = (startHour === undefined ? 0 : startHour) + k * dt;
+      const b = balance(Object.assign({}, s, { soc: socc }));
+      // интегрируем заряд
+      if (b.batt > 0) socc = Math.min(BATTERY.maxSoc, socc + b.batt * dt * BATTERY.eff / capKwh);
+      else if (b.batt < 0) socc = Math.max(0, socc + b.batt * dt / BATTERY.eff / capKwh);
+      out.pv += b.pv * dt; out.wind += b.wind * dt; out.load += b.load * dt;
+      out.gen += b.gen * dt;
+      out.gridImport += b.gridImport * dt; out.gridExport += b.gridExport * dt;
+      out.unserved += b.unserved * dt; out.curtail += b.curtail * dt; out.gas += b.gas * dt;
+      out.cost += (b.gridImport * priceAt(s.hour) - b.gridExport * TARIFF.feedIn + b.gas * GAS.fuelCost) * dt;
+      out.co2 += (b.gridImport * CO2.grid + b.gas * CO2.gas) * dt;
+      out.minSoc = Math.min(out.minSoc, socc);
+      out.series.push({
+        hour: s.hour, pv: b.pv, wind: b.wind, load: b.load,
+        batt: b.batt, grid: b.gridImport - b.gridExport, soc: socc
+      });
+    }
+    out.socEnd = socc;
+    out.selfUse = out.gen > 0.01 ? Math.max(0, Math.min(1, (out.gen - out.gridExport - out.curtail) / out.gen)) : 0;
+    out.renewShare = out.load > 0.01 ? Math.max(0, Math.min(1, (out.load - out.gridImport - out.gas - out.unserved) / out.load)) : 0;
+    return out;
+  }
+
+  // сколько стоит зарядка электромобиля в заданном окне: разница суток с EV и без него
+  function evMarginal(st, start, end) {
+    const withEv = simulateDay(Object.assign({}, st, { evOn: true, evStart: start, evEnd: end }), 0, 15);
+    const noEv = simulateDay(Object.assign({}, st, { evOn: false }), 0, 15);
+    const energy = Math.max(0.01, withEv.load - noEv.load);
+    const cost = withEv.cost - noEv.cost;
+    return { energy: energy, cost: cost, price: cost / energy, day: withEv };
+  }
+
+  // базовый вариант «до модернизации»: только сеть, без ВИЭ и АКБ
+  function baselineDay(st) {
+    const s = Object.assign({}, st, {
+      pvKwp: 0, windRated: 0, batteryKwh: 0.1, soc: 0, gasOn: false, island: false
+    });
+    const d = simulateDay(s, 0, 15);
+    d.co2 = d.load * CO2.grid;
+    d.cost = d.load * 0 + (() => { // считаем по тарифу в каждом шаге
+      let c = 0;
+      const s2 = Object.assign({}, s);
+      for (let k = 0; k < 96; k++) {
+        s2.hour = k * 0.25;
+        c += loadPower(s2) * priceAt(s2.hour) * 0.25;
+      }
+      return c;
+    })();
+    return d;
+  }
+
+  /* ---------------- задания ---------------- */
+  const TASKS = [
+    {
+      t: 'Сбалансировать сутки',
+      goal: 'Добейтесь, чтобы за сутки не было невыданной энергии (0 кВт·ч) и расход из сети не превышал 6 кВт·ч.',
+      steps: ['Подберите мощность панелей под дневной профиль.', 'Добавьте ветрогенератор для вечера и ночи.',
+        'Поставьте накопитель (батарею), чтобы перекрыть вечерний пик.'],
+      hints: ['Начните с 3–4 кВт панелей и ветряка 2 кВт.',
+        'Аккумулятор на 5–10 кВт·ч снимает вечерний пик нагрузки.',
+        'Следите за строкой «Из сети» на панели показаний.'],
+      check: function (f) { return f.day.unserved < 0.01 && f.day.gridImport <= 6; },
+      stars: function (f) { return f.day.unserved < 0.01 && f.day.gridImport <= 2 ? 3 : (f.day.gridImport <= 4 ? 2 : 1); },
+      why: 'Микросеть работает, когда выработка закрывает нагрузку в каждый момент: днём солнце, вечером — ветер и батарея.'
+    },
+    {
+      t: 'Собственное потребление',
+      goal: 'Доведите долю собственного потребления выработки до 70 % (выработка не уходит в сеть зря).',
+      steps: ['Посмотрите суточную выработку и отдачу в сеть.', 'Уменьшите мощность ВИЭ, если выработка избыточна.',
+        'Добавьте накопитель, чтобы запасать излишки.'],
+      hints: ['Если отдача в сеть больше трети выработки — источник слишком мощный.',
+        'Накопитель повышает собственное потребление сильнее, чем рост панелей.'],
+      check: function (f) { return f.day.selfUse >= 0.7; },
+      stars: function (f) { return f.day.selfUse >= 0.9 ? 3 : (f.day.selfUse >= 0.8 ? 2 : 1); },
+      why: 'Собственное потребление = (выработка − отдача в сеть − ограничение) / выработка. Чем оно выше, тем выгоднее установка.'
+    },
+    {
+      t: 'Автономность',
+      goal: 'В островном режиме (сеть отключена) продержитесь сутки без отключений нагрузки.',
+      steps: ['Включите островной режим.', 'Настройте накопитель и резервный генератор.',
+        'Проверьте, что невыданной энергии нет.'],
+      hints: ['В островном режиме излишек не отдаётся в сеть, а ограничивается.',
+        'Небольшой резервный генератор закрывает редкие провалы.'],
+      check: function (f) { return f.st.island && f.day.unserved < 0.01; },
+      stars: function (f) { return f.st.island && f.day.unserved < 0.01 && !f.st.gasOn ? 3 : 2; },
+      why: 'Островная микросеть живёт только на своей выработке и накопителе: баланс должен сходиться в каждом получасовом интервале.'
+    },
+    {
+      t: 'Ночной тариф',
+      goal: 'Включите зарядку электромобиля ночью (с 23 до 7) — стоимость суток должна быть ниже, чем при заряде вечером.',
+      steps: ['Задайте окно зарядки EV: 23 → 7.', 'Сравните стоимость с вечерним окном (19 → 23).',
+        'Проверьте, что пик нагрузки не превышает мощность батареи и сети.'],
+      hints: ['Ночью тариф 2,6 ₽, днём и вечером — 5,2 ₽.',
+        'Ночью же обычно дует ветер — часть зарядки закроет ветрогенератор.'],
+      check: function (f) {
+        const night = ((f.st.evStart % 24) + 24) % 24;
+        return f.st.evOn && (night >= 22 || night < 6) && f.evNight.price < f.evEvening.price * 0.75;
+      },
+      stars: function (f) {
+        const k = f.evEvening.price > 0 ? f.evNight.price / f.evEvening.price : 1;
+        return k <= 0.55 ? 3 : (k <= 0.65 ? 2 : 1);
+      },
+      why: 'Сдвиг мощной нагрузки на ночной тариф — самый дешёвый способ снизить счёт: он не требует нового оборудования.'
+    },
+    {
+      t: 'Меньше CO₂',
+      goal: 'Снизьте суточные выбросы CO₂ не меньше чем на 40 % относительно варианта «только сеть».',
+      steps: ['Посмотрите базовый вариант: сколько CO₂ даёт сеть.', 'Добавьте ВИЭ и накопитель.',
+        'Сравните выбросы на панели экологии.'],
+      hints: ['Каждый кВт·ч из сети — это 0,42 кг CO₂.',
+        'Резервный генератор тоже даёт выбросы (0,20 кг/кВт·ч), но меньше сетевых.'],
+      check: function (f) { return f.co2Cut >= 0.4; },
+      stars: function (f) { return f.co2Cut >= 0.7 ? 3 : (f.co2Cut >= 0.55 ? 2 : 1); },
+      why: 'Выбросы считаются по энергии, взятой из сети и от генератора; собственная выработка ВИЭ считается нулевой.'
+    },
+    {
+      t: 'Вечерний пик',
+      goal: 'Пройдите вечерний пик (18–22 ч) без импорта из сети больше 0,5 кВт·ч.',
+      steps: ['Увеличьте накопитель.', 'Поднимите ветрогенератор или его высоту.',
+        'Не включайте EV в вечерний пик.'],
+      hints: ['Пик нагрузки — около 19–20 часов, солнца в это время почти нет.',
+        'Высота оси ветряка даёт прибавку: скорость растёт как h^0,14.'],
+      check: function (f) {
+        const eve = f.eveningImport;
+        return eve !== undefined && eve <= 0.5;
+      },
+      stars: function (f) { return f.eveningImport <= 0.15 ? 3 : (f.eveningImport <= 0.3 ? 2 : 1); },
+      why: 'Вечерний пик — самый дорогой и самый углеродоёмкий период. Его закрывают накопитель и ветер.'
+    }
+  ];
+
+  /* ---------------- факты для UI ---------------- */
+  function facts(st) {
+    const b = balance(st);
+    const day = simulateDay(st, 0, 15);
+    const base = baselineDay(st);
+    // импорт из сети за вечерний пик
+    const s2 = Object.assign({}, st);
+    let eveningImport = 0;
+    for (let k = 0; k < 16; k++) {           // 18:00 … 22:00 шагом 15 мин
+      s2.hour = 18 + k * 0.25;
+      const bb = balance(s2);
+      eveningImport += bb.gridImport * 0.25;
+    }
+    // стоимость зарядки в ночном и вечернем окнах
+    const evNight = evMarginal(st, 23, 7);
+    const evEvening = evMarginal(st, 19, 23);
+    const co2Base = base.load * CO2.grid;
+    return {
+      t: st.t, hour: st.hour, st: st,
+      pv: b.pv, wind: b.wind, gen: b.gen, load: b.load, net: b.net,
+      batt: b.batt, gridImport: b.gridImport, gridExport: b.gridExport,
+      unserved: b.unserved, curtail: b.curtail, gas: b.gas,
+      soc: st.soc, vWind: b.vWind, price: b.price,
+      day: day, base: base,
+      eveningImport: eveningImport,
+      co2Cut: co2Base > 0.01 ? Math.max(0, 1 - day.co2 / co2Base) : 0,
+      co2Day: day.co2, co2Base: co2Base,
+      evNight: evNight, evEvening: evEvening,
+      evNightCost: evNight.cost, evDayCost: evEvening.cost,
+      evNightSaving: Math.max(0, (evEvening.price - evNight.price) * evNight.energy),
+      selfUse: day.selfUse, renewShare: day.renewShare,
+      warnings: (function () {
+        const w = [];
+        if (day.unserved > 0.01) w.push('Невыданная энергия: ' + day.unserved.toFixed(2) + ' кВт·ч');
+        if (st.soc < 0.1) w.push('Батарея почти пуста');
+        if (b.curtail > 0.05) w.push('Излишек ограничивается: ' + (b.curtail * 1000).toFixed(0) + ' Вт');
+        if (st.windRef > 20) w.push('Штормовой ветер — генератор остановлен');
+        return w;
+      })()
+    };
+  }
+
+  const API = {
+    LAT: LAT, PV: PV, WIND: WIND, BATTERY: BATTERY, TARIFF: TARIFF, CO2: CO2, GAS: GAS,
+    TASKS: TASKS,
+    createState: createState, step: step, facts: facts,
+    sunPosition: sunPosition, irradiance: irradiance, pvPower: pvPower,
+    windSpeed: windSpeed, windPower: windPower, loadProfile: loadProfile, loadPower: loadPower,
+    evActive: evActive, priceAt: priceAt, balance: balance,
+    simulateDay: simulateDay, baselineDay: baselineDay, evMarginal: evMarginal
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.Grid = API;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* ============================================================
+   Энерджиквантум · grid.ui.js
+   Интерфейс стенда «Микросеть»: солнце + ветер + накопитель + сеть + зарядка EV
+   ============================================================ */
+(function () {
+  'use strict';
+  var G = window.Grid;
+  if (!G || !document.getElementById('benchGrid')) return;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var st = G.createState();
+  var solved = {}, taskIndex = 0, playing = true, speed = 1;
+  var lastTick = 0, taskTick = 0, meterTick = 0, lastKey = '';
+  var meas = [];
+
+  function n(v, d) { return Number(v || 0).toFixed(d === undefined ? 1 : d).replace('.', ','); }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function hhmm(h) {
+    var hh = Math.floor(((h % 24) + 24) % 24), mm = Math.round((h - Math.floor(h)) * 60);
+    if (mm === 60) { hh = (hh + 1) % 24; mm = 0; }
+    return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+  }
+
+  var css = document.createElement('style');
+  UI.text(css, `
+  .grid main{display:grid;grid-template-columns:252px minmax(430px,1fr) 330px;gap:10px;padding:10px;min-height:0}
+  .grid .rctl{overflow:auto}
+  .grid .fld{margin-bottom:9px;padding:0 9px}
+  .grid .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .grid .fld .top b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .grid .seg{display:flex;gap:2px;background:#e8eef5;border-radius:8px;padding:2px;margin:0 9px 8px}
+  .grid .seg button{flex:1;padding:4px 2px;font-size:11px;border-radius:5px;color:var(--muted);white-space:nowrap}
+  .grid .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(20,40,90,.16)}
+  .grid .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 9px}
+  .grid .chk input{width:15px;height:15px;accent-color:var(--accent)}
+  .gstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid #c4d0da;background:#f4f8fb;overflow:hidden}
+  .gstage svg{width:100%;height:100%;display:block}
+  .grid .bottombar.collapsed{height:36px!important;flex:0 0 36px}
+  .grid .bottombar.collapsed .tabbody{display:none}
+  .gridtable{width:100%;border-collapse:collapse;font-size:11px}
+  .gridtable th,.gridtable td{padding:3px 8px;text-align:right;border-bottom:1px solid #eef2f6}
+  .gridtable th{color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
+  .gridtable th:first-child,.gridtable td:first-child{text-align:left}
+  .grid .ecom{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:9px}
+  .grid .ecom .cell{background:#f6f9fc;border:1px solid #d7e2ec;border-radius:9px;padding:6px 8px}
+  .grid .ecom .k{font-size:9.5px;letter-spacing:.4px;color:var(--muted);text-transform:uppercase}
+  .grid .ecom .v{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+  .grid .ecom .v small{font-size:10px;color:var(--muted);font-weight:600}
+  @media (max-width:1180px){.grid main{grid-template-columns:226px minmax(360px,1fr) 300px}}
+  @media (max-width:980px){.grid main{grid-template-columns:1fr}.gstage{min-height:380px}}
+  @media (max-height:820px){.grid main{min-height:0}.gstage{min-height:280px;max-height:52vh}}
+  `);
+  document.head.appendChild(css);
+
+  var main = $('benchGrid');
+  main.className = 'grid';
+
+  UI.html(main, `
+    <aside class="panel rctl">
+      <h2>Солнце</h2>
+      <div class="fld"><div class="top"><span>Мощность панелей</span><b id="gPvV">3 кВт</b></div>
+        <input type="range" id="gPv" min="0" max="8" step="0.5" value="3"></div>
+      <div class="fld"><div class="top"><span>Наклон панели</span><b id="gTiltV">40°</b></div>
+        <input type="range" id="gTilt" min="0" max="90" step="1" value="40"></div>
+      <div class="fld"><div class="top"><span>Азимут (0 — юг)</span><b id="gAzV">0°</b></div>
+        <input type="range" id="gAz" min="-90" max="90" step="5" value="0"></div>
+      <div class="fld"><div class="top"><span>Облачность</span><b id="gCloudV">20 %</b></div>
+        <input type="range" id="gCloud" min="0" max="100" step="5" value="20"></div>
+
+      <h2>Ветер</h2>
+      <div class="fld"><div class="top"><span>Номинал генератора</span><b id="gWindV">2 кВт</b></div>
+        <input type="range" id="gWind" min="0" max="5" step="0.5" value="2"></div>
+      <div class="fld"><div class="top"><span>Скорость ветра (10 м)</span><b id="gVrefV">6,0 м/с</b></div>
+        <input type="range" id="gVref" min="0" max="24" step="0.5" value="6"></div>
+      <div class="fld"><div class="top"><span>Высота оси</span><b id="gHubV">12 м</b></div>
+        <input type="range" id="gHub" min="3" max="30" step="1" value="12"></div>
+
+      <h2>Накопитель и нагрузка</h2>
+      <div class="fld"><div class="top"><span>Ёмкость батареи</span><b id="gBattV">5 кВт·ч</b></div>
+        <input type="range" id="gBatt" min="0" max="20" step="1" value="5"></div>
+      <div class="fld"><div class="top"><span>Мощность батареи</span><b id="gBpV">2,5 кВт</b></div>
+        <input type="range" id="gBp" min="0" max="6" step="0.5" value="2.5"></div>
+      <div class="fld"><div class="top"><span>Базовый расход дома</span><b id="gBaseV">1,2 кВт</b></div>
+        <input type="range" id="gBase" min="0.2" max="4" step="0.1" value="1.2"></div>
+
+      <h2>Электромобиль</h2>
+      <label class="chk"><input type="checkbox" id="gEvOn"> Зарядка включена</label>
+      <div class="fld"><div class="top"><span>Мощность зарядки</span><b id="gEvPV">7 кВт</b></div>
+        <input type="range" id="gEvP" min="1" max="11" step="1" value="7"></div>
+      <div class="fld"><div class="top"><span>Окно зарядки</span><b id="gEvWinV">19:00–23:00</b></div>
+        <input type="range" id="gEvStart" min="0" max="23" step="1" value="19">
+        <input type="range" id="gEvEnd" min="1" max="24" step="1" value="23"></div>
+
+      <h2>Режимы</h2>
+      <label class="chk"><input type="checkbox" id="gIsland"> Островной режим (сеть отключена)</label>
+      <label class="chk"><input type="checkbox" id="gGas"> Резервный генератор 1 кВт</label>
+    </aside>
+
+    <section class="stagewrap">
+      <div class="timebar panel">
+        <div class="grp" id="gSpeed">
+          <button id="gPlay" title="Пауза / пуск">⏸</button>
+          <button data-sp="1" class="active">×1</button>
+          <button data-sp="4">×4</button>
+          <button data-sp="12">×12</button>
+        </div>
+        <div class="clock">время: <b id="gClock">12:00</b></div>
+        <div class="grow"></div>
+        <button class="btn ghost" id="gReset">Сброс</button>
+        <button class="btn primary" id="gSample">＋ Снять точку</button>
+      </div>
+
+      <div class="gstage" id="gStage">
+        <svg id="gScene" viewBox="0 0 760 470" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="gSkyD" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#a9d4ee"/><stop offset="100%" stop-color="#f4f9fc"/>
+            </linearGradient>
+            <linearGradient id="gSkyN" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#1b2f52"/><stop offset="100%" stop-color="#33507a"/>
+            </linearGradient>
+            <linearGradient id="gGround" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#e9f0f6"/><stop offset="100%" stop-color="#dde7ef"/>
+            </linearGradient>
+            <linearGradient id="gPanelFace" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#122a4a"/><stop offset="55%" stop-color="#1f4a76"/><stop offset="100%" stop-color="#0e2340"/>
+            </linearGradient>
+            <radialGradient id="gSunGlow">
+              <stop offset="0%" stop-color="#fff3c4" stop-opacity=".95"/><stop offset="100%" stop-color="#ffd166" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="gBattFill" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#2ea3dc"/><stop offset="100%" stop-color="#1b3e8f"/>
+            </linearGradient>
+            <pattern id="gGridP" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M20 0 H0 V20" fill="none" stroke="#dbe6ee" stroke-width="1"/>
+            </pattern>
+          </defs>
+
+          <rect id="gSky" x="0" y="0" width="760" height="470" fill="url(#gSkyD)"/>
+          <rect x="0" y="0" width="760" height="470" fill="url(#gGridP)" opacity=".35"/>
+          <g id="gStars" opacity="0"></g>
+          <circle id="gSunGlowC" cx="0" cy="0" r="64" fill="url(#gSunGlow)" opacity="0"/>
+          <circle id="gSunDisc" cx="0" cy="0" r="20" fill="#ffd166" opacity="0"/>
+          <g id="gClouds" opacity=".85"></g>
+          <rect x="0" y="330" width="760" height="140" fill="url(#gGround)"/>
+          <line x1="0" y1="330" x2="760" y2="330" stroke="#c6d3dd" stroke-width="2"/>
+
+          <!-- дом с нагрузкой -->
+          <g id="gHouse" transform="translate(120,232)">
+            <rect x="-46" y="0" width="92" height="76" rx="6" fill="#ffffff" stroke="#c6d3dd" stroke-width="2"/>
+            <path d="M-56 2 L0 -46 L56 2 Z" fill="#eef3f8" stroke="#c6d3dd" stroke-width="2"/>
+            <rect id="gWin1" x="-32" y="16" width="26" height="22" rx="3" fill="#cfe3f2"/>
+            <rect id="gWin2" x="6" y="16" width="26" height="22" rx="3" fill="#cfe3f2"/>
+            <rect x="-16" y="46" width="32" height="30" rx="3" fill="#e3ebf2" stroke="#c6d3dd"/>
+            <text id="gHouseP" x="0" y="96" text-anchor="middle" font-size="11" font-weight="700" fill="#22303c" font-family="sans-serif">0,0 кВт</text>
+            <text x="0" y="112" text-anchor="middle" font-size="9.5" fill="#6b7c8b" font-family="sans-serif">дом</text>
+          </g>
+
+          <!-- солнечная панель -->
+          <g id="gPvG" transform="translate(258,268)">
+            <line x1="0" y1="46" x2="0" y2="66" stroke="#b9c8d4" stroke-width="5"/>
+            <g id="gPvTilt">
+              <rect x="-52" y="-30" width="104" height="60" rx="4" fill="url(#gPanelFace)" stroke="#0e2340" stroke-width="2"/>
+              <g stroke="#5f9ec4" stroke-width="1" opacity=".6">
+                <path d="M-26 -30 V30 M0 -30 V30 M26 -30 V30 M-52 0 H52"/>
+              </g>
+            </g>
+            <text id="gPvTxt" x="0" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#22303c" font-family="sans-serif">0,0 кВт</text>
+            <text x="0" y="102" text-anchor="middle" font-size="9.5" fill="#6b7c8b" font-family="sans-serif">солнечная панель</text>
+          </g>
+
+          <!-- ветрогенератор -->
+          <g id="gWindG" transform="translate(388,300)">
+            <line x1="0" y1="30" x2="0" y2="-70" stroke="#dbe6ee" stroke-width="6" stroke-linecap="round"/>
+            <g transform="translate(0,-76)">
+              <g id="gRotor">
+                <path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#2ea3dc"/>
+                <path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#2ea3dc" transform="rotate(120)"/>
+                <path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#2ea3dc" transform="rotate(240)"/>
+              </g>
+              <circle r="6" fill="#fff" stroke="#c6d3dd" stroke-width="1.6"/>
+            </g>
+            <text id="gWindTxt" x="0" y="48" text-anchor="middle" font-size="11" font-weight="700" fill="#22303c" font-family="sans-serif">0,0 кВт</text>
+            <text id="gWindVv" x="0" y="64" text-anchor="middle" font-size="9.5" fill="#6b7c8b" font-family="sans-serif">6,0 м/с</text>
+          </g>
+
+          <!-- батарея -->
+          <g id="gBattG" transform="translate(520,236)">
+            <rect x="-34" y="0" width="68" height="78" rx="8" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
+            <rect x="-12" y="-8" width="24" height="10" rx="3" fill="#dbe6ee" stroke="#c6d3dd" stroke-width="1.6"/>
+            <rect id="gBattFill" x="-28" y="70" width="56" height="0" rx="6" fill="url(#gBattFill)" style="transition:height .2s,y .2s"/>
+            <text id="gSocTxt" x="0" y="-16" text-anchor="middle" font-size="11" font-weight="700" fill="#1b3e8f" font-family="sans-serif">50 %</text>
+            <text id="gBattP" x="0" y="98" text-anchor="middle" font-size="11" font-weight="700" fill="#22303c" font-family="sans-serif">0,0 кВт</text>
+            <text x="0" y="114" text-anchor="middle" font-size="9.5" fill="#6b7c8b" font-family="sans-serif">накопитель</text>
+          </g>
+
+          <!-- сеть -->
+          <g id="gGridG" transform="translate(646,268)">
+            <line x1="0" y1="72" x2="0" y2="-6" stroke="#b9c8d4" stroke-width="5"/>
+            <line x1="-20" y1="-6" x2="20" y2="-6" stroke="#b9c8d4" stroke-width="5"/>
+            <line x1="-14" y1="-24" x2="14" y2="-24" stroke="#b9c8d4" stroke-width="4"/>
+            <line x1="0" y1="-40" x2="0" y2="-58" stroke="#b9c8d4" stroke-width="3"/>
+            <text id="gGridTxt" x="0" y="92" text-anchor="middle" font-size="11" font-weight="700" fill="#22303c" font-family="sans-serif">0,0 кВт</text>
+            <text id="gGridDir" x="0" y="108" text-anchor="middle" font-size="9.5" fill="#6b7c8b" font-family="sans-serif">сеть</text>
+          </g>
+
+          <!-- электромобиль -->
+          <g id="gEvG" transform="translate(120,398)">
+            <g id="gCar">
+              <rect x="-44" y="-14" width="88" height="22" rx="6" fill="#2ea3dc" stroke="#1f4a76" stroke-width="1.6"/>
+              <path d="M-24 -14 L-14 -28 L18 -28 L28 -14 Z" fill="#cfe3f2" stroke="#1f4a76" stroke-width="1.4"/>
+              <circle cx="-24" cy="10" r="9" fill="#22303c"/><circle cx="-24" cy="10" r="3.5" fill="#dbe6ee"/>
+              <circle cx="24" cy="10" r="9" fill="#22303c"/><circle cx="24" cy="10" r="3.5" fill="#dbe6ee"/>
+            </g>
+            <g id="gEvBolt" opacity="0">
+              <path d="M-6 -46 L4 -46 L-2 -36 L8 -36 L-8 -18 L-2 -32 L-10 -32 Z" fill="#ffd166" stroke="#e0a300" stroke-width="1"/>
+            </g>
+            <text id="gEvTxt" x="0" y="34" text-anchor="middle" font-size="10" fill="#6b7c8b" font-family="sans-serif">электромобиль</text>
+          </g>
+
+          <!-- потоки энергии -->
+          <path id="gFlowPv" d="M258 320 L170 300" stroke="#ffd166" stroke-width="4" stroke-dasharray="5 10" fill="none" opacity="0"/>
+          <path id="gFlowWind" d="M388 320 L200 312" stroke="#2ea3dc" stroke-width="4" stroke-dasharray="5 10" fill="none" opacity="0"/>
+          <path id="gFlowGrid" d="M646 330 L560 314" stroke="#8fa3b3" stroke-width="4" stroke-dasharray="5 10" fill="none" opacity="0"/>
+
+          <!-- итоговое табло -->
+          <g transform="translate(380,52)">
+            <rect x="-176" y="-26" width="352" height="56" rx="10" fill="#ffffff" stroke="#d7e2ec" stroke-width="1.5" opacity=".95"/>
+            <text id="gBalTxt" x="0" y="-2" text-anchor="middle" font-size="12" font-weight="700" fill="#1b3e8f" font-family="sans-serif">баланс: 0,0 кВт</text>
+            <text id="gBalSub" x="0" y="17" text-anchor="middle" font-size="10" fill="#5d6f7d" font-family="sans-serif">выработка — нагрузка — накопитель</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="bottombar panel" style="height:132px">
+        <div class="tabs">
+          <button class="active" data-gtab="journal">Журнал</button>
+          <button data-gtab="meas">Протокол <span id="gMeasCount" class="badge"></span></button>
+          <div class="grow"></div>
+          <button class="btn ghost tiny" id="gCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+          <button class="btn ghost tiny" id="gLogFold" title="Свернуть журнал" style="margin:4px 6px 4px 0">Свернуть ▾</button>
+        </div>
+        <div class="tabbody" id="gTabJournal"><div class="journal" id="gJournal"></div></div>
+        <div class="tabbody" id="gTabMeas" hidden></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card task">
+        <h2>Задание <span class="badge" id="gTaskId">1 / 6</span></h2>
+        <div class="body" id="gTaskBody"></div>
+        <div class="tasklist" id="gTaskList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Показания прибора</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>баланс, кВт</span><span>АКБ, %</span></div>
+            <div class="main" id="gLcdBal">0,00</div>
+            <div class="sub" id="gLcdSoc">50</div>
+          </div>
+        </div>
+        <div class="meters">
+          <div class="meter accent"><div class="k"><span>Выработка</span><span>P</span></div>
+            <div class="v" id="gGen">0 <small>кВт</small></div></div>
+          <div class="meter"><div class="k"><span>Нагрузка</span><span>L</span></div>
+            <div class="v" id="gLoad">0 <small>кВт</small></div></div>
+          <div class="meter"><div class="k"><span>Из сети</span><span>⇦</span></div>
+            <div class="v" id="gImp">0 <small>кВт</small></div></div>
+          <div class="meter"><div class="k"><span>В сеть</span><span>⇨</span></div>
+            <div class="v" id="gExp">0 <small>кВт</small></div></div>
+          <div class="meter wide"><div class="k"><span>Заряд АКБ</span><span id="gSocState">—</span></div>
+            <div class="v" id="gSoc">50 <small>%</small></div>
+            <div class="bar"><i id="gSocBar" style="width:50%"></i></div></div>
+        </div>
+        <div class="aux"><span>Ветер на оси: <b id="gVhub">—</b></span><span>Тариф: <b id="gPrice">—</b></span></div>
+      </div>
+
+      <div class="card">
+        <h2>Сутки и экология</h2>
+        <div class="ecom">
+          <div class="cell"><div class="k">выработка</div><div class="v" id="gDayGen">0 <small>кВт·ч</small></div></div>
+          <div class="cell"><div class="k">из сети</div><div class="v" id="gDayImp">0 <small>кВт·ч</small></div></div>
+          <div class="cell"><div class="k">стоимость</div><div class="v" id="gDayCost">0 <small>₽</small></div></div>
+          <div class="cell"><div class="k">CO₂</div><div class="v" id="gDayCo2">0 <small>кг</small></div></div>
+        </div>
+        <div class="aux"><span>Доля ВИЭ: <b id="gRenew">—</b></span><span>Своё потребление: <b id="gSelf">—</b></span></div>
+        <div class="aux" style="padding-top:0"><span>Снижение CO₂: <b id="gCo2Cut">—</b></span><span>Пик вечером: <b id="gEve">—</b></span></div>
+      </div>
+
+      <div class="card">
+        <h2>Сравнение с «только сеть»</h2>
+        <div style="padding:4px 0"><table class="gridtable" id="gCompare"></table></div>
+      </div>
+    </aside>`);
+
+  /* ---------- журнал ---------- */
+  function log(kind, text) {
+    st.log.push({ t: st.t, hour: st.hour, kind: kind, text: text });
+    if (st.log.length > 300) st.log.shift();
+    renderJournal();
+  }
+  function renderJournal() {
+    var box = $('gJournal');
+    if (!st.log.length) { UI.html(box, '<div class="empty-note">Меняйте настройки слева — всё попадёт в журнал.</div>'); return; }
+    UI.html(box, st.log.slice(-80).map(function (r) {
+      return '<div class="jrow ' + r.kind + '"><span class="tm">' + hhmm(r.hour) + '</span><span class="dot"></span><span class="tx">' + esc(r.text) + '</span></div>';
+    }).join(''));
+    var p = box.parentElement;
+    p.scrollTop = p.scrollHeight;
+  }
+
+  function renderMeasurements() {
+    var box = $('gTabMeas'), cnt = $('gMeasCount');
+    if (cnt) cnt.textContent = meas.length ? String(meas.length) : '';
+    if (!meas.length) { UI.html(box, '<div class="empty-note">Нажмите «Снять точку», чтобы записать режим сети.</div>'); return; }
+    UI.html(box, '<table class="gridtable"><thead><tr><th>Время</th><th>Выраб.</th><th>Нагрузка</th><th>Из сети</th><th>В сеть</th><th>АКБ</th><th>%, АКБ</th></tr></thead><tbody>' +
+      meas.slice().reverse().map(function (r) {
+        return '<tr><td>' + hhmm(r.hour) + '</td><td>' + n(r.gen) + '</td><td>' + n(r.load) + '</td><td>' +
+          n(r.imp) + '</td><td>' + n(r.exp) + '</td><td>' + n(r.batt) + '</td><td>' + Math.round(r.soc * 100) + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  function sample() {
+    var f = G.facts(st);
+    meas.push({ hour: st.hour, gen: f.gen, load: f.load, imp: f.gridImport, exp: f.gridExport, batt: f.batt, soc: f.soc });
+    log('ok', 'Точка снята: выработка ' + n(f.gen) + ' кВт, нагрузка ' + n(f.load) + ' кВт, из сети ' + n(f.gridImport) + ' кВт');
+    renderMeasurements();
+  }
+
+  function exportCsv() {
+    var lines = ['Время;Выработка,кВт;Нагрузка,кВт;Из сети,кВт;В сеть,кВт;АКБ,кВт;Заряд АКБ,%'];
+    meas.forEach(function (r) {
+      lines.push([hhmm(r.hour), n(r.gen, 2), n(r.load, 2), n(r.imp, 2), n(r.exp, 2), n(r.batt, 2), Math.round(r.soc * 100)].join(';'));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'microgrid-protocol.csv';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    log('ok', 'Протокол выгружен в CSV (' + meas.length + ' строк)');
+  }
+
+  /* ---------- элементы управления ---------- */
+  var RANGES = {
+    gPv: { set: function (v) { st.pvKwp = v; }, fmt: function (v) { return n(v, 1) + ' кВт'; } },
+    gTilt: { set: function (v) { st.tilt = v; }, fmt: function (v) { return v + '°'; } },
+    gAz: { set: function (v) { st.azimuth = v; }, fmt: function (v) { return v + '°'; } },
+    gCloud: { set: function (v) { st.cloud = v / 100; }, fmt: function (v) { return v + ' %'; } },
+    gWind: { set: function (v) { st.windRated = v; }, fmt: function (v) { return n(v, 1) + ' кВт'; } },
+    gVref: { set: function (v) { st.windRef = v; }, fmt: function (v) { return n(v, 1) + ' м/с'; } },
+    gHub: { set: function (v) { st.windHub = v; }, fmt: function (v) { return v + ' м'; } },
+    gBatt: { set: function (v) { st.batteryKwh = v; }, fmt: function (v) { return v + ' кВт·ч'; } },
+    gBp: { set: function (v) { st.batteryMaxP = v; }, fmt: function (v) { return n(v, 1) + ' кВт'; } },
+    gBase: { set: function (v) { st.baseLoad = v; }, fmt: function (v) { return n(v, 1) + ' кВт'; } },
+    gEvP: { set: function (v) { st.evPower = v; }, fmt: function (v) { return v + ' кВт'; } },
+    gEvStart: { set: function (v) { st.evStart = v; }, fmt: null },
+    gEvEnd: { set: function (v) { st.evEnd = v; }, fmt: null }
+  };
+
+  function syncControls() {
+    Object.keys(RANGES).forEach(function (id) {
+      var el = $(id);
+      if (el) el.value = id === 'gCloud' ? Math.round(st.cloud * 100) : (RANGES[id].get ? RANGES[id].get() : evalValue(id));
+    });
+    syncLabels();
+    $('gEvOn').checked = st.evOn;
+    $('gIsland').checked = st.island;
+    $('gGas').checked = st.gasOn;
+  }
+  function evalValue(id) {
+    return ({
+      gPv: st.pvKwp, gTilt: st.tilt, gAz: st.azimuth, gCloud: st.cloud * 100,
+      gWind: st.windRated, gVref: st.windRef, gHub: st.windHub,
+      gBatt: st.batteryKwh, gBp: st.batteryMaxP, gBase: st.baseLoad,
+      gEvP: st.evPower, gEvStart: st.evStart, gEvEnd: st.evEnd
+    })[id];
+  }
+
+  function syncLabels() {
+    Object.keys(RANGES).forEach(function (id) {
+      var el = $(id), out = $(id + 'V');
+      if (!out || !el) return;
+      var f = RANGES[id].fmt;
+      if (f) UI.text(out, f(parseFloat(el.value)));
+    });
+    UI.text($('gEvWinV'), hhmm(st.evStart) + '–' + hhmm(st.evEnd));
+  }
+
+  Object.keys(RANGES).forEach(function (id) {
+    var el = $(id);
+    if (!el) return;
+    el.oninput = function () {
+      RANGES[id].set(parseFloat(el.value));
+      syncLabels();
+      lastKey = '';
+      render(G.facts(st));
+    };
+    el.onchange = function () {
+      log('info', 'Изменено: ' + id.replace('g', '') + ' → ' + el.value);
+    };
+  });
+  $('gEvOn').onchange = function () { st.evOn = this.checked; log('info', this.checked ? 'Зарядка электромобиля включена' : 'Зарядка электромобиля выключена'); lastKey = ''; };
+  $('gIsland').onchange = function () {
+    st.island = this.checked;
+    log(st.island ? 'warn' : 'ok', st.island ? 'Островной режим: сеть отключена' : 'Сеть подключена');
+    lastKey = '';
+  };
+  $('gGas').onchange = function () { st.gasOn = this.checked; log('info', this.checked ? 'Резервный генератор включён (1 кВт)' : 'Резервный генератор выключен'); };
+
+  (function () {
+    var btns = document.querySelectorAll('#gSpeed button[data-sp]');
+    [].forEach.call(btns, function (b) {
+      b.onclick = function () {
+        [].forEach.call(btns, function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        speed = +b.dataset.sp;
+      };
+    });
+  })();
+
+  $('gPlay').onclick = function () {
+    playing = !playing;
+    this.textContent = playing ? '⏸' : '▶';
+  };
+  $('gReset').onclick = function () {
+    st = G.createState();
+    meas.length = 0;
+    lastKey = '';
+    syncControls();
+    renderTask(); renderMeasurements(); render(G.facts(st));
+    log('ok', 'Стенд сброшен: 3 кВт панелей, 2 кВт ветра, батарея 5 кВт·ч.');
+  };
+  $('gSample').onclick = sample;
+  $('gCsv').onclick = exportCsv;
+  $('gLogFold').onclick = function () {
+    var bar = document.querySelector('#benchGrid .bottombar');
+    var folded = bar.classList.toggle('collapsed');
+    UI.text(this, folded ? 'Развернуть ▴' : 'Свернуть ▾');
+  };
+  [].forEach.call(document.querySelectorAll('[data-gtab]'), function (b) {
+    b.onclick = function () {
+      [].forEach.call(document.querySelectorAll('[data-gtab]'), function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      var m = b.dataset.gtab === 'meas';
+      $('gTabJournal').hidden = m;
+      $('gTabMeas').hidden = !m;
+    };
+  });
+
+  /* ---------- сцена ---------- */
+  function drawSky(f) {
+    var day = f.hour >= 6 && f.hour < 21;
+    var s = G.sunPosition(st.dayOfYear, st.hour);
+    var night = !day;
+    UI.attr($('gSky'), 'fill', night ? 'url(#gSkyN)' : 'url(#gSkyD)');
+    UI.attr($('gStars'), 'opacity', night ? 0.9 : 0);
+    if (night && !$('gStars').childNodes.length) {
+      var stars = '';
+      for (var i = 0; i < 40; i++) {
+        stars += '<circle cx="' + (Math.random() * 740 + 10).toFixed(0) + '" cy="' + (Math.random() * 200 + 10).toFixed(0) +
+          '" r="' + (Math.random() * 1.2 + 0.5).toFixed(1) + '" fill="#eaf1ff" opacity="' + (0.4 + Math.random() * 0.6).toFixed(2) + '"/>';
+      }
+      UI.html($('gStars'), stars);
+    }
+    // солнце
+    var vis = s.elevDeg > 0;
+    var x = 380 + (s.azimuth) * 2.6, y = 250 - s.elevDeg * 2.9;
+    UI.attr($('gSunDisc'), 'cx', x); UI.attr($('gSunDisc'), 'cy', y);
+    UI.attr($('gSunGlowC'), 'cx', x); UI.attr($('gSunGlowC'), 'cy', y);
+    var lit = vis ? Math.max(0.15, (1 - st.cloud)) * Math.min(1, s.elevDeg / 30) : 0;
+    UI.attr($('gSunDisc'), 'opacity', vis ? 1 : 0);
+    UI.attr($('gSunGlowC'), 'opacity', lit);
+    // облака
+    var key = st.cloud.toFixed(2) + '|' + night;
+    if (lastKey.indexOf(key) < 0) {
+      var cl = '';
+      var n2 = Math.round(st.cloud * 6);
+      for (var k = 0; k < n2; k++) {
+        var cx = 90 + k * 120, cy = 70 + (k % 3) * 26;
+        cl += '<g opacity="' + (0.5 + 0.5 * st.cloud).toFixed(2) + '"><ellipse cx="' + cx + '" cy="' + cy + '" rx="46" ry="17" fill="' +
+          (night ? '#4a6588' : '#ffffff') + '"/><ellipse cx="' + (cx + 30) + '" cy="' + (cy + 6) + '" rx="32" ry="13" fill="' +
+          (night ? '#4a6588' : '#f4f8fb') + '"/></g>';
+      }
+      UI.html($('gClouds'), cl);
+    }
+  }
+
+  function render(f) {
+    f = f || G.facts(st);
+    drawSky(f);
+
+    // панель: наклон
+    var tiltNow = st.tilt;
+    UI.attr($('gPvTilt'), 'transform', 'rotate(' + (-tiltNow * 0.30).toFixed(1) + ' 0 8)');
+    UI.attr($('gPvG'), 'opacity', st.pvKwp > 0.01 ? 1 : 0.35);
+    UI.text($('gPvTxt'), n(f.pv) + ' кВт');
+
+    // ветряк: скорость вращения
+    var dur = f.vWind > 0.5 ? Math.max(0.35, 2.6 / f.vWind).toFixed(2) : 0;
+    var rotor = $('gRotor');
+    if (Math.abs((rotor.dataset.dur || 0) - dur) > 0.02) {
+      rotor.dataset.dur = dur;
+      UI.html(rotor, dur === 0
+        ? '<path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#c6d3dd"/><path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#c6d3dd" transform="rotate(120)"/><path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#c6d3dd" transform="rotate(240)"/>'
+        : '<g><path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#2ea3dc"/><path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#2ea3dc" transform="rotate(120)"/><path d="M0 0 C 8 -14 4 -38 -6 -44 C -2 -28 -3 -10 0 0 Z" fill="#2ea3dc" transform="rotate(240)"/>' +
+        '<animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="' + dur + 's" repeatCount="indefinite"/></g>');
+    }
+    UI.attr($('gWindG'), 'opacity', st.windRated > 0.01 ? 1 : 0.35);
+    UI.text($('gWindTxt'), n(f.wind) + ' кВт');
+    UI.text($('gWindVv'), n(f.vWind, 1) + ' м/с');
+
+    // батарея
+    var h = Math.round(Math.max(0, Math.min(1, f.soc)) * 68);
+    UI.attr($('gBattFill'), 'height', h);
+    UI.attr($('gBattFill'), 'y', 70 - h);
+    UI.text($('gSocTxt'), Math.round(f.soc * 100) + ' %');
+    UI.text($('gBattP'), (f.batt >= 0 ? '+' : '−') + n(Math.abs(f.batt)) + ' кВт');
+
+    // дом и сеть
+    UI.text($('gHouseP'), n(f.load) + ' кВт');
+    var litWin = f.load / Math.max(0.2, st.baseLoad) > 1.2;
+    UI.attr($('gWin1'), 'fill', litWin ? '#ffe9a8' : '#cfe3f2');
+    UI.attr($('gWin2'), 'fill', litWin ? '#ffe9a8' : '#cfe3f2');
+    UI.text($('gGridTxt'), n(Math.max(f.gridImport, f.gridExport)) + ' кВт');
+    UI.text($('gGridDir'), st.island ? 'сеть отключена' : (f.gridImport > 0.02 ? 'импорт из сети' : (f.gridExport > 0.02 ? 'отдача в сеть' : 'обмен ≈ 0')));
+
+    // электромобиль
+    var ev = st.evOn && G.evActive(st);
+    UI.attr($('gCar'), 'opacity', st.evOn ? 1 : 0.4);
+    UI.attr($('gEvBolt'), 'opacity', ev ? 1 : 0);
+    UI.text($('gEvTxt'), st.evOn ? (ev ? 'зарядка ' + n(st.evPower, 0) + ' кВт' : 'ждёт окна ' + hhmm(st.evStart)) : 'выключен');
+
+    // потоки
+    UI.attr($('gFlowPv'), 'opacity', f.pv > 0.05 ? 0.85 : 0);
+    UI.attr($('gFlowWind'), 'opacity', f.wind > 0.05 ? 0.85 : 0);
+    UI.attr($('gFlowGrid'), 'opacity', (Math.abs(f.gridImport) + Math.abs(f.gridExport)) > 0.05 ? 0.8 : 0);
+
+    // табло баланса
+    var bal = f.gen - f.load + f.batt + f.gridImport - f.gridExport;
+    UI.text($('gBalTxt'), (bal >= 0 ? 'профицит ' : 'дефицит ') + n(Math.abs(bal)) + ' кВт');
+    UI.text($('gBalSub'), st.island ? 'островной режим — только своя выработка' :
+      (f.gridImport > 0.02 ? 'недостаток покрывает сеть' : (f.gridExport > 0.02 ? 'излишек уходит в сеть' : 'баланс сходится')));
+    UI.attr($('gBalTxt'), 'fill', bal >= -0.02 ? '#1f7a4d' : '#c2410c');
+
+    // приборная панель
+    UI.text($('gLcdBal'), n(f.gen - f.load, 2));
+    UI.text($('gLcdSoc'), String(Math.round(f.soc * 100)));
+    UI.text($('gGen'), n(f.gen) + ' кВт');
+    UI.text($('gLoad'), n(f.load) + ' кВт');
+    UI.text($('gImp'), n(f.gridImport) + ' кВт');
+    UI.text($('gExp'), n(f.gridExport) + ' кВт');
+    UI.text($('gSoc'), Math.round(f.soc * 100) + ' %');
+    $('gSocBar').style.width = Math.round(f.soc * 100) + '%';
+    $('gSocBar').style.background = f.soc < 0.15 ? '#d64545' : (f.soc > 0.8 ? '#1f9d6b' : 'linear-gradient(90deg,#2ea3dc,#1b3e8f)');
+    UI.text($('gSocState'), f.soc < 0.15 ? 'низкий' : (f.soc > 0.92 ? 'полный' : 'заряд'));
+    UI.text($('gVhub'), n(f.vWind, 1) + ' м/с');
+    UI.text($('gPrice'), n(f.price, 1) + ' ₽/кВт·ч');
+
+    // сутки и экология
+    UI.text($('gDayGen'), n(f.day.gen, 1) + ' кВт·ч');
+    UI.text($('gDayImp'), n(f.day.gridImport, 1) + ' кВт·ч');
+    UI.text($('gDayCost'), n(f.day.cost, 0) + ' ₽');
+    UI.text($('gDayCo2'), n(f.day.co2, 1) + ' кг');
+    UI.text($('gRenew'), Math.round(f.day.renewShare * 100) + ' %');
+    UI.text($('gSelf'), Math.round(f.day.selfUse * 100) + ' %');
+    UI.text($('gCo2Cut'), Math.round(f.co2Cut * 100) + ' %');
+    UI.text($('gEve'), n(f.eveningImport, 2) + ' кВт·ч');
+    UI.text($('gClock'), hhmm(st.hour));
+
+    // сравнение
+    UI.html($('gCompare'), '<thead><tr><th>Показатель</th><th>Сеть</th><th>Микросеть</th></tr></thead><tbody>' +
+      [['Из сети, кВт·ч', n(f.base.gridImport, 1), n(f.day.gridImport, 1)],
+       ['Стоимость, ₽', n(f.base.cost, 0), n(f.day.cost, 0)],
+       ['CO₂, кг', n(f.co2Base, 1), n(f.day.co2, 1)],
+       ['Нагрузка, кВт·ч', n(f.base.load, 1), n(f.day.load, 1)]].map(function (r) {
+        return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td><b>' + r[2] + '</b></td></tr>';
+      }).join('') + '</tbody>');
+  }
+
+  /* ---------- задания ---------- */
+  function renderTask() {
+    var tk = G.TASKS[taskIndex];
+    var done = solved[taskIndex];
+    UI.text($('gTaskId'), (taskIndex + 1) + ' / ' + G.TASKS.length);
+    UI.html($('gTaskBody'),
+      '<div class="glyph">' + (done ? '★'.repeat(done) : '🎯') + '</div>' +
+      '<div class="goal"><b>' + esc(tk.t) + '</b><br>' + esc(tk.goal) + '</div>' +
+      '<ol class="steps">' + tk.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
+      '<div class="row" style="gap:6px;margin-top:6px">' +
+      '<button class="btn ghost tiny" id="gHint">Подсказка</button>' +
+      '<button class="btn primary tiny" id="gCheck">Проверить</button></div>' +
+      '<div class="checkout" id="gCheckOut"></div>');
+    UI.html($('gTaskList'), G.TASKS.map(function (t, i) {
+      return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
+        '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + esc(t.t) + '</span></button>';
+    }).join(''));
+    $('gHint').onclick = function () {
+      tk._h = tk._h || 0;
+      var hint = tk.hints[tk._h % tk.hints.length];
+      tk._h++;
+      UI.html($('gCheckOut'), '<div class="hintline">💡 ' + esc(hint) + '</div>');
+      log('info', 'Подсказка к заданию ' + (taskIndex + 1) + ': ' + hint);
+    };
+    $('gCheck').onclick = function () { checkTask(true); };
+    [].forEach.call($('gTaskList').children, function (b) {
+      b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); };
+    });
+  }
+
+  function checkTask(show) {
+    var tk = G.TASKS[taskIndex], f = G.facts(st), was = !!solved[taskIndex];
+    var ok = false;
+    try { ok = tk.check(f); } catch (e) { ok = false; }
+    if (ok && !was) {
+      var stars = 1;
+      try { stars = tk.stars(f) || 1; } catch (e) { stars = 1; }
+      solved[taskIndex] = stars;
+      log('ok', 'Задание выполнено: ' + tk.t + ' (' + stars + '★)');
+      renderTask();
+    } else if (show) {
+      UI.html($('gCheckOut'), ok
+        ? '<div class="okline">✓ Условие выполнено' + (tk.why ? '<br><span class="tiny muted">' + esc(tk.why) + '</span>' : '') + '</div>'
+        : '<div class="badline">Пока не выполнено — сверьтесь с шагами и подсказкой.</div>');
+    }
+    return ok;
+  }
+
+  /* ---------- кадр ---------- */
+  function frame(ts) {
+    if (!lastTick) lastTick = ts;
+    var dtReal = Math.min(0.1, (ts - lastTick) / 1000);
+    lastTick = ts;
+    if (window.__bench === 'grid') {
+      if (playing) G.step(st, dtReal * speed / 600);   // 1 с ≈ 1 мин модельного времени при ×1
+      render(G.facts(st));
+      meterTick += dtReal;
+      if (meterTick > 0.15) {
+        meterTick = 0; taskTick += 0.15;
+        if (taskTick > 1.2 && st.t > 5) { taskTick = 0; checkTask(false); }
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- старт ---------- */
+  syncControls();
+  renderTask();
+  renderMeasurements();
+  render(G.facts(st));
+  log('ok', 'Стенд «Микросеть»: 3 кВт панелей, ветряк 2 кВт, батарея 5 кВт·ч, нагрузка дома 1,2 кВт.');
+  log('info', 'Задание 1 — сбалансировать сутки: выработка должна закрывать нагрузку в каждый момент.');
+  requestAnimationFrame(frame);
+
+  window.__grid = {
+    state: function () { return st; },
+    facts: function () { return G.facts(st); },
+    sample: sample,
+    solved: function () { return solved; },
+    G: G
   };
 })();
 </script>
@@ -5845,6 +7114,38 @@
       check: function (f) { return f.lamps >= 2 && f.closed && f.lampsOn >= 2; },
       stars: function (f) { return f.lamps >= 2 && f.lampsOn >= 2 ? (f.lampMeasurements >= 2 ? 3 : 2) : 0; },
       why: 'Последовательное соединение: I одинаков, U делится пропорционально сопротивлениям. При перегорании одной лампы цепь разрывается и гаснут обе.'
+    },
+    {
+      t: 'Параллельное соединение',
+      goal: 'Соберите две лампы параллельно: напряжения на них равны, а ток источника больше тока каждой лампы.',
+      steps: ['Поставьте две лампы рядом.', 'Соедините клеммы так, чтобы обе лампы висели на одних и тех же узлах.',
+        'Снимите показания с каждой лампы и с источника.'],
+      hints: ['При параллельном соединении напряжения равны: U1 = U2 = U источника.',
+        'Токи складываются: I источника = I1 + I2 — это первый закон Кирхгофа.',
+        'Проверьте: суммарный ток должен быть больше тока любой из ламп.'],
+      guess: {
+        prompt: 'Предскажите: во сколько раз ток источника больше тока одной лампы?',
+        placeholder: 'во сколько раз',
+        unit: '×',
+        actual: function (f) {
+          const c = f.lampCurrents.filter(function (v) { return v > 0.005; });
+          return c.length ? f.sourceCurrent / c[0] : 0;
+        }
+      },
+      check: function (f) { return f.parallelLamps === true && f.lampsOn >= 2; },
+      stars: function (f) { return f.parallelLamps && f.lampsOn >= 2 ? (f.lampMeasurements >= 2 ? 3 : 2) : 0; },
+      why: 'Параллельное соединение: напряжение одинаковое для всех ветвей, а токи складываются. Лампы горят независимо друг от друга.'
+    },
+    {
+      t: 'Энергия и стоимость',
+      goal: 'Зажгите лампу и оставьте установку включённой на 3 минуты модельного времени (ускорение ×4). Снимите точку с накопленной энергией больше 0,1 Вт·ч.',
+      steps: ['Соберите цепь с лампой и замкните ключ.', 'Включите ускорение времени.', 'Подождите и снимите показания.'],
+      hints: ['Энергия = мощность × время: 2 Вт за 3 минуты — это 0,1 Вт·ч.',
+        'При ускорении ×4 модельные минуты идут быстрее.',
+        'Энергия накапливается только пока ключ замкнут.'],
+      check: function (f) { return f.energyWh >= 0.1 && f.closed; },
+      stars: function (f) { return f.energyWh >= 0.3 ? 3 : (f.energyWh >= 0.15 ? 2 : 1); },
+      why: 'Счётчик за электроэнергию считает работу тока: мощность (Вт) × время (ч) = энергия (Вт·ч).'
     }
   ];
 
@@ -6240,8 +7541,8 @@
   /* ================= переключение стендов ================= */
   var bench = 'circuits';
   window.__bench = 'circuits';
-  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd' };
-  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen' };
+  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd', grid: 'grid' };
+  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen', grid: 'benchGrid' };
   function setBench(name) {
     bench = name;
     window.__bench = name;

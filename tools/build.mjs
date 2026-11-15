@@ -25,6 +25,8 @@ for (const [marker, file] of [
   ['/*__EFFICIENCY_UI__*/', 'src/efficiency.ui.js'],
   ['/*__HYDROGEN__*/', 'src/hydrogen.js'],
   ['/*__HYDROGEN_UI__*/', 'src/hydrogen.ui.js'],
+  ['/*__GRID__*/', 'src/grid.js'],
+  ['/*__GRID_UI__*/', 'src/grid.ui.js'],
 ]) {
   if (!out.includes(marker)) {
     console.error(`Нет метки ${marker} в src/app.dev.html`);

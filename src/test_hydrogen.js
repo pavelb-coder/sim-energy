@@ -149,7 +149,7 @@ console.log('Модель «Водородный контур» (FCJJ-40)');
 /* 13. Задания: проверки срабатывают на правильных состояниях */
 {
   const T = H.TASKS;
-  ok('шесть заданий', T.length === 6);
+  ok('восемь заданий (6 базовых + 2 лабораторные)', T.length === 8, 'сейчас ' + T.length);
 
   const f1 = { h2pct: 0.7 }, f1b = { h2pct: 0.3 };
   ok('задание 1: 70 % H₂ — выполнено', T[0].check(f1));
@@ -174,6 +174,12 @@ console.log('Модель «Водородный контур» (FCJJ-40)');
   ok('задание 6: 120 см/с', T[5].check(f6));
   ok('задание 6: 80 см/с мало', !T[5].check({ loadP: 0.05, carSpeed: 80 }));
 
+  ok('задание «Сравнить источники» требует все три элемента',
+    T[6].check({ chemKinds: { ethanol: 1, salt: 1, thermal: 1 } }) &&
+    !T[6].check({ chemKinds: { ethanol: 1 } }));
+  ok('задание «Минимум разложения» ловит узкий диапазон',
+    T[7].check({ mode: 'electrolysis', elecV: 1.6, elecI: 0.05 }) &&
+    !T[7].check({ mode: 'electrolysis', elecV: 2.4, elecI: 0.6 }));
   ok('у каждого задания есть цель, шаги и подсказки',
     T.every(t => t.goal && t.steps.length >= 2 && t.hints.length >= 2 && typeof t.stars === 'function'));
 }

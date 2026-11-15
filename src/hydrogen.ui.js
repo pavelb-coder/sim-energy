@@ -10,6 +10,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var st = H.createState();
   var solved = {}, taskIndex = 0, lastFacts = null, taskTick = 0, meterTick = 0, playing = true;
+  var chemKinds = {};   // какие химические элементы уже снимали точку
   var lastKey = '';
 
   var css = document.createElement('style');
@@ -340,6 +341,7 @@
   var meas = [];
   function sample() {
     var f = H.facts(st);
+    if (st.cap && st.cap !== 'none') chemKinds[st.cap] = true;
     meas.push({
       t: st.t, mode: st.mode, src: f.sourceLabel,
       u: f.mode === 'electrolysis' ? f.elecV : f.fcV,
@@ -725,6 +727,7 @@
 
   function checkTask(show) {
     var tk = H.TASKS[taskIndex], f = H.facts(st), was = !!solved[taskIndex];
+    f.chemKinds = chemKinds;
     var ok = false;
     try { ok = tk.check(f); } catch (e) { ok = false; }
     if (ok && !was) {

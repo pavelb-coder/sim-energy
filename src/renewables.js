@@ -243,6 +243,34 @@
       }
       if (pair) break;
     }
+    // разброс по наклону панели и по числу лопастей — для лабораторных работ
+    const pm = (st.measures || []).filter(function (m) { return m.kind === 'pv'; });
+    const tilts = {};
+    pm.forEach(function (m) { tilts[Math.round(m.tilt / 5) * 5] = 1; });
+    f.tiltPoints = Object.keys(tilts).length;
+    const tiltsPv = pm.map(function (m) { return { tilt: m.tilt, pv: m.pv }; });
+    if (tiltsPv.length >= 2) {
+      const hi = tiltsPv.reduce(function (a, b) { return b.pv > a.pv ? b : a; }, tiltsPv[0]);
+      const lo = tiltsPv.reduce(function (a, b) { return b.pv < a.pv ? b : a; }, tiltsPv[0]);
+      f.tiltBest = hi.tilt;
+      f.tiltWorst = lo.tilt;
+      f.tiltGain = lo.pv > 0.5 ? hi.pv / lo.pv : 0;
+    }
+    const wm = (st.measures || []).filter(function (m) { return m.kind === 'wind'; });
+    const bladeGroups = {};
+    wm.forEach(function (m) { bladeGroups[m.blades] = (bladeGroups[m.blades] || 0) + 1; });
+    f.bladeGroups = Object.keys(bladeGroups).length;
+    // средняя мощность при каждом числе лопастей
+    const byBlades = {};
+    wm.forEach(function (m) {
+      byBlades[m.blades] = byBlades[m.blades] || { sum: 0, n: 0 };
+      byBlades[m.blades].sum += m.p; byBlades[m.blades].n += 1;
+    });
+    f.bladeAvg = {};
+    Object.keys(byBlades).forEach(function (k) {
+      f.bladeAvg[k] = byBlades[k].sum / byBlades[k].n;
+    });
+
     if (pair) {
       f.windRatio = pair.hi.p / pair.lo.p;
       f.windRatioTheory = Math.pow(pair.ratio, 3);
@@ -365,6 +393,37 @@
       why: 'На широте Красноярска (56°) зимой солнце поднимается низко, а день короткий: суммарная выработка падает в 3–4 раза. Поэтому в автономных системах закладывают зимний расчёт.'
     }
   ];
+
+  TASKS.push({
+    t: 'Наклон панели',
+    goal: 'Снимите не меньше 3 точек при разном наклоне панели (например, 0°, 30°, 60°) и найдите наклон, при котором мощность максимальна.',
+    steps: ['Оставьте ясную погоду и полдень.', 'Меняйте наклон панели и снимайте показания.',
+      'Сравните мощность при разных углах.'],
+    hints: ['Летом в полдень солнце высоко, поэтому оптимальный наклон меньше 45°.',
+      'Разница между «плашмя» и оптимальным наклоном заметна на глаз — до 40 %.',
+      'На каждое значение наклона нужна своя точка в протоколе.'],
+    check: function (f) { return f.tiltPoints >= 3 && f.tiltGain >= 1.06; },
+    stars: function (f) { return f.tiltPoints >= 3 && f.tiltGain >= 1.06 ? (f.tiltGain >= 1.2 ? 3 : 2) : 0; },
+    why: 'Мощность панели зависит от угла падения света: оптимальный наклон — когда лучи перпендикулярны плоскости панели. Летом он меньше, зимой больше.'
+  });
+  TASKS.push({
+    t: 'Число лопастей',
+    goal: 'Снимите точки для двух разных чисел лопастей при одинаковом ветре и сравните мощность.',
+    steps: ['Задайте ветер 8 м/с.', 'Поставьте 3 лопасти и снимите точку.', 'Поставьте 5 лопастей и снимите ещё одну.'],
+    hints: ['Больше лопастей — больше ометаемая площадь и выше мощность при слабом ветре.',
+      'При сильном ветре разница меньше: генератор уже выходит на номинал.',
+      'Проверьте по протоколу, что точки отличаются только числом лопастей.'],
+    check: function (f) { return f.bladeGroups >= 2 && f.windMeasure.length >= 2; },
+    stars: function (f) {
+      const a = f.bladeAvg || {};
+      const k = Object.keys(a);
+      if (k.length < 2) return 0;
+      const max = Math.max.apply(null, k.map(function (x) { return a[x]; }));
+      const min = Math.min.apply(null, k.map(function (x) { return a[x]; }));
+      return min > 0.5 && max / min > 1.15 ? 3 : 2;
+    },
+    why: 'Мощность ветрогенератора пропорциональна ометаемой площади: пять лопастей при том же диаметре дают заметно больше, чем три.'
+  });
 
   const API = {
     LAT: LAT, PANEL_A: PANEL_A, TURB_D: TURB_D, LOADS: LOADS, TASKS: TASKS,

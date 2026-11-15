@@ -243,6 +243,16 @@
       maxTemp: st.measures.reduce(function (a, m) { return Math.max(a, m.temp || 0); }, st.temp),
       capEnergyJ: 0.5 * CAP.C * st.capVoltage * st.capVoltage
     };
+    // дополнительные величины для лабораторных работ
+    f.typesMeasured = {};
+    st.measures.forEach(function (m) { if (m.type) f.typesMeasured[m.type] = 1; });
+    f.typesCount = Object.keys(f.typesMeasured).length;
+    f.converterPoints = st.measures.filter(function (m) { return m.kind === 'eff'; }).map(function (m) { return m.eff; });
+    f.tempPoints = st.measures.map(function (m) { return m.temp || st.temp; });
+    f.tempSpread = f.tempPoints.length >= 2 ? Math.max.apply(null, f.tempPoints) - Math.min.apply(null, f.tempPoints) : 0;
+    f.chargeTempRise = st.measures.filter(function (m) { return m.kind === 'charge'; })
+      .reduce(function (a, m) { return Math.max(a, m.temp || 0); }, st.temp) - 25;
+
     // разброс отданной ёмкости при разных токах
     const d = f.dischargeRuns;
     if (d.length >= 2) {
@@ -335,6 +345,41 @@
       why: 'У инвертора есть «холостой ход»: собственное потребление 3–8 Вт. На малой нагрузке оно съедает большую долю, поэтому КПД растёт с загрузкой.'
     }
   ];
+
+  TASKS.push({
+    t: 'Сравнить два типа АКБ',
+    goal: 'Снимите хотя бы по одной точке для двух разных типов накопителей (например, Li-ion и свинцового) при одинаковом заряде.',
+    steps: ['Выберите Li-ion, поставьте заряд 60 %, снимите точку.', 'Смените тип на свинцовый при том же заряде.',
+      'Сравните напряжение и отданную энергию.'],
+    hints: ['У свинцового номинальное напряжение 12 В, у Li-ion — 3,7 В: это разные классы батарей.',
+      'Сравнивать нужно удельную энергию: Вт·ч на килограмм или на литр.',
+      'Плотность энергии Li-ion примерно втрое выше свинцовой.'],
+    check: function (f) { return f.typesCount >= 2; },
+    stars: function (f) { return f.typesCount >= 3 ? 3 : 2; },
+    why: 'Li-ion даёт больше энергии при меньшей массе и выдерживает больше циклов, свинцовый дешевле, но тяжелее и живёт меньше.'
+  });
+  TASKS.push({
+    t: 'Нагрев при заряде',
+    goal: 'Замерьте нагрев аккумулятора при заряде током 1C и при 0,5C — сравните прирост температуры.',
+    steps: ['Включите заряд и задайте 1C, снимите точку после прогрева.', 'Сбросьте опыт и повторите при 0,5C.',
+      'Сравните температуру в протоколе.'],
+    hints: ['Потери в внутреннем сопротивлении растут как I²·r — ток вдвое больше даёт вчетверо больше тепла.',
+      'Перегрев выше 45 °C ускоряет износ и опасен для Li-ion.',
+      'Температура видна в показаниях и в протоколе.'],
+    check: function (f) {
+      const charges = f.chargeMeasures;
+      const hot = charges.some(function (m) { return m.temp >= 30; });
+      return charges.length >= 2 && hot;
+    },
+    stars: function (f) {
+      const c = f.chargeMeasures;
+      if (c.length < 2) return 0;
+      const max = Math.max.apply(null, c.map(function (m) { return m.temp || 0; }));
+      const min = Math.min.apply(null, c.map(function (m) { return m.temp || 0; }));
+      return max - min >= 6 ? 3 : 2;
+    },
+    why: 'Нагрев батареи — это потери: Q = I²·r·t. Поэтому быстрый заряд всегда греет сильнее, и в BMS есть температурная защита.'
+  });
 
   const API = {
     TYPES: TYPES, LOADS: LOADS, CAP: CAP, TASKS: TASKS,

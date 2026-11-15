@@ -342,6 +342,7 @@
       <button data-bench="storage">Накопители</button>
       <button data-bench="efficiency">Эффективность</button>
       <button data-bench="hydrogen">Водородный контур</button>
+      <button data-bench="grid">Микросеть</button>
     </nav>
     <div class="grow"></div>
     <div class="modes" role="tablist" aria-label="Режим работы">
@@ -473,6 +474,7 @@
 <main id="benchStorage" data-bench-id="storage" hidden></main>
 <main id="benchEfficiency" data-bench-id="efficiency" hidden></main>
 <main id="benchHydrogen" data-bench-id="hydrogen" hidden></main>
+<main id="benchGrid" data-bench-id="grid" hidden></main>
 
 <div class="modal" id="help">
   <div class="sheet">
@@ -532,6 +534,8 @@
 <script>/*__EFFICIENCY_UI__*/</script>
 <script>/*__HYDROGEN__*/</script>
 <script>/*__HYDROGEN_UI__*/</script>
+<script>/*__GRID__*/</script>
+<script>/*__GRID_UI__*/</script>
 <script>
 (function () {
   'use strict';
@@ -1323,6 +1327,38 @@
       check: function (f) { return f.lamps >= 2 && f.closed && f.lampsOn >= 2; },
       stars: function (f) { return f.lamps >= 2 && f.lampsOn >= 2 ? (f.lampMeasurements >= 2 ? 3 : 2) : 0; },
       why: 'Последовательное соединение: I одинаков, U делится пропорционально сопротивлениям. При перегорании одной лампы цепь разрывается и гаснут обе.'
+    },
+    {
+      t: 'Параллельное соединение',
+      goal: 'Соберите две лампы параллельно: напряжения на них равны, а ток источника больше тока каждой лампы.',
+      steps: ['Поставьте две лампы рядом.', 'Соедините клеммы так, чтобы обе лампы висели на одних и тех же узлах.',
+        'Снимите показания с каждой лампы и с источника.'],
+      hints: ['При параллельном соединении напряжения равны: U1 = U2 = U источника.',
+        'Токи складываются: I источника = I1 + I2 — это первый закон Кирхгофа.',
+        'Проверьте: суммарный ток должен быть больше тока любой из ламп.'],
+      guess: {
+        prompt: 'Предскажите: во сколько раз ток источника больше тока одной лампы?',
+        placeholder: 'во сколько раз',
+        unit: '×',
+        actual: function (f) {
+          const c = f.lampCurrents.filter(function (v) { return v > 0.005; });
+          return c.length ? f.sourceCurrent / c[0] : 0;
+        }
+      },
+      check: function (f) { return f.parallelLamps === true && f.lampsOn >= 2; },
+      stars: function (f) { return f.parallelLamps && f.lampsOn >= 2 ? (f.lampMeasurements >= 2 ? 3 : 2) : 0; },
+      why: 'Параллельное соединение: напряжение одинаковое для всех ветвей, а токи складываются. Лампы горят независимо друг от друга.'
+    },
+    {
+      t: 'Энергия и стоимость',
+      goal: 'Зажгите лампу и оставьте установку включённой на 3 минуты модельного времени (ускорение ×4). Снимите точку с накопленной энергией больше 0,1 Вт·ч.',
+      steps: ['Соберите цепь с лампой и замкните ключ.', 'Включите ускорение времени.', 'Подождите и снимите показания.'],
+      hints: ['Энергия = мощность × время: 2 Вт за 3 минуты — это 0,1 Вт·ч.',
+        'При ускорении ×4 модельные минуты идут быстрее.',
+        'Энергия накапливается только пока ключ замкнут.'],
+      check: function (f) { return f.energyWh >= 0.1 && f.closed; },
+      stars: function (f) { return f.energyWh >= 0.3 ? 3 : (f.energyWh >= 0.15 ? 2 : 1); },
+      why: 'Счётчик за электроэнергию считает работу тока: мощность (Вт) × время (ч) = энергия (Вт·ч).'
     }
   ];
 
@@ -1718,8 +1754,8 @@
   /* ================= переключение стендов ================= */
   var bench = 'circuits';
   window.__bench = 'circuits';
-  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd' };
-  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen' };
+  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd', grid: 'grid' };
+  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen', grid: 'benchGrid' };
   function setBench(name) {
     bench = name;
     window.__bench = name;

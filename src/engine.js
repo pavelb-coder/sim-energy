@@ -328,6 +328,29 @@
     f.closed = Math.abs(f.sourceCurrent) > 1e-4;
 
     // нелинейность лампы по измерениям
+    // дополнительные величины для лабораторных работ
+    f.energyWh = world.energyLoadWh;
+    const kinds = {};
+    world.measurements.forEach(function (m) { kinds[m.kind] = (kinds[m.kind] || 0) + 1; });
+    f.measureKinds = kinds;
+    // параллельное соединение: две лампы с примерно равными напряжениями при одном источнике
+    const lamps = world.parts.filter(function (p) { return p.type === 'lamp'; });
+    f.lampVoltages = lamps.map(function (p) {
+      const i = sol.parts[p.id] || {};
+      return Math.abs(i.U || 0);
+    });
+    f.lampCurrents = lamps.map(function (p) {
+      const i = sol.parts[p.id] || {};
+      return Math.abs(i.I || 0);
+    });
+    // признак параллельного включения: напряжения близки, токи складываются
+    const lv = f.lampVoltages.filter(function (v) { return v > 0.2; });
+    f.parallelLamps = lv.length >= 2 && Math.abs(lv[0] - lv[1]) / Math.max(lv[0], lv[1]) < 0.08 &&
+      Math.abs(f.sourceCurrent) > Math.max.apply(null, f.lampCurrents) * 1.3;
+    // последовательное включение: токи равны, напряжения разные
+    const lc = f.lampCurrents.filter(function (v) { return v > 0.005; });
+    f.seriesLamps = lc.length >= 2 && Math.abs(lc[0] - lc[1]) / Math.max(lc[0], lc[1]) < 0.05;
+
     const lampM = world.measurements.filter(function (m) { return m.kind === 'lamp'; });
     const rl = lampM.filter(function (m) { return m.R > 0; }).map(function (m) { return m.R; });
     f.lampRratio = rl.length >= 2 ? Math.max.apply(null, rl) / Math.min.apply(null, rl) : 0;
