@@ -92,14 +92,15 @@ if ($diff) {
     $ok[] = 'языковые ключи: ' . count(array_unique($mru[1])) . ' (ru = en)';
 }
 
-// 7) сборка стенда на месте и содержит все четыре стенда
+// 7) сборка стенда на месте и содержит все шесть стендов
 $lab = file_get_contents($root . '/standalone/lab.html');
-foreach (['data-bench-id="circuits"', 'data-bench-id="renew"', 'data-bench-id="storage"', 'data-bench-id="efficiency"'] as $needle) {
+foreach (['data-bench-id="circuits"', 'data-bench-id="renew"', 'data-bench-id="storage"', 'data-bench-id="efficiency"',
+    'data-bench-id="hydrogen"', 'data-bench-id="grid"'] as $needle) {
     if (strpos($lab, $needle) === false) {
         $errors[] = "в standalone/lab.html нет $needle";
     }
 }
-foreach (['window.__lab', 'window.__renew', 'window.__storage', 'window.__eff'] as $needle) {
+foreach (['window.__lab', 'window.__renew', 'window.__storage', 'window.__eff', 'window.__hydrogen', 'window.__grid'] as $needle) {
     if (strpos($lab, $needle) === false) {
         $errors[] = "в сборке нет хука $needle";
     }
@@ -107,7 +108,7 @@ foreach (['window.__lab', 'window.__renew', 'window.__storage', 'window.__eff'] 
 if (strpos($lab, 'preserveAspectRatio="xMidYMid slice"') !== false) {
     $errors[] = 'в сборке остался обрезающий preserveAspectRatio slice';
 }
-$ok[] = 'standalone/lab.html: 4 стенда и 4 хука прогресса, размер ' . round(filesize($root . '/standalone/lab.html') / 1024) . ' КБ';
+$ok[] = 'standalone/lab.html: 6 стендов и 6 хуков прогресса, размер ' . round(filesize($root . '/standalone/lab.html') / 1024) . ' КБ';
 
 // 8) AJAX-сервис объявлен и класс существует
 $services = file_get_contents($root . '/db/services.php');

@@ -12,6 +12,8 @@ function mod_energy_bench_list(): array {
         'renew'      => get_string('bench_renew', 'mod_energy'),
         'storage'    => get_string('bench_storage', 'mod_energy'),
         'efficiency' => get_string('bench_efficiency', 'mod_energy'),
+        'hydrogen'   => get_string('bench_hydrogen', 'mod_energy'),
+        'grid'       => get_string('bench_grid', 'mod_energy'),
     ];
 }
 
@@ -205,16 +207,16 @@ function mod_energy_is_open(stdClass $energy): bool {
 }
 
 /**
- * Сколько заданий доступно в экземпляре (по 6 на каждый включённый стенд).
+ * Сколько заданий доступно в экземпляре (по 8 на каждый включённый стенд).
  *
  * @param stdClass|null $energy
  * @return int
  */
 function mod_energy_total_tasks(?stdClass $energy = null): int {
     if ($energy === null) {
-        return 24;
+        return 48;
     }
-    return 6 * count(mod_energy_enabled_benches($energy));
+    return 8 * count(mod_energy_enabled_benches($energy));
 }
 
 /**

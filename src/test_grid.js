@@ -161,13 +161,26 @@ console.log('Модель «Микросеть»');
 /* 12. Задания: проверки срабатывают */
 {
   const T = G.TASKS;
-  ok('шесть заданий', T.length === 6);
+  ok('восемь заданий (6 базовых + 2 лабораторные)', T.length === 8, 'сейчас ' + T.length);
   const st = G.createState();
   st.pvKwp = 6; st.windRated = 3; st.batteryKwh = 12; st.soc = 0.7; st.windRef = 7;
   const f = G.facts(st);
   ok('при мощной системе задание «Сбалансировать сутки» выполнено', T[0].check(f),
     'импорт ' + f.day.gridImport.toFixed(1) + ' кВт·ч');
   ok('звёзды от 1 до 3', (function () { const s = T[0].stars(f); return s >= 1 && s <= 3; })());
+
+  // лабораторные работы по методике измерений
+  const withMeas = Object.assign({}, st, { meas: [
+    { hour: 12, gen: 2, cloud: 0, tilt: 40 }, { hour: 12, gen: 1.2, cloud: 0.5, tilt: 40 },
+    { hour: 12, gen: 0.5, cloud: 1, tilt: 40 }] });
+  const fm = G.facts(withMeas);
+  ok('«Облачность и выработка» — три уровня облачности', T[6].check(fm), 'точек ' + fm.cloudPoints);
+  ok('«Облачность и выработка» не срабатывает на одной точке', !T[6].check(G.facts(Object.assign({}, st, { meas: [{ cloud: 0, tilt: 40 }] }))));
+  const ft = G.facts(Object.assign({}, st, { meas: [
+    { cloud: 0.2, tilt: 0 }, { cloud: 0.2, tilt: 35 }, { cloud: 0.2, tilt: 65 }] }));
+  ok('«Оптимальный наклон» — три угла, есть попадание в 30–45°', T[7].check(ft) && T[7].stars(ft) === 3);
+  ok('«Оптимальный наклон» даёт 2 звезды без попадания в оптимум',
+    T[7].stars(G.facts(Object.assign({}, st, { meas: [{ tilt: 0 }, { tilt: 10 }, { tilt: 80 }] }))) === 2);
 
   const weak = G.facts(G.createState());
   ok('на слабой системе «Сбалансировать сутки» не выполнено', !T[0].check(weak));

@@ -324,9 +324,13 @@
 
   function sample() {
     var f = G.facts(st);
-    meas.push({ hour: st.hour, gen: f.gen, load: f.load, imp: f.gridImport, exp: f.gridExport, batt: f.batt, soc: f.soc });
+    meas.push({ hour: st.hour, gen: f.gen, load: f.load, imp: f.gridImport, exp: f.gridExport,
+      batt: f.batt, soc: f.soc, cloud: st.cloud, tilt: st.tilt,
+      vWind: f.vWind, pv: f.pv, wind: f.wind, price: f.price });
+    st.meas = meas;
     log('ok', 'Точка снята: выработка ' + n(f.gen) + ' кВт, нагрузка ' + n(f.load) + ' кВт, из сети ' + n(f.gridImport) + ' кВт');
     renderMeasurements();
+    checkTask(false);
   }
 
   function exportCsv() {

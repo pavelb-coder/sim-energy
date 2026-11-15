@@ -360,6 +360,15 @@
 
   /* ---------------- факты для UI ---------------- */
   function facts(st) {
+    // уже снятые точки (нужны лабораторным работам по методике измерений)
+    const meas = (st.meas || []).map(function (m) {
+      return { hour: m.hour, gen: m.gen, load: m.load, imp: m.imp, exp: m.exp, soc: m.soc, cloud: m.cloud, tilt: m.tilt };
+    });
+    const cloudKeys = {}, tiltKeys = {};
+    meas.forEach(function (m) {
+      if (typeof m.cloud === 'number') cloudKeys[Math.round(m.cloud * 10)] = 1;
+      if (typeof m.tilt === 'number') tiltKeys[Math.round(m.tilt / 10) * 10] = 1;
+    });
     const b = balance(st);
     const day = simulateDay(st, 0, 15);
     const base = baselineDay(st);
@@ -389,6 +398,10 @@
       evNightCost: evNight.cost, evDayCost: evEvening.cost,
       evNightSaving: Math.max(0, (evEvening.price - evNight.price) * evNight.energy),
       selfUse: day.selfUse, renewShare: day.renewShare,
+      measCount: meas.length,
+      meas: meas,
+      cloudPoints: Object.keys(cloudKeys).length,
+      tiltPoints: Object.keys(tiltKeys).length,
       warnings: (function () {
         const w = [];
         if (day.unserved > 0.01) w.push('Невыданная энергия: ' + day.unserved.toFixed(2) + ' кВт·ч');
@@ -399,6 +412,36 @@
       })()
     };
   }
+
+  // ---------- лабораторные работы: методика измерений ----------
+  TASKS.push({
+    t: 'Облачность и выработка',
+    goal: 'Снимите точки при трёх разных уровнях облачности (полдень, небо от ясного до пасмурного) и убедитесь, что мощность панели падает.',
+    steps: ['Поставьте время 12:00 и ясную погоду, снимите точку.', 'Повторите при облачности 50 % и 100 %.',
+      'Сравните выработку в протоколе.'],
+    hints: ['Ползунок «Облачность» задаёт долю закрытого неба.',
+      'Кнопка «Снять точку» пишет строку в журнал и протокол.',
+      'Разница между ясно и пасмурно — примерно в 5 раз.'],
+    check: function (f) { return f.cloudPoints >= 3; },
+    stars: function (f) { return f.cloudPoints >= 4 ? 3 : 2; },
+    why: 'Мощность панели пропорциональна освещённости: облака рассеивают свет, и выработка падает почти линейно.'
+  });
+  TASKS.push({
+    t: 'Оптимальный наклон',
+    goal: 'Снимите точки при трёх разных углах наклона панели и найдите угол, при котором выработка максимальна.',
+    steps: ['Полдень, ясно, наклон 0° — снимите точку.', 'Повторите при 35° и 65°.', 'Сравните мощность.'],
+    hints: ['Оптимальный наклон летом в полдень близок к 35–40°, зимой — к 60°.',
+      'Разница между «плашмя» и оптимальным углом — до 30 %.',
+      'Смотрите на карточку «Выработка» после каждого снятия точки.'],
+    check: function (f) { return f.tiltPoints >= 3; },
+    stars: function (f) {
+      if (f.tiltPoints < 3) return 0;
+      const m = f.meas || [];
+      const best = m.filter(function (x) { return x.tilt >= 30 && x.tilt <= 45; });
+      return best.length ? 3 : 2;
+    },
+    why: 'Наклон выбирают так, чтобы лучи падали перпендикулярно панели: летом угол меньше, зимой больше.'
+  });
 
   const API = {
     LAT: LAT, PV: PV, WIND: WIND, BATTERY: BATTERY, TARIFF: TARIFF, CO2: CO2, GAS: GAS,

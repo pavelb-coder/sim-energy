@@ -6,7 +6,7 @@ defined('MOODLE_INTERNAL') || die();
 $string['pluginname'] = 'Energyquantum virtual laboratory';
 $string['modulename'] = 'Virtual laboratory';
 $string['modulenameplural'] = 'Virtual laboratories';
-$string['modulename_help'] = 'Interactive energy stands: electric circuits, renewables, storage and converters, energy efficiency. Students complete tasks on the stands; progress is written to the gradebook automatically.';
+$string['modulename_help'] = 'Interactive energy stands: electric circuits, renewables, storage and converters, energy efficiency, hydrogen loop, microgrid. Students complete tasks on the stands; progress is written to the gradebook automatically.';
 $string['pluginadministration'] = 'Virtual laboratory administration';
 
 $string['energy:addinstance'] = 'Add a virtual laboratory to the course';
@@ -22,6 +22,8 @@ $string['bench_circuits'] = 'Electric circuits';
 $string['bench_renew'] = 'Renewable energy';
 $string['bench_storage'] = 'Storage and converters';
 $string['bench_efficiency'] = 'Energy efficiency and smart home';
+$string['bench_hydrogen'] = 'Hydrogen loop (FCJJ-40)';
+$string['bench_grid'] = 'Microgrid and EV charging';
 
 $string['gradetarget'] = 'Tasks for the full grade';
 $string['gradetarget_help'] = 'How many tasks a student must complete to get the maximum grade.';
