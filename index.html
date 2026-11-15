@@ -4141,6 +4141,8 @@
   .hyd .seg button{flex:1 1 auto;min-width:0;padding:4px 6px;font-size:11px;border-radius:5px;color:var(--muted);white-space:nowrap}
   .hyd #hyLoad{display:grid;grid-template-columns:1fr 1fr;gap:2px}
   .hyd .rctl{overflow:auto}
+  .hyd .bottombar.collapsed{height:36px!important;flex:0 0 36px}
+  .hyd .bottombar.collapsed .tabbody{display:none}
   .hyd .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .hyd .fld{margin-bottom:8px}
   .hyd .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:3px}
@@ -4292,12 +4294,13 @@
         </svg>
       </div>
 
-      <div class="panel" style="padding:6px 9px 9px">
+      <div class="bottombar panel" style="height:132px">
         <div class="tabs">
           <button class="active" data-hytab="journal">Журнал</button>
           <button data-hytab="meas">Протокол <span id="hyMeasCount" class="badge"></span></button>
           <div class="grow"></div>
           <button class="btn ghost tiny" id="hyCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+          <button class="btn ghost tiny" id="hyLogFold" title="Свернуть журнал" style="margin:4px 6px 4px 0">Свернуть ▾</button>
         </div>
         <div class="tabbody" id="hyTabJournal"><div class="journal" id="hyJournal"></div></div>
         <div class="tabbody" id="hyTabMeas" hidden></div>
@@ -4751,6 +4754,12 @@
   };
   $('hySample').onclick = sample;
   $('hyCsv').onclick = exportCsv;
+  $('hyLogFold').onclick = function () {
+    var bar = document.querySelector('#benchHydrogen .bottombar');
+    var folded = bar.classList.toggle('collapsed');
+    UI.text(this, folded ? 'Развернуть ▴' : 'Свернуть ▾');
+    this.title = folded ? 'Развернуть журнал' : 'Свернуть журнал';
+  };
   [].forEach.call(document.querySelectorAll('[data-hytab]'), function (b) {
     b.onclick = function () {
       [].forEach.call(document.querySelectorAll('[data-hytab]'), function (x) { x.classList.remove('active'); });
