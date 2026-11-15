@@ -16,7 +16,7 @@
   var css = document.createElement('style');
   UI.text(css, `
   .stor main{display:grid;grid-template-columns:238px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
-  .stor .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .stor .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px}
   .stor .seg button{flex:1;padding:4px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
   .stor .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .stor .fld{margin-bottom:9px}
@@ -25,10 +25,10 @@
   .stor input[type=range]{width:100%}
   .stor .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:4px 0}
   .stor .chk input{width:15px;height:15px;accent-color:var(--accent)}
-  .sstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#fbfdfe;overflow:hidden}
+  .sstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#f8fbfd;overflow:hidden}
   .sstage svg.scene{width:100%;height:100%;display:block}
   .scope{padding:6px 9px 9px}
-  .scope canvas{width:100%;height:104px;display:block;background:#f7fafc;border:1px solid var(--line);border-radius:8px}
+  .scope canvas{width:100%;height:104px;display:block;background:#f6f9fc;border:1px solid var(--line);border-radius:8px}
   .warnchip{display:inline-block;background:#fdecec;border:1px solid #f3bcbc;color:#a02020;border-radius:6px;padding:1px 6px;font-size:10.5px;margin:2px 3px 0 0}
   @media (max-width:980px){.stor main{grid-template-columns:1fr}.sstage{min-height:380px}}
   @media (max-height:820px){
@@ -104,14 +104,14 @@
               <stop offset="0%" stop-color="#8fe0b8"/><stop offset="100%" stop-color="#1f9d6b"/>
             </linearGradient>
             <linearGradient id="cellWarm" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stop-color="#ffd08a"/><stop offset="100%" stop-color="#e8850c"/>
+              <stop offset="0%" stop-color="#ffc98a"/><stop offset="100%" stop-color="#e8850c"/>
             </linearGradient>
           </defs>
 
           <!-- накопитель -->
           <g id="gCell" transform="translate(120,190)">
-            <rect x="-62" y="-96" width="124" height="192" rx="14" fill="#fff" stroke="#7a8fa0" stroke-width="2.5"/>
-            <rect x="-20" y="-108" width="40" height="14" rx="4" fill="#7a8fa0"/>
+            <rect x="-62" y="-96" width="124" height="192" rx="14" fill="#fff" stroke="#b9c8d4" stroke-width="2.5"/>
+            <rect x="-20" y="-108" width="40" height="14" rx="4" fill="#b9c8d4"/>
             <rect id="cellFill" x="-56" y="90" width="112" height="0" rx="8" fill="url(#cellFillG)" style="transition:height .12s,y .12s"/>
             <g id="cellBolt" opacity="0">
               <path d="M-4 -44 L12 -44 L-2 -12 L12 -12 L-12 34 L-4 -6 L-16 -6 Z" fill="#ffd166" stroke="#e8a93a"/>
@@ -122,27 +122,27 @@
           </g>
 
           <!-- провода и преобразователь -->
-          <path d="M182 190 L246 190" stroke="#8fa3b3" stroke-width="3" fill="none"/>
+          <path d="M182 190 L246 190" stroke="#b9c8d4" stroke-width="3" fill="none"/>
           <g id="gConv" transform="translate(300,190)">
-            <rect x="-54" y="-50" width="108" height="100" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
+            <rect x="-54" y="-50" width="108" height="100" rx="10" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
             <text x="0" y="-30" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif" id="convName">buck</text>
-            <text id="convOut" x="0" y="4" text-anchor="middle" font-size="19" font-weight="700" fill="#0b6e99" font-family="sans-serif">5,0 В</text>
+            <text id="convOut" x="0" y="4" text-anchor="middle" font-size="19" font-weight="700" fill="#1b3e8f" font-family="sans-serif">5,0 В</text>
             <text id="convEff" x="0" y="24" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif">КПД 85 %</text>
             <text id="convD" x="0" y="40" text-anchor="middle" font-size="10" fill="#8a97a3" font-family="sans-serif">D = 0,42</text>
           </g>
-          <path d="M354 190 L418 190" stroke="#8fa3b3" stroke-width="3" fill="none"/>
+          <path d="M354 190 L418 190" stroke="#b9c8d4" stroke-width="3" fill="none"/>
 
           <!-- нагрузка -->
           <g id="gLoad" transform="translate(486,190)">
-            <rect x="-56" y="-46" width="112" height="92" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
-            <circle id="loadBulb" cx="0" cy="-12" r="15" fill="#e9eff4" stroke="#a9bcc9" stroke-width="2"/>
+            <rect x="-56" y="-46" width="112" height="92" rx="10" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
+            <circle id="loadBulb" cx="0" cy="-12" r="15" fill="#e9eff4" stroke="#c6d3dd" stroke-width="2"/>
             <text id="loadName" x="0" y="20" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">Лампа 5 Вт</text>
             <text id="loadP" x="0" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2a36" font-family="sans-serif">5 Вт</text>
           </g>
 
           <!-- инвертор -->
           <g id="gInv" transform="translate(620,190)" opacity="0.35">
-            <rect x="-50" y="-40" width="100" height="80" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
+            <rect x="-50" y="-40" width="100" height="80" rx="10" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
             <path d="M-26 8 q13 -26 26 0 q13 26 26 0" fill="none" stroke="#8f6bd0" stroke-width="2.4"/>
             <text x="0" y="28" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif">220 В · 50 Гц</text>
           </g>
@@ -188,6 +188,13 @@
 
       <div class="card">
         <h2>Показания</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>U, В</span><span>I, А</span></div>
+            <div class="main" id="stLcdU">0,00</div>
+            <div class="sub" id="stLcdI">0,00</div>
+          </div>
+        </div>
         <div class="meters">
           <div class="meter accent"><div class="k"><span>Напряжение</span><span>U</span></div>
             <div class="v" id="stU">3,75 <small>В</small></div></div>
@@ -460,7 +467,7 @@
       var y = H / 2 - (v / maxV) * (H / 2 - 12);
       i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     });
-    ctx.strokeStyle = st.load === 'inverter' && st.inverterOn ? '#8f6bd0' : '#0b6e99';
+    ctx.strokeStyle = st.load === 'inverter' && st.inverterOn ? '#8f6bd0' : '#1b3e8f';
     ctx.lineWidth = 2.2; ctx.stroke();
     ctx.fillStyle = '#8a97a3'; ctx.font = '18px sans-serif';
     ctx.fillText(Math.round(maxV) + ' В', 8, 22);
@@ -471,6 +478,8 @@
   function renderMeters(f) {
     UI.html($('stU'), pct(f.volt, 2) + ' <small>В</small>');
     UI.html($('stI'), pct(f.current, 2) + ' <small>А</small>');
+    UI.text($('stLcdU'), pct(f.volt, 2));
+    UI.text($('stLcdI'), pct(f.current, 2));
     UI.html($('stP'), pct(f.power, 1) + ' <small>Вт</small>');
     UI.html($('stT'), Math.round(st.temp) + ' <small>°C</small>');
     $('stTempBox').classList.toggle('hot', st.temp > S.TYPES[st.type].tempMax);

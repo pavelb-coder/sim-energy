@@ -15,7 +15,7 @@
   var css = document.createElement('style');
   UI.text(css, `
   .hyd main{display:grid;grid-template-columns:250px minmax(420px,1fr) 330px;gap:10px;padding:10px;min-height:0}
-  .hyd .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px;flex-wrap:wrap}
+  .hyd .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px;flex-wrap:wrap}
   .hyd .seg button{flex:1 1 auto;min-width:0;padding:4px 6px;font-size:11px;border-radius:5px;color:var(--muted);white-space:nowrap}
   .hyd #hyLoad{display:grid;grid-template-columns:1fr 1fr;gap:2px}
   .hyd .rctl{overflow:auto}
@@ -52,13 +52,6 @@
     box-shadow:0 0 0 2px rgba(46,163,220,.16)}
   .hyd .meter{background:#f6f9fc;border-color:#d7e2ec}
   .hyd .meter.accent .v{color:#1b3e8f}
-  .hylcd{background:#dfe9d2;border:2px solid #24313d;border-radius:6px;padding:5px 8px;text-align:right;
-    box-shadow:inset 0 1px 4px rgba(30,50,20,.22);
-    font-family:'DejaVu Sans Mono',Consolas,'Courier New',monospace}
-  .hylcd .main{font-size:19px;font-weight:700;color:#22301a;letter-spacing:.4px;line-height:1.1}
-  .hylcd .sub{font-size:11.5px;color:#3d5230;letter-spacing:.3px;margin-top:1px}
-  .hylcd .cap{display:flex;justify-content:space-between;font-size:9.5px;color:#5a6d4c;text-transform:uppercase;
-    letter-spacing:.7px;margin-bottom:2px}
   .hybrand{display:flex;align-items:center;gap:8px;padding:7px 10px 0;font-size:10.5px;color:#7a8b99;
     text-transform:uppercase;letter-spacing:.8px}
   .hybrand b{color:#1b3e8f;letter-spacing:1.2px;font-size:11px}
@@ -300,7 +293,7 @@
       <div class="card">
         <h2>Показания прибора</h2>
         <div style="padding:9px 9px 0">
-          <div class="hylcd" style="text-align:center">
+          <div class="lcd" style="text-align:center">
             <div class="cap"><span>U, В</span><span>I, мА</span></div>
             <div class="main" id="hyU">0,00</div>
             <div class="sub" id="hyI">0,0</div>

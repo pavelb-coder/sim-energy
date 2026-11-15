@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Энерджиквантум · Виртуальная лаборатория</title>
 <style>
+  /* Фирменная палитра Horizon Energy Box: белый пластик, синий корпус, оранжевые метки */
   :root{
-    --bg:#eaeff4; --panel:#ffffff; --ink:#1f2a36; --muted:#5a6772; --line:#d3dce5;
-    --accent:#0b6e99; --accent-soft:#e6f2f8; --accent2:#f28c28; --ok:#1f9d6b;
-    --warn:#e8850c; --err:#d64545; --grid:#c9d6e2;
-    --shadow:0 1px 2px rgba(16,32,48,.06),0 6px 18px rgba(16,32,48,.07);
+    --bg:#eef3f8; --panel:#ffffff; --ink:#22303c; --muted:#5d6f7d; --line:#d3dee7;
+    --accent:#1b3e8f; --accent-soft:#e8eefb; --accent2:#f07d20; --ok:#1f9d6b;
+    --warn:#e8850c; --err:#d64545; --grid:#d7e2ec;
+    --sky:#2ea3dc; --sun:#ffd166; --graffiti:#b3c1cc;
+    --shadow:0 1px 2px rgba(22,42,72,.06),0 6px 18px rgba(22,42,72,.08);
     --r:10px;
   }
   *{box-sizing:border-box}
@@ -26,35 +28,48 @@
 
   /* ---------- header ---------- */
   header{
-    display:flex;align-items:center;gap:14px;padding:8px 14px;background:var(--panel);
-    border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(16,32,48,.03);z-index:20;flex-wrap:wrap;
+    display:flex;align-items:center;gap:14px;padding:8px 14px;
+    background:linear-gradient(180deg,#1c3f8c,#173573);
+    color:#eaf1ff;border-bottom:2px solid #f07d20;box-shadow:0 2px 10px rgba(16,32,60,.18);
+    z-index:20;flex-wrap:wrap;
   }
-  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.2px;white-space:nowrap}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.2px;white-space:nowrap;color:#fff}
   .brand .bolt{
-    width:26px;height:26px;border-radius:8px;background:linear-gradient(150deg,var(--accent),#1291c4);
-    display:grid;place-items:center;color:#fff;font-size:15px;box-shadow:0 2px 6px rgba(11,110,153,.35)
+    width:27px;height:27px;border-radius:8px;background:linear-gradient(150deg,#2ea3dc,#1b6fb5);
+    display:grid;place-items:center;color:#fff;font-size:15px;box-shadow:0 2px 8px rgba(4,20,50,.45)
   }
-  .brand span.sub{font-weight:500;color:var(--muted);font-size:11.5px;letter-spacing:0}
-  .benchnav{display:flex;gap:4px;background:#f2f6f9;padding:3px;border-radius:10px;border:1px solid var(--line);flex-wrap:wrap}
+  .brand .word{display:flex;flex-direction:column;line-height:1.12}
+  .brand .word b{font-size:13px;letter-spacing:1.4px;text-transform:uppercase}
+  .brand .word b i{font-style:normal;color:#ffb066}
+  .brand span.sub{font-weight:500;color:#a9bfe4;font-size:11px;letter-spacing:.2px}
+  .benchnav{display:flex;gap:3px;background:rgba(255,255,255,.10);padding:3px;border-radius:10px;
+    border:1px solid rgba(255,255,255,.16);flex-wrap:wrap}
   .benchnav button{
-    padding:6px 11px;border-radius:8px;font-size:12.5px;color:var(--muted);white-space:nowrap;
-    display:flex;align-items:center;gap:6px
+    padding:6px 11px;border-radius:8px;font-size:12.5px;color:#c9d8f2;white-space:nowrap;
+    display:flex;align-items:center;gap:6px;transition:background .12s,color .12s
   }
-  .benchnav button.active{background:var(--panel);color:var(--accent);font-weight:600;box-shadow:var(--shadow)}
-  .benchnav button[disabled]{opacity:.55;cursor:not-allowed}
-  .benchnav em{font-style:normal;font-size:10px;background:var(--accent-soft);color:var(--accent);
+  .benchnav button:hover{background:rgba(255,255,255,.12);color:#fff}
+  .benchnav button.active{background:#fff;color:#1b3e8f;font-weight:600;box-shadow:0 2px 8px rgba(4,20,50,.28)}
+  .benchnav button.active::before{content:'';width:7px;height:7px;border-radius:2px;background:#f07d20;flex:0 0 7px}
+  .benchnav button[disabled]{opacity:.45;cursor:not-allowed}
+  .benchnav em{font-style:normal;font-size:10px;background:rgba(255,255,255,.18);color:#eaf1ff;
     padding:1px 5px;border-radius:5px;font-weight:600}
+  .benchnav button.active em{background:#e8eefb;color:#1b3e8f}
   .grow{flex:1}
-  .modes{display:flex;gap:2px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-  .modes button{padding:7px 12px;font-size:12.5px;color:var(--muted);background:#fff}
-  .modes button.active{background:var(--accent);color:#fff;font-weight:600}
-  .iconbtn{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--muted);font-size:15px}
-  .iconbtn:hover{background:#f1f5f8;color:var(--ink)}
+  .modes{display:flex;gap:2px;border:1px solid rgba(255,255,255,.22);border-radius:10px;overflow:hidden}
+  .modes button{padding:7px 12px;font-size:12.5px;color:#c9d8f2;background:rgba(255,255,255,.06)}
+  .modes button:hover{background:rgba(255,255,255,.14);color:#fff}
+  .modes button.active{background:#f07d20;color:#fff;font-weight:600}
+  .iconbtn{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#c9d8f2;font-size:15px}
+  header .iconbtn:hover{background:rgba(255,255,255,.16);color:#fff}
 
   /* ---------- layout ---------- */
   main{flex:1;display:grid;grid-template-columns:186px minmax(420px,1fr) 306px;gap:10px;padding:10px;min-height:0}
 
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+  .panel h2,.card h2{position:relative}
+  .panel h2::before,.card h2::before{content:'';width:7px;height:7px;border-radius:2px;background:var(--sky);
+    flex:0 0 7px;box-shadow:0 0 0 2px rgba(46,163,220,.16)}
   .panel h2{margin:0;padding:9px 11px;font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;
     color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
   .panel h2 .badge{background:var(--accent-soft);color:var(--accent);border-radius:5px;padding:1px 6px;
@@ -68,7 +83,7 @@
     background:#fafcfe;color:var(--ink)
   }
   .chips{display:flex;flex-wrap:wrap;gap:4px;padding:7px 8px;border-bottom:1px solid var(--line)}
-  .chips button{font-size:11px;padding:3px 7px;border-radius:20px;background:#f2f6f9;color:var(--muted);border:1px solid transparent}
+  .chips button{font-size:11px;padding:3px 7px;border-radius:20px;background:#e8eef5;color:var(--muted);border:1px solid transparent}
   .chips button.active{background:var(--accent-soft);color:var(--accent);border-color:#b9dcec;font-weight:600}
   .parts{overflow:auto;padding:6px;display:flex;flex-direction:column;gap:3px;flex:1;min-height:0}
   .partitem{
@@ -85,24 +100,27 @@
   /* ---------- stage ---------- */
   .stagewrap{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
   .timebar{display:flex;align-items:center;gap:8px;padding:6px 9px;flex-wrap:wrap}
-  .timebar .grp{display:flex;align-items:center;gap:2px;background:#f2f6f9;border-radius:8px;padding:2px}
+  .timebar .grp{display:flex;align-items:center;gap:2px;background:#e8eef5;border-radius:8px;padding:2px}
   .timebar .grp button{padding:4px 9px;border-radius:6px;font-size:12px;color:var(--muted)}
   .timebar .grp button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .clock{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--muted);
-    background:#f2f6f9;padding:4px 9px;border-radius:7px;min-width:74px;text-align:center}
+    background:#e8eef5;padding:4px 9px;border-radius:7px;min-width:74px;text-align:center}
   .clock b{color:var(--ink);font-weight:600}
   .btn{padding:5px 10px;border-radius:7px;font-size:12px;border:1px solid var(--line);background:#fff;color:var(--ink)}
   .btn:hover{border-color:#b9c9d6;background:#fafcfe}
-  .btn.ghost{background:#f2f6f9;border-color:transparent;color:var(--muted)}
-  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  .btn.primary:hover{background:#0a5f85}
+  .btn.ghost{background:#e8eef5;border-color:transparent;color:var(--muted)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;
+    box-shadow:0 1px 3px rgba(27,62,143,.28)}
+  .btn.primary:hover{background:#16327a}
+  .btn.ghost.tiny,.btn.tiny{border-radius:7px}
+  .btn.warn{background:#fff;border-color:#f2cfa8;color:#a35c00}
   .btn.warn{background:#fff;border-color:#f0c48a;color:#a35c00}
 
   .stage{
-    position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);
-    background-color:#fbfdfe;overflow:hidden;touch-action:none;
+    position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid #c4d0da;
+    background-color:#f6f9fc;overflow:hidden;touch-action:none;
     background-image:radial-gradient(var(--grid) 1px,transparent 1px);background-size:22px 22px;
-    box-shadow:inset 0 0 60px rgba(11,110,153,.035)
+    box-shadow:inset 0 0 70px rgba(20,40,90,.05)
   }
   .stage.empty::after{
     content:"Перетащите детали сюда слева  ·  затем соедините клеммы проводом";
@@ -118,7 +136,7 @@
   }
   .part.selected svg .body{stroke:var(--accent);stroke-width:2.2}
   .term{
-    position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #8fa3b3;
+    position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid #b9c8d4;
     transform:translate(-50%,-50%);cursor:crosshair;z-index:6;transition:transform .08s,border-color .1s
   }
   .term::after{content:"";position:absolute;inset:-10px;border-radius:50%}
@@ -170,18 +188,27 @@
     color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
   .card .body{padding:9px 11px}
   .meters{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:9px}
-  .meter{background:#fbfdfe;border:1px solid var(--line);border-radius:9px;padding:6px 8px;position:relative;overflow:hidden}
+  .meter{background:#f6f9fc;border:1px solid #d7e2ec;border-radius:9px;padding:6px 8px;position:relative;overflow:hidden}
   .meter .k{font-size:10px;letter-spacing:.4px;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between}
   .meter .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px;margin-top:1px}
   .meter .v small{font-size:11px;font-weight:600;color:var(--muted);margin-left:2px}
   .meter .spark{position:absolute;right:0;bottom:0;left:0;height:16px;opacity:.5}
   .meter.hot .v{color:var(--err)}
   .meter.accent .v{color:var(--accent)}
+  .meter.accent{border-color:#bcd2f0;background:linear-gradient(180deg,#f4f8ff,#eef4fd)}
+  /* ЖК-табло прибора — как у мультиметра из набора */
+  .lcd{background:#dfe9d2;border:2px solid #24313d;border-radius:6px;padding:6px 9px;text-align:right;
+    box-shadow:inset 0 1px 4px rgba(30,50,20,.22);
+    font-family:'DejaVu Sans Mono',Consolas,'Courier New',monospace}
+  .lcd .main{font-size:20px;font-weight:700;color:#22301a;letter-spacing:.4px;line-height:1.1}
+  .lcd .sub{font-size:11.5px;color:#3d5230;letter-spacing:.3px}
+  .lcd .cap{display:flex;justify-content:space-between;font-size:9.5px;color:#5a6d4c;
+    text-transform:uppercase;letter-spacing:.7px;margin-bottom:2px}
   .meter.wide{grid-column:span 2}
   .aux{display:flex;justify-content:space-between;gap:8px;padding:0 9px 9px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
   .aux b{color:var(--ink);font-variant-numeric:tabular-nums}
   .bar{height:6px;border-radius:4px;background:#e9eff4;overflow:hidden;margin-top:5px}
-  .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffd08a,var(--accent2));width:0;transition:width .12s}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#2ea3dc,var(--accent));width:0;transition:width .12s}
 
   .task .goal{font-size:12.5px;line-height:1.4;color:var(--ink)}
   .task ol{margin:7px 0 0;padding-left:18px;font-size:12px;color:var(--muted)}
@@ -195,19 +222,26 @@
   .tasklist{display:flex;flex-direction:column;gap:3px;padding:6px}
   .tasklist button{text-align:left;padding:6px 8px;border-radius:8px;font-size:12px;display:flex;gap:7px;align-items:flex-start}
   .tasklist button:hover{background:#f4f8fb}
-  .tasklist button.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .tasklist button.active{background:var(--accent-soft);color:var(--accent);font-weight:600;
+    box-shadow:inset 3px 0 0 var(--accent2)}
   .tasklist .num{width:16px;flex:0 0 16px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
   .tasklist button.done .num{color:var(--ok)}
 
   .inspector .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
   .inspector label{color:var(--muted);flex:0 0 auto}
   .inspector input[type=range]{width:100%}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:4px;
+    background:#cfdde9;outline:none;margin:5px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:var(--accent2);border:2px solid #fff;box-shadow:0 1px 3px rgba(20,40,90,.35);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--accent2);
+    border:2px solid #fff;box-shadow:0 1px 3px rgba(20,40,90,.35);cursor:pointer}
   .inspector .field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
   .inspector .field .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
   .inspector .field b{color:var(--ink);font-variant-numeric:tabular-nums}
-  .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .seg{display:flex;gap:2px;background:#e8eef5;border-radius:8px;padding:2px}
   .seg button{flex:1;padding:3px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
-  .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(20,40,90,.16)}
   .muted{color:var(--muted)}
   .tiny{font-size:11px}
 
@@ -221,7 +255,7 @@
   .modal h3{margin:14px 0 6px;font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.5px}
   .modal ul{margin:0;padding-left:18px}
   .modal li{margin-bottom:4px}
-  kbd{background:#f2f6f9;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px;font-family:inherit}
+  kbd{background:#e8eef5;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px;font-family:inherit}
   .tbbox{background:#fff8ec;border:1px solid #f5e0bf;border-radius:9px;padding:9px 11px;color:#7a4a00;font-size:12.5px}
 
   .toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#1f2a36;color:#fff;
@@ -300,7 +334,7 @@
   <header>
     <div class="brand">
       <div class="bolt">⚡</div>
-      <div>Энерджиквантум<br><span class="sub">виртуальная лаборатория</span></div>
+      <div class="word"><b>HORIZON<i>·</i>LAB</b><span class="sub">Энерджиквантум · виртуальная лаборатория</span></div>
     </div>
     <nav class="benchnav" aria-label="Стенды">
       <button class="active" data-bench="circuits">Электрические цепи</button>
@@ -399,6 +433,13 @@
       <!-- приборы -->
       <div class="card">
         <h2>Показания приборов</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>U, В</span><span>I, А</span></div>
+            <div class="main" id="lcdU">0,00</div>
+            <div class="sub" id="lcdI">0,000</div>
+          </div>
+        </div>
         <div class="meters">
           <div class="meter accent"><div class="k"><span>Ток</span><span>I</span></div>
             <div class="v" id="mI">0,000 <small>А</small></div><svg class="spark" id="sI" viewBox="0 0 100 16" preserveAspectRatio="none"></svg></div>
@@ -425,13 +466,13 @@
       </div>
     </aside>
   </main>
-  </div>
-
-  <main id="benchRenew" data-bench-id="renew" hidden></main>
-  <main id="benchStorage" data-bench-id="storage" hidden></main>
-  <main id="benchEfficiency" data-bench-id="efficiency" hidden></main>
-  <main id="benchHydrogen" data-bench-id="hydrogen" hidden></main>
 </div>
+
+<!-- остальные стенды: каждый — самостоятельный <main> -->
+<main id="benchRenew" data-bench-id="renew" hidden></main>
+<main id="benchStorage" data-bench-id="storage" hidden></main>
+<main id="benchEfficiency" data-bench-id="efficiency" hidden></main>
+<main id="benchHydrogen" data-bench-id="hydrogen" hidden></main>
 
 <div class="modal" id="help">
   <div class="sheet">
@@ -474,7 +515,7 @@
         <li>Нить лампы нелинейна: R(T) = R₂₀·(1 + α·ΔT), температура — из баланса мощности и теплоотдачи.</li>
         <li>Модель упрощённая и предназначена для обучения, а не для инженерных расчётов.</li>
       </ul>
-      <p class="tiny muted" style="margin-top:14px">Прототип v0.9 · стенд «Электрические цепи». Остальные стенды — по дорожной карте ТЗ.</p>
+      <p class="tiny muted" style="margin-top:14px">Версия v1.1 · пять стендов: электрические цепи, возобновляемая энергетика, накопители, энергоэффективность, водородный контур.</p>
     </div>
   </div>
 </div>
@@ -1408,7 +1449,7 @@
   .rctl .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:2px}
   .rctl .fld .top b{color:var(--ink);font-variant-numeric:tabular-nums}
   .rctl input[type=range]{width:100%}
-  .rctl .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .rctl .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px}
   .rctl .seg button{flex:1;padding:4px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
   .rctl .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .rctl .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:4px 0;color:var(--ink)}
@@ -1500,7 +1541,7 @@
         <svg id="rScene" viewBox="0 -60 800 560" preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#8fc6ea"/><stop offset="100%" stop-color="#e7f3fb"/>
+              <stop offset="0%" stop-color="#a9d4ee"/><stop offset="100%" stop-color="#f4f9fc"/>
             </linearGradient>
             <linearGradient id="skyNight" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#16283d"/><stop offset="100%" stop-color="#264a68"/>
@@ -1508,7 +1549,7 @@
             <radialGradient id="sunGlow"><stop offset="0%" stop-color="#fff3c4" stop-opacity=".95"/>
               <stop offset="100%" stop-color="#ffd166" stop-opacity="0"/></radialGradient>
             <linearGradient id="panelFace" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#1b4f72"/><stop offset="55%" stop-color="#2d7096"/><stop offset="100%" stop-color="#1b4f72"/>
+              <stop offset="0%" stop-color="#122a4a"/><stop offset="55%" stop-color="#1f4a76"/><stop offset="100%" stop-color="#122a4a"/>
             </linearGradient>
             <linearGradient id="battFillG" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stop-color="#7ed0a8"/><stop offset="100%" stop-color="#1f9d6b"/>
@@ -1520,8 +1561,8 @@
           <circle id="sunGlowC" cx="0" cy="0" r="70" fill="url(#sunGlow)" opacity="0"/>
           <circle id="sunDisc" cx="0" cy="0" r="22" fill="#ffd166" opacity="0"/>
           <g id="sunRays" opacity="0"></g>
-          <line id="horizon" x1="0" y1="372" x2="800" y2="372" stroke="#b7cbd9" stroke-width="2"/>
-          <rect x="0" y="372" width="800" height="88" fill="#e6eef4"/>
+          <line id="horizon" x1="0" y1="372" x2="800" y2="372" stroke="#c6d3dd" stroke-width="2"/>
+          <rect x="0" y="372" width="800" height="88" fill="#eef3f8"/>
 
           <g id="gPanel" transform="translate(215,300)">
             <line x1="0" y1="52" x2="0" y2="72" stroke="#6b7d8c" stroke-width="5"/>
@@ -1536,13 +1577,13 @@
           </g>
 
           <g id="gTurb" transform="translate(450,296)">
-            <path d="M-6 72 L6 72 L4 -60 L-4 -60 Z" fill="#dfe8ee" stroke="#a9bcc9" stroke-width="1.5"/>
+            <path d="M-6 72 L6 72 L4 -60 L-4 -60 Z" fill="#dfe8ee" stroke="#c6d3dd" stroke-width="1.5"/>
             <g id="rotor" transform="translate(0,-62)">
-              <circle cx="0" cy="0" r="7" fill="#7a8fa0"/>
+              <circle cx="0" cy="0" r="7" fill="#b9c8d4"/>
               <g id="blades">
-                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4"/>
-                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4" transform="rotate(120)"/>
-                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4" transform="rotate(240)"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#e8eef5" stroke="#c6d3dd" stroke-width="1.4"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#e8eef5" stroke="#c6d3dd" stroke-width="1.4" transform="rotate(120)"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#e8eef5" stroke="#c6d3dd" stroke-width="1.4" transform="rotate(240)"/>
               </g>
               <circle cx="0" cy="0" r="4" fill="#33475a"/>
             </g>
@@ -1550,22 +1591,22 @@
           </g>
 
           <g id="gHouse" transform="translate(620,300)">
-            <path d="M-46 32 L-46 -12 L0 -48 L46 -12 L46 32 Z" fill="#f7fafc" stroke="#a9bcc9" stroke-width="2"/>
-            <rect id="win" x="-16" y="-6" width="32" height="24" rx="2" fill="#cfe3ee" stroke="#a9bcc9"/>
+            <path d="M-46 32 L-46 -12 L0 -48 L46 -12 L46 32 Z" fill="#f6f9fc" stroke="#c6d3dd" stroke-width="2"/>
+            <rect id="win" x="-16" y="-6" width="32" height="24" rx="2" fill="#cfe3ee" stroke="#c6d3dd"/>
             <circle id="lampGlow" cx="0" cy="6" r="30" fill="#ffd166" opacity="0"/>
             <text x="0" y="56" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">потребители</text>
           </g>
 
           <g id="gBatt" transform="translate(560,392)">
-            <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#7a8fa0" stroke-width="2"/>
-            <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#7a8fa0"/>
+            <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#b9c8d4" stroke-width="2"/>
+            <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#b9c8d4"/>
             <rect id="battFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#battFillG)"/>
             <text id="battTxt" x="0" y="30" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">АКБ 35 %</text>
           </g>
 
           <g id="flows">
-            <path id="flowPV" d="M215 332 C 300 356 370 384 416 396" fill="none" stroke="#f2a93b" stroke-width="3" class="rflow" opacity="0"/>
-            <path id="flowWT" d="M450 318 C 450 356 500 380 528 396" fill="none" stroke="#3aa0c9" stroke-width="3" class="rflow" opacity="0"/>
+            <path id="flowPV" d="M215 332 C 300 356 370 384 416 396" fill="none" stroke="#f07d20" stroke-width="3" class="rflow" opacity="0"/>
+            <path id="flowWT" d="M450 318 C 450 356 500 380 528 396" fill="none" stroke="#2ea3dc" stroke-width="3" class="rflow" opacity="0"/>
             <path id="flowLoad" d="M592 396 C 616 386 618 352 620 330" fill="none" stroke="#8f6bd0" stroke-width="3" class="rflow" opacity="0"/>
           </g>
           <g id="warnText" opacity="0">
@@ -1596,6 +1637,13 @@
 
       <div class="card">
         <h2>Мощности</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>выработка, Вт</span><span>АКБ, В</span></div>
+            <div class="main" id="lcdGen">0</div>
+            <div class="sub" id="lcdBatt">12,0</div>
+          </div>
+        </div>
         <div class="meters">
           <div class="meter accent"><div class="k"><span>Солнце</span><span>PV</span></div>
             <div class="v" id="rPV">0 <small>Вт</small></div></div>
@@ -1623,8 +1671,8 @@
         <h2>Выработка за сутки</h2>
         <div class="chartbox"><svg id="rChart" viewBox="0 0 300 132" preserveAspectRatio="none"></svg></div>
         <div class="legend">
-          <span><i style="background:#f2a93b"></i>солнце</span>
-          <span><i style="background:#3aa0c9"></i>ветер</span>
+          <span><i style="background:#f07d20"></i>солнце</span>
+          <span><i style="background:#2ea3dc"></i>ветер</span>
           <span><i style="background:#8f6bd0"></i>нагрузка</span>
         </div>
         <div class="aux" style="padding:0 9px 9px">
@@ -1891,11 +1939,11 @@
     var now = x(st.hour);
     UI.html($('rChart'), grid +
       '<path d="' + area + '" fill="#fdf0dc" opacity=".75"/>' +
-      '<path d="' + line('pv') + '" fill="none" stroke="#f2a93b" stroke-width="1.6"/>' +
-      '<path d="' + line('wt') + '" fill="none" stroke="#3aa0c9" stroke-width="1.6" stroke-dasharray="3 2"/>' +
+      '<path d="' + line('pv') + '" fill="none" stroke="#f07d20" stroke-width="1.6"/>' +
+      '<path d="' + line('wt') + '" fill="none" stroke="#2ea3dc" stroke-width="1.6" stroke-dasharray="3 2"/>' +
       '<path d="' + line('load') + '" fill="none" stroke="#8f6bd0" stroke-width="1.4"/>' +
-      '<line x1="' + now + '" y1="6" x2="' + now + '" y2="' + y(0) + '" stroke="#0b6e99" stroke-width="1.2" opacity=".8"/>' +
-      '<circle cx="' + now + '" cy="8" r="2.6" fill="#0b6e99"/>');
+      '<line x1="' + now + '" y1="6" x2="' + now + '" y2="' + y(0) + '" stroke="#1b3e8f" stroke-width="1.2" opacity=".8"/>' +
+      '<circle cx="' + now + '" cy="8" r="2.6" fill="#1b3e8f"/>');
     var d = R.dayEnergy(st);
     UI.text($('rDayGen'), Math.round(d.gen) + ' Вт·ч');
     UI.text($('rDayUse'), Math.round(d.use) + ' Вт·ч');
@@ -1988,6 +2036,9 @@
   function renderMeters(f) {
     UI.html($('rPV'), fmtW(f.pv) + ' <small>Вт</small>');
     UI.html($('rWT'), fmtW(f.wt) + ' <small>Вт</small>');
+    UI.text($('lcdGen'), fmtW(f.pv + f.wt));
+    var vb = st.battV || st.voltage || 12;
+    UI.text($('lcdBatt'), (Math.round(vb * 10) / 10).toFixed(1).replace('.', ','));
     UI.html($('rLoad'), fmtW(f.load) + ' <small>Вт</small>');
     var net = f.pv + f.wt * 1 - f.load;
     var netCtrl = Math.round((f.pv + f.wt) * R.controllerEff(st) - f.load);
@@ -1995,7 +2046,7 @@
     $('rNet').style.color = netCtrl >= 0 ? '#1f9d6b' : '#d64545';
     UI.html($('rSoc'), Math.round(st.soc * 100) + ' <small>%</small>');
     $('rSocBar').style.width = Math.round(st.soc * 100) + '%';
-    $('rSocBar').style.background = st.soc < 0.2 ? '#d64545' : (st.soc > 0.8 ? '#1f9d6b' : 'linear-gradient(90deg,#ffd08a,#f28c28)');
+    $('rSocBar').style.background = st.soc < 0.2 ? '#d64545' : (st.soc > 0.8 ? '#1f9d6b' : 'linear-gradient(90deg,#ffc98a,#f07d20)');
     UI.text($('rSocState'), st.soc < 0.2 ? 'низкий' : (st.soc > 0.9 ? 'полный' : 'заряд'));
     UI.text($('rG'), Math.round(f.G) + ' Вт/м²');
     UI.text($('rElev'), pct(Math.max(0, f.elevDeg), 1) + '°');
@@ -2424,7 +2475,7 @@
   var css = document.createElement('style');
   UI.text(css, `
   .stor main{display:grid;grid-template-columns:238px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
-  .stor .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .stor .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px}
   .stor .seg button{flex:1;padding:4px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
   .stor .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .stor .fld{margin-bottom:9px}
@@ -2433,10 +2484,10 @@
   .stor input[type=range]{width:100%}
   .stor .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:4px 0}
   .stor .chk input{width:15px;height:15px;accent-color:var(--accent)}
-  .sstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#fbfdfe;overflow:hidden}
+  .sstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#f8fbfd;overflow:hidden}
   .sstage svg.scene{width:100%;height:100%;display:block}
   .scope{padding:6px 9px 9px}
-  .scope canvas{width:100%;height:104px;display:block;background:#f7fafc;border:1px solid var(--line);border-radius:8px}
+  .scope canvas{width:100%;height:104px;display:block;background:#f6f9fc;border:1px solid var(--line);border-radius:8px}
   .warnchip{display:inline-block;background:#fdecec;border:1px solid #f3bcbc;color:#a02020;border-radius:6px;padding:1px 6px;font-size:10.5px;margin:2px 3px 0 0}
   @media (max-width:980px){.stor main{grid-template-columns:1fr}.sstage{min-height:380px}}
   @media (max-height:820px){
@@ -2512,14 +2563,14 @@
               <stop offset="0%" stop-color="#8fe0b8"/><stop offset="100%" stop-color="#1f9d6b"/>
             </linearGradient>
             <linearGradient id="cellWarm" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stop-color="#ffd08a"/><stop offset="100%" stop-color="#e8850c"/>
+              <stop offset="0%" stop-color="#ffc98a"/><stop offset="100%" stop-color="#e8850c"/>
             </linearGradient>
           </defs>
 
           <!-- накопитель -->
           <g id="gCell" transform="translate(120,190)">
-            <rect x="-62" y="-96" width="124" height="192" rx="14" fill="#fff" stroke="#7a8fa0" stroke-width="2.5"/>
-            <rect x="-20" y="-108" width="40" height="14" rx="4" fill="#7a8fa0"/>
+            <rect x="-62" y="-96" width="124" height="192" rx="14" fill="#fff" stroke="#b9c8d4" stroke-width="2.5"/>
+            <rect x="-20" y="-108" width="40" height="14" rx="4" fill="#b9c8d4"/>
             <rect id="cellFill" x="-56" y="90" width="112" height="0" rx="8" fill="url(#cellFillG)" style="transition:height .12s,y .12s"/>
             <g id="cellBolt" opacity="0">
               <path d="M-4 -44 L12 -44 L-2 -12 L12 -12 L-12 34 L-4 -6 L-16 -6 Z" fill="#ffd166" stroke="#e8a93a"/>
@@ -2530,27 +2581,27 @@
           </g>
 
           <!-- провода и преобразователь -->
-          <path d="M182 190 L246 190" stroke="#8fa3b3" stroke-width="3" fill="none"/>
+          <path d="M182 190 L246 190" stroke="#b9c8d4" stroke-width="3" fill="none"/>
           <g id="gConv" transform="translate(300,190)">
-            <rect x="-54" y="-50" width="108" height="100" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
+            <rect x="-54" y="-50" width="108" height="100" rx="10" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
             <text x="0" y="-30" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif" id="convName">buck</text>
-            <text id="convOut" x="0" y="4" text-anchor="middle" font-size="19" font-weight="700" fill="#0b6e99" font-family="sans-serif">5,0 В</text>
+            <text id="convOut" x="0" y="4" text-anchor="middle" font-size="19" font-weight="700" fill="#1b3e8f" font-family="sans-serif">5,0 В</text>
             <text id="convEff" x="0" y="24" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif">КПД 85 %</text>
             <text id="convD" x="0" y="40" text-anchor="middle" font-size="10" fill="#8a97a3" font-family="sans-serif">D = 0,42</text>
           </g>
-          <path d="M354 190 L418 190" stroke="#8fa3b3" stroke-width="3" fill="none"/>
+          <path d="M354 190 L418 190" stroke="#b9c8d4" stroke-width="3" fill="none"/>
 
           <!-- нагрузка -->
           <g id="gLoad" transform="translate(486,190)">
-            <rect x="-56" y="-46" width="112" height="92" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
-            <circle id="loadBulb" cx="0" cy="-12" r="15" fill="#e9eff4" stroke="#a9bcc9" stroke-width="2"/>
+            <rect x="-56" y="-46" width="112" height="92" rx="10" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
+            <circle id="loadBulb" cx="0" cy="-12" r="15" fill="#e9eff4" stroke="#c6d3dd" stroke-width="2"/>
             <text id="loadName" x="0" y="20" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">Лампа 5 Вт</text>
             <text id="loadP" x="0" y="36" text-anchor="middle" font-size="11" font-weight="700" fill="#1f2a36" font-family="sans-serif">5 Вт</text>
           </g>
 
           <!-- инвертор -->
           <g id="gInv" transform="translate(620,190)" opacity="0.35">
-            <rect x="-50" y="-40" width="100" height="80" rx="10" fill="#fff" stroke="#a9bcc9" stroke-width="2"/>
+            <rect x="-50" y="-40" width="100" height="80" rx="10" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
             <path d="M-26 8 q13 -26 26 0 q13 26 26 0" fill="none" stroke="#8f6bd0" stroke-width="2.4"/>
             <text x="0" y="28" text-anchor="middle" font-size="10.5" fill="#5a6772" font-family="sans-serif">220 В · 50 Гц</text>
           </g>
@@ -2596,6 +2647,13 @@
 
       <div class="card">
         <h2>Показания</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>U, В</span><span>I, А</span></div>
+            <div class="main" id="stLcdU">0,00</div>
+            <div class="sub" id="stLcdI">0,00</div>
+          </div>
+        </div>
         <div class="meters">
           <div class="meter accent"><div class="k"><span>Напряжение</span><span>U</span></div>
             <div class="v" id="stU">3,75 <small>В</small></div></div>
@@ -2868,7 +2926,7 @@
       var y = H / 2 - (v / maxV) * (H / 2 - 12);
       i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     });
-    ctx.strokeStyle = st.load === 'inverter' && st.inverterOn ? '#8f6bd0' : '#0b6e99';
+    ctx.strokeStyle = st.load === 'inverter' && st.inverterOn ? '#8f6bd0' : '#1b3e8f';
     ctx.lineWidth = 2.2; ctx.stroke();
     ctx.fillStyle = '#8a97a3'; ctx.font = '18px sans-serif';
     ctx.fillText(Math.round(maxV) + ' В', 8, 22);
@@ -2879,6 +2937,8 @@
   function renderMeters(f) {
     UI.html($('stU'), pct(f.volt, 2) + ' <small>В</small>');
     UI.html($('stI'), pct(f.current, 2) + ' <small>А</small>');
+    UI.text($('stLcdU'), pct(f.volt, 2));
+    UI.text($('stLcdI'), pct(f.current, 2));
     UI.html($('stP'), pct(f.power, 1) + ' <small>Вт</small>');
     UI.html($('stT'), Math.round(st.temp) + ' <small>°C</small>');
     $('stTempBox').classList.toggle('hot', st.temp > S.TYPES[st.type].tempMax);
@@ -3248,7 +3308,7 @@
   var css = document.createElement('style');
   UI.text(css, `
   .eff main{display:grid;grid-template-columns:246px minmax(420px,1fr) 330px;gap:10px;padding:10px;min-height:0}
-  .eff .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px;flex-wrap:wrap}
+  .eff .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px;flex-wrap:wrap}
   .eff .seg button{flex:1;padding:4px 2px;font-size:11px;border-radius:5px;color:var(--muted)}
   .eff .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .eff .fld{margin-bottom:8px}
@@ -3256,7 +3316,7 @@
   .eff .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 0}
   .eff .chk input{width:15px;height:15px;accent-color:var(--accent)}
   .eff .chk span.pw{margin-left:auto;color:var(--muted);font-size:11px}
-  .estage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#f7fafc;overflow:hidden}
+  .estage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#f6f9fc;overflow:hidden}
   .estage svg{width:100%;height:100%;display:block}
   .houseroom{cursor:pointer}
   .houseroom:hover rect{stroke:var(--accent)}
@@ -3319,7 +3379,7 @@
 
       <div class="estage" id="efStage">
         <svg viewBox="0 0 760 400" preserveAspectRatio="xMidYMid meet">
-          <rect x="0" y="0" width="760" height="400" fill="#f7fafc"/>
+          <rect x="0" y="0" width="760" height="400" fill="#f6f9fc"/>
           <!-- кабинет -->
           <g class="houseroom" id="roomClass">
             <rect x="30" y="40" width="330" height="230" rx="8" fill="#ffffff" stroke="#cbd9e4" stroke-width="2"/>
@@ -3386,6 +3446,13 @@
 
       <div class="card">
         <h2>Энергия и деньги</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>за сутки, кВт·ч</span><span>₽</span></div>
+            <div class="main" id="lcdKwh">0,00</div>
+            <div class="sub" id="lcdRub">0,0</div>
+          </div>
+        </div>
         <div class="meters">
           <div class="meter accent"><div class="k"><span>За сутки</span><span>кВт·ч</span></div>
             <div class="v" id="efKwh">0 <small>кВт·ч</small></div></div>
@@ -3650,8 +3717,8 @@
       ' L' + x(24).toFixed(1) + ',' + y(0).toFixed(1) + ' L' + x(0).toFixed(1) + ',' + y(0).toFixed(1) + ' Z';
     var nowX = x(st.hour);
     UI.html($('efChart'), grid +
-      '<path d="' + area + '" fill="#e6f2f8" stroke="#0b6e99" stroke-width="1.6"/>' +
-      '<line x1="' + nowX + '" y1="6" x2="' + nowX + '" y2="' + y(0) + '" stroke="#f28c28" stroke-width="1.4"/>');
+      '<path d="' + area + '" fill="#e6f2f8" stroke="#1b3e8f" stroke-width="1.6"/>' +
+      '<line x1="' + nowX + '" y1="6" x2="' + nowX + '" y2="' + y(0) + '" stroke="#f07d20" stroke-width="1.4"/>');
     UI.text($('efPeak'), 'пик ' + Math.round(maxV) + ' Вт');
   }
 
@@ -3659,6 +3726,8 @@
     var s = E.savings(st);
     UI.html($('efKwh'), pct(s.now.total, 2) + ' <small>кВт·ч</small>');
     UI.html($('efRub'), pct(s.now.cost, 1) + ' <small>₽</small>');
+    UI.text($('lcdKwh'), pct(s.now.total, 2));
+    UI.text($('lcdRub'), pct(s.now.cost, 1));
     UI.html($('efSave'), Math.round(s.percent * 100) + ' <small>%</small>');
     UI.html($('efStandby'), pct(s.now.standby, 2) + ' <small>кВт·ч</small>');
     UI.text($('efBase'), pct(s.base.total, 2) + ' кВт·ч · ' + pct(s.base.cost, 1) + ' ₽');
@@ -4137,7 +4206,7 @@
   var css = document.createElement('style');
   UI.text(css, `
   .hyd main{display:grid;grid-template-columns:250px minmax(420px,1fr) 330px;gap:10px;padding:10px;min-height:0}
-  .hyd .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px;flex-wrap:wrap}
+  .hyd .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px;flex-wrap:wrap}
   .hyd .seg button{flex:1 1 auto;min-width:0;padding:4px 6px;font-size:11px;border-radius:5px;color:var(--muted);white-space:nowrap}
   .hyd #hyLoad{display:grid;grid-template-columns:1fr 1fr;gap:2px}
   .hyd .rctl{overflow:auto}
@@ -4174,13 +4243,6 @@
     box-shadow:0 0 0 2px rgba(46,163,220,.16)}
   .hyd .meter{background:#f6f9fc;border-color:#d7e2ec}
   .hyd .meter.accent .v{color:#1b3e8f}
-  .hylcd{background:#dfe9d2;border:2px solid #24313d;border-radius:6px;padding:5px 8px;text-align:right;
-    box-shadow:inset 0 1px 4px rgba(30,50,20,.22);
-    font-family:'DejaVu Sans Mono',Consolas,'Courier New',monospace}
-  .hylcd .main{font-size:19px;font-weight:700;color:#22301a;letter-spacing:.4px;line-height:1.1}
-  .hylcd .sub{font-size:11.5px;color:#3d5230;letter-spacing:.3px;margin-top:1px}
-  .hylcd .cap{display:flex;justify-content:space-between;font-size:9.5px;color:#5a6d4c;text-transform:uppercase;
-    letter-spacing:.7px;margin-bottom:2px}
   .hybrand{display:flex;align-items:center;gap:8px;padding:7px 10px 0;font-size:10.5px;color:#7a8b99;
     text-transform:uppercase;letter-spacing:.8px}
   .hybrand b{color:#1b3e8f;letter-spacing:1.2px;font-size:11px}
@@ -4422,7 +4484,7 @@
       <div class="card">
         <h2>Показания прибора</h2>
         <div style="padding:9px 9px 0">
-          <div class="hylcd" style="text-align:center">
+          <div class="lcd" style="text-align:center">
             <div class="cap"><span>U, В</span><span>I, мА</span></div>
             <div class="main" id="hyU">0,00</div>
             <div class="sub" id="hyI">0,0</div>
@@ -5439,7 +5501,7 @@
     if (!p) return;
     var s = termPos(p, pendingTerm.idx);
     var d = roundPath(routePoints(s, termDir(pendingTerm.idx), { x: mouse.x, y: mouse.y }, mouse.x >= s.x ? -1 : 1, 0), 9);
-    rubber = '<path d="' + d + '" fill="none" stroke="#f28c28" stroke-width="2.2" stroke-dasharray="5 5"/>';
+    rubber = '<path d="' + d + '" fill="none" stroke="#f07d20" stroke-width="2.2" stroke-dasharray="5 5"/>';
     renderWires();
   }
   function onRubberUp() {
@@ -5609,7 +5671,7 @@
       var bar = box.querySelector('[data-livebar="ledI"]');
       if (bar) {
         bar.style.width = Math.min(100, mA / 25 * 100) + '%';
-        bar.style.background = mA > 25 ? '#d64545' : 'linear-gradient(90deg,#ffd08a,#f28c28)';
+        bar.style.background = mA > 25 ? '#d64545' : 'linear-gradient(90deg,#ffc98a,#f07d20)';
       }
     }
     if (p.type === 'fuse') set('fuseI', fmt(Math.abs(p._I || 0), 3) + ' А');
@@ -5990,6 +6052,8 @@
 
     UI.html($('mI'), fmt(I, I < 1 ? 3 : 2) + ' <small>А</small>');
     UI.html($('mU'), fmt(U, 2) + ' <small>В</small>');
+    UI.text($('lcdU'), fmt(U, 2));
+    UI.text($('lcdI'), fmt(I, I < 1 ? 3 : 2));
     UI.html($('mP'), fmt(P, 2) + ' <small>Вт</small>');
     UI.html($('mE'), fmt(world.energyLoadWh, world.energyLoadWh < 1 ? 3 : 2) + ' <small>Вт·ч</small>');
 
@@ -6079,7 +6143,7 @@
       var pts = arr.map(function (v, i) {
         return (i / (arr.length - 1 || 1) * 100).toFixed(1) + ',' + (16 - (v / max) * 14).toFixed(1);
       }).join(' ');
-      var col = k === 'I' ? '#0b6e99' : k === 'U' ? '#1f9d6b' : '#f28c28';
+      var col = k === 'I' ? '#1b3e8f' : k === 'U' ? '#1f9d6b' : '#f07d20';
       UI.html(svg, '<polyline points="' + pts + '" fill="none" stroke="' + col + '" stroke-width="1.4" opacity=".9"/>');
     });
   }

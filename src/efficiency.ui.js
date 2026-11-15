@@ -15,7 +15,7 @@
   var css = document.createElement('style');
   UI.text(css, `
   .eff main{display:grid;grid-template-columns:246px minmax(420px,1fr) 330px;gap:10px;padding:10px;min-height:0}
-  .eff .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px;flex-wrap:wrap}
+  .eff .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px;flex-wrap:wrap}
   .eff .seg button{flex:1;padding:4px 2px;font-size:11px;border-radius:5px;color:var(--muted)}
   .eff .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .eff .fld{margin-bottom:8px}
@@ -23,7 +23,7 @@
   .eff .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 0}
   .eff .chk input{width:15px;height:15px;accent-color:var(--accent)}
   .eff .chk span.pw{margin-left:auto;color:var(--muted);font-size:11px}
-  .estage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#f7fafc;overflow:hidden}
+  .estage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid var(--line);background:#f6f9fc;overflow:hidden}
   .estage svg{width:100%;height:100%;display:block}
   .houseroom{cursor:pointer}
   .houseroom:hover rect{stroke:var(--accent)}
@@ -86,7 +86,7 @@
 
       <div class="estage" id="efStage">
         <svg viewBox="0 0 760 400" preserveAspectRatio="xMidYMid meet">
-          <rect x="0" y="0" width="760" height="400" fill="#f7fafc"/>
+          <rect x="0" y="0" width="760" height="400" fill="#f6f9fc"/>
           <!-- кабинет -->
           <g class="houseroom" id="roomClass">
             <rect x="30" y="40" width="330" height="230" rx="8" fill="#ffffff" stroke="#cbd9e4" stroke-width="2"/>
@@ -153,6 +153,13 @@
 
       <div class="card">
         <h2>Энергия и деньги</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>за сутки, кВт·ч</span><span>₽</span></div>
+            <div class="main" id="lcdKwh">0,00</div>
+            <div class="sub" id="lcdRub">0,0</div>
+          </div>
+        </div>
         <div class="meters">
           <div class="meter accent"><div class="k"><span>За сутки</span><span>кВт·ч</span></div>
             <div class="v" id="efKwh">0 <small>кВт·ч</small></div></div>
@@ -417,8 +424,8 @@
       ' L' + x(24).toFixed(1) + ',' + y(0).toFixed(1) + ' L' + x(0).toFixed(1) + ',' + y(0).toFixed(1) + ' Z';
     var nowX = x(st.hour);
     UI.html($('efChart'), grid +
-      '<path d="' + area + '" fill="#e6f2f8" stroke="#0b6e99" stroke-width="1.6"/>' +
-      '<line x1="' + nowX + '" y1="6" x2="' + nowX + '" y2="' + y(0) + '" stroke="#f28c28" stroke-width="1.4"/>');
+      '<path d="' + area + '" fill="#e6f2f8" stroke="#1b3e8f" stroke-width="1.6"/>' +
+      '<line x1="' + nowX + '" y1="6" x2="' + nowX + '" y2="' + y(0) + '" stroke="#f07d20" stroke-width="1.4"/>');
     UI.text($('efPeak'), 'пик ' + Math.round(maxV) + ' Вт');
   }
 
@@ -426,6 +433,8 @@
     var s = E.savings(st);
     UI.html($('efKwh'), pct(s.now.total, 2) + ' <small>кВт·ч</small>');
     UI.html($('efRub'), pct(s.now.cost, 1) + ' <small>₽</small>');
+    UI.text($('lcdKwh'), pct(s.now.total, 2));
+    UI.text($('lcdRub'), pct(s.now.cost, 1));
     UI.html($('efSave'), Math.round(s.percent * 100) + ' <small>%</small>');
     UI.html($('efStandby'), pct(s.now.standby, 2) + ' <small>кВт·ч</small>');
     UI.text($('efBase'), pct(s.base.total, 2) + ' кВт·ч · ' + pct(s.base.cost, 1) + ' ₽');

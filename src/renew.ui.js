@@ -28,7 +28,7 @@
   .rctl .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:2px}
   .rctl .fld .top b{color:var(--ink);font-variant-numeric:tabular-nums}
   .rctl input[type=range]{width:100%}
-  .rctl .seg{display:flex;gap:2px;background:#f2f6f9;border-radius:7px;padding:2px}
+  .rctl .seg{display:flex;gap:2px;background:#e8eef5;border-radius:7px;padding:2px}
   .rctl .seg button{flex:1;padding:4px 0;font-size:11.5px;border-radius:5px;color:var(--muted)}
   .rctl .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .rctl .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:4px 0;color:var(--ink)}
@@ -120,7 +120,7 @@
         <svg id="rScene" viewBox="0 -60 800 560" preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#8fc6ea"/><stop offset="100%" stop-color="#e7f3fb"/>
+              <stop offset="0%" stop-color="#a9d4ee"/><stop offset="100%" stop-color="#f4f9fc"/>
             </linearGradient>
             <linearGradient id="skyNight" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#16283d"/><stop offset="100%" stop-color="#264a68"/>
@@ -128,7 +128,7 @@
             <radialGradient id="sunGlow"><stop offset="0%" stop-color="#fff3c4" stop-opacity=".95"/>
               <stop offset="100%" stop-color="#ffd166" stop-opacity="0"/></radialGradient>
             <linearGradient id="panelFace" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#1b4f72"/><stop offset="55%" stop-color="#2d7096"/><stop offset="100%" stop-color="#1b4f72"/>
+              <stop offset="0%" stop-color="#122a4a"/><stop offset="55%" stop-color="#1f4a76"/><stop offset="100%" stop-color="#122a4a"/>
             </linearGradient>
             <linearGradient id="battFillG" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stop-color="#7ed0a8"/><stop offset="100%" stop-color="#1f9d6b"/>
@@ -140,8 +140,8 @@
           <circle id="sunGlowC" cx="0" cy="0" r="70" fill="url(#sunGlow)" opacity="0"/>
           <circle id="sunDisc" cx="0" cy="0" r="22" fill="#ffd166" opacity="0"/>
           <g id="sunRays" opacity="0"></g>
-          <line id="horizon" x1="0" y1="372" x2="800" y2="372" stroke="#b7cbd9" stroke-width="2"/>
-          <rect x="0" y="372" width="800" height="88" fill="#e6eef4"/>
+          <line id="horizon" x1="0" y1="372" x2="800" y2="372" stroke="#c6d3dd" stroke-width="2"/>
+          <rect x="0" y="372" width="800" height="88" fill="#eef3f8"/>
 
           <g id="gPanel" transform="translate(215,300)">
             <line x1="0" y1="52" x2="0" y2="72" stroke="#6b7d8c" stroke-width="5"/>
@@ -156,13 +156,13 @@
           </g>
 
           <g id="gTurb" transform="translate(450,296)">
-            <path d="M-6 72 L6 72 L4 -60 L-4 -60 Z" fill="#dfe8ee" stroke="#a9bcc9" stroke-width="1.5"/>
+            <path d="M-6 72 L6 72 L4 -60 L-4 -60 Z" fill="#dfe8ee" stroke="#c6d3dd" stroke-width="1.5"/>
             <g id="rotor" transform="translate(0,-62)">
-              <circle cx="0" cy="0" r="7" fill="#7a8fa0"/>
+              <circle cx="0" cy="0" r="7" fill="#b9c8d4"/>
               <g id="blades">
-                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4"/>
-                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4" transform="rotate(120)"/>
-                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#f2f6f9" stroke="#9fb4c4" stroke-width="1.4" transform="rotate(240)"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#e8eef5" stroke="#c6d3dd" stroke-width="1.4"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#e8eef5" stroke="#c6d3dd" stroke-width="1.4" transform="rotate(120)"/>
+                <path d="M0 0 L-6 -72 L6 -72 Z" fill="#e8eef5" stroke="#c6d3dd" stroke-width="1.4" transform="rotate(240)"/>
               </g>
               <circle cx="0" cy="0" r="4" fill="#33475a"/>
             </g>
@@ -170,22 +170,22 @@
           </g>
 
           <g id="gHouse" transform="translate(620,300)">
-            <path d="M-46 32 L-46 -12 L0 -48 L46 -12 L46 32 Z" fill="#f7fafc" stroke="#a9bcc9" stroke-width="2"/>
-            <rect id="win" x="-16" y="-6" width="32" height="24" rx="2" fill="#cfe3ee" stroke="#a9bcc9"/>
+            <path d="M-46 32 L-46 -12 L0 -48 L46 -12 L46 32 Z" fill="#f6f9fc" stroke="#c6d3dd" stroke-width="2"/>
+            <rect id="win" x="-16" y="-6" width="32" height="24" rx="2" fill="#cfe3ee" stroke="#c6d3dd"/>
             <circle id="lampGlow" cx="0" cy="6" r="30" fill="#ffd166" opacity="0"/>
             <text x="0" y="56" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">потребители</text>
           </g>
 
           <g id="gBatt" transform="translate(560,392)">
-            <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#7a8fa0" stroke-width="2"/>
-            <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#7a8fa0"/>
+            <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#b9c8d4" stroke-width="2"/>
+            <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#b9c8d4"/>
             <rect id="battFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#battFillG)"/>
             <text id="battTxt" x="0" y="30" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">АКБ 35 %</text>
           </g>
 
           <g id="flows">
-            <path id="flowPV" d="M215 332 C 300 356 370 384 416 396" fill="none" stroke="#f2a93b" stroke-width="3" class="rflow" opacity="0"/>
-            <path id="flowWT" d="M450 318 C 450 356 500 380 528 396" fill="none" stroke="#3aa0c9" stroke-width="3" class="rflow" opacity="0"/>
+            <path id="flowPV" d="M215 332 C 300 356 370 384 416 396" fill="none" stroke="#f07d20" stroke-width="3" class="rflow" opacity="0"/>
+            <path id="flowWT" d="M450 318 C 450 356 500 380 528 396" fill="none" stroke="#2ea3dc" stroke-width="3" class="rflow" opacity="0"/>
             <path id="flowLoad" d="M592 396 C 616 386 618 352 620 330" fill="none" stroke="#8f6bd0" stroke-width="3" class="rflow" opacity="0"/>
           </g>
           <g id="warnText" opacity="0">
@@ -216,6 +216,13 @@
 
       <div class="card">
         <h2>Мощности</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>выработка, Вт</span><span>АКБ, В</span></div>
+            <div class="main" id="lcdGen">0</div>
+            <div class="sub" id="lcdBatt">12,0</div>
+          </div>
+        </div>
         <div class="meters">
           <div class="meter accent"><div class="k"><span>Солнце</span><span>PV</span></div>
             <div class="v" id="rPV">0 <small>Вт</small></div></div>
@@ -243,8 +250,8 @@
         <h2>Выработка за сутки</h2>
         <div class="chartbox"><svg id="rChart" viewBox="0 0 300 132" preserveAspectRatio="none"></svg></div>
         <div class="legend">
-          <span><i style="background:#f2a93b"></i>солнце</span>
-          <span><i style="background:#3aa0c9"></i>ветер</span>
+          <span><i style="background:#f07d20"></i>солнце</span>
+          <span><i style="background:#2ea3dc"></i>ветер</span>
           <span><i style="background:#8f6bd0"></i>нагрузка</span>
         </div>
         <div class="aux" style="padding:0 9px 9px">
@@ -511,11 +518,11 @@
     var now = x(st.hour);
     UI.html($('rChart'), grid +
       '<path d="' + area + '" fill="#fdf0dc" opacity=".75"/>' +
-      '<path d="' + line('pv') + '" fill="none" stroke="#f2a93b" stroke-width="1.6"/>' +
-      '<path d="' + line('wt') + '" fill="none" stroke="#3aa0c9" stroke-width="1.6" stroke-dasharray="3 2"/>' +
+      '<path d="' + line('pv') + '" fill="none" stroke="#f07d20" stroke-width="1.6"/>' +
+      '<path d="' + line('wt') + '" fill="none" stroke="#2ea3dc" stroke-width="1.6" stroke-dasharray="3 2"/>' +
       '<path d="' + line('load') + '" fill="none" stroke="#8f6bd0" stroke-width="1.4"/>' +
-      '<line x1="' + now + '" y1="6" x2="' + now + '" y2="' + y(0) + '" stroke="#0b6e99" stroke-width="1.2" opacity=".8"/>' +
-      '<circle cx="' + now + '" cy="8" r="2.6" fill="#0b6e99"/>');
+      '<line x1="' + now + '" y1="6" x2="' + now + '" y2="' + y(0) + '" stroke="#1b3e8f" stroke-width="1.2" opacity=".8"/>' +
+      '<circle cx="' + now + '" cy="8" r="2.6" fill="#1b3e8f"/>');
     var d = R.dayEnergy(st);
     UI.text($('rDayGen'), Math.round(d.gen) + ' Вт·ч');
     UI.text($('rDayUse'), Math.round(d.use) + ' Вт·ч');
@@ -608,6 +615,9 @@
   function renderMeters(f) {
     UI.html($('rPV'), fmtW(f.pv) + ' <small>Вт</small>');
     UI.html($('rWT'), fmtW(f.wt) + ' <small>Вт</small>');
+    UI.text($('lcdGen'), fmtW(f.pv + f.wt));
+    var vb = st.battV || st.voltage || 12;
+    UI.text($('lcdBatt'), (Math.round(vb * 10) / 10).toFixed(1).replace('.', ','));
     UI.html($('rLoad'), fmtW(f.load) + ' <small>Вт</small>');
     var net = f.pv + f.wt * 1 - f.load;
     var netCtrl = Math.round((f.pv + f.wt) * R.controllerEff(st) - f.load);
@@ -615,7 +625,7 @@
     $('rNet').style.color = netCtrl >= 0 ? '#1f9d6b' : '#d64545';
     UI.html($('rSoc'), Math.round(st.soc * 100) + ' <small>%</small>');
     $('rSocBar').style.width = Math.round(st.soc * 100) + '%';
-    $('rSocBar').style.background = st.soc < 0.2 ? '#d64545' : (st.soc > 0.8 ? '#1f9d6b' : 'linear-gradient(90deg,#ffd08a,#f28c28)');
+    $('rSocBar').style.background = st.soc < 0.2 ? '#d64545' : (st.soc > 0.8 ? '#1f9d6b' : 'linear-gradient(90deg,#ffc98a,#f07d20)');
     UI.text($('rSocState'), st.soc < 0.2 ? 'низкий' : (st.soc > 0.9 ? 'полный' : 'заряд'));
     UI.text($('rG'), Math.round(f.G) + ' Вт/м²');
     UI.text($('rElev'), pct(Math.max(0, f.elevDeg), 1) + '°');
