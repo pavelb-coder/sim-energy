@@ -595,6 +595,13 @@
       htmlCache.set(el, v);
       el.innerHTML = v;
     },
+    /* очистка сбрасывает кэш: иначе UI.html(el, '') считается «уже применённым»,
+       а добавленные через appendChild узлы остаются — список дублируется */
+    clear: function (el) {
+      if (!el) return;
+      if (el.firstChild) el.textContent = '';
+      htmlCache.delete(el);
+    },
     attr: function (el, name, v) {
       if (!el) return;
       var m = attrCache.get(el) || (attrCache.set(el, {}), attrCache.get(el));
@@ -6486,7 +6493,7 @@
 
   function renderPalette() {
     var box = $('parts');
-    UI.html(box, '');
+    UI.clear(box);            // было UI.html(box, '') — из-за кэша список копился
     ORDER.forEach(function (type) {
       var def = Lab.PART_DEFS[type];
       if (filterCat !== 'all' && def.cat !== filterCat) return;
@@ -6501,7 +6508,14 @@
         e.preventDefault();
         startPaletteDrag(type, e);
       });
-      b.addEventListener('click', function () { addAtFreeSpot(type); });
+      b.addEventListener('click', function () {
+        // двойной клик не должен ставить две одинаковые детали: второй щелчок
+        // в пределах 300 мс считаем случайным повторным нажатием
+        var now = Date.now();
+        if (b._lastClick && now - b._lastClick < 300) return;
+        b._lastClick = now;
+        addAtFreeSpot(type);
+      });
       box.appendChild(b);
     });
     if (!box.children.length) UI.html(box, '<div class="empty-note">Ничего не найдено</div>');
@@ -7545,7 +7559,7 @@
     ['I', 'U', 'P'].forEach(function (k) {
       var arr = sparkBuf[k];
       var svg = $('s' + k);
-      if (!arr.length) { UI.html(svg, ''); return; }
+      if (!arr.length) { UI.clear(svg); return; }
       var max = Math.max.apply(null, arr) || 1;
       var pts = arr.map(function (v, i) {
         return (i / (arr.length - 1 || 1) * 100).toFixed(1) + ',' + (16 - (v / max) * 14).toFixed(1);

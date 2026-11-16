@@ -15,6 +15,13 @@
       htmlCache.set(el, v);
       el.innerHTML = v;
     },
+    /* очистка сбрасывает кэш: иначе UI.html(el, '') считается «уже применённым»,
+       а добавленные через appendChild узлы остаются — список дублируется */
+    clear: function (el) {
+      if (!el) return;
+      if (el.firstChild) el.textContent = '';
+      htmlCache.delete(el);
+    },
     attr: function (el, name, v) {
       if (!el) return;
       var m = attrCache.get(el) || (attrCache.set(el, {}), attrCache.get(el));

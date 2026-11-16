@@ -38,6 +38,21 @@ async def main():
         await pg.click('button[data-mode="task"]'); await pg.wait_for_timeout(500)
         t6 = await pg.inner_text('#taskList')
         assert 'Параллельное соединение' in t6 and 'Энергия и стоимость' in t6
+        # регрессия: палитра «Цепей» не должна дублировать оборудование
+        await pg.click('button[data-bench="circuits"]'); await pg.wait_for_timeout(600)
+        base = await pg.evaluate("() => document.querySelectorAll('.partitem').length")
+        await pg.fill('#q', 'лампа'); await pg.wait_for_timeout(250)
+        await pg.fill('#q', ''); await pg.wait_for_timeout(250)
+        for _ in range(3):
+            await pg.click('.chips button[data-cat="load"]'); await pg.wait_for_timeout(120)
+            await pg.click('.chips button[data-cat="all"]'); await pg.wait_for_timeout(120)
+        after = await pg.evaluate("() => document.querySelectorAll('.partitem').length")
+        assert base == after == 10, (base, after)
+        await pg.dblclick('.partitem:has-text("Резистор")'); await pg.wait_for_timeout(400)
+        n = await pg.evaluate("() => window.__lab.world().parts.length")
+        assert n == 1, ('двойное нажатие добавило ' + str(n) + ' детали')
+        print('палитра без дублей, двойное нажатие ставит одну деталь — ок')
+
         print('все новые работы видны в списках, ошибок:', len(errs), errs[:3] if errs else '')
         await b.close()
 asyncio.run(main())
