@@ -750,7 +750,7 @@
     if (!lastTick) lastTick = ts;
     var dtReal = Math.min(0.1, (ts - lastTick) / 1000);
     lastTick = ts;
-    if (window.__bench === 'hydrogen') {
+    if (window.__bench === 'hydrogen' && window.__benchVisible === 'hydrogen') {
       var dt = playing ? dtReal * speed : 0;
       if (dt > 0) H.step(st, dt);
       var f = H.facts(st);

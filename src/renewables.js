@@ -90,11 +90,40 @@
     return 25 + (ir.G / 800) * 28;   // нагрев модуля: до +28 °C при полном солнце
   }
 
+  // быстрый вариант: солнце считается один раз на вызов (было три раза)
+  function pvPowerAt(st, G, sun) {
+    if (G <= 0 || sun.elev <= 0) return 0;
+    const beta = st.tilt * Math.PI / 180;
+    const alpha = st.azimuth * Math.PI / 180;
+    const cosT = Math.sin(sun.elev) * Math.cos(beta) +
+      Math.cos(sun.elev) * Math.sin(beta) * Math.cos(sun.azim - alpha);
+    if (cosT <= 0) return 0;
+    const tCoeff = 1 - 0.004 * ((G / 800) * 28);
+    return Math.max(0, G * cosT * PANEL_A * PANEL_ETA * tCoeff);
+  }
+
   function pvPower(st) {
     const ir = irradiance(st);
-    const cosT = incidenceCos(st);
-    const tCoeff = 1 - 0.004 * (panelTemp(st) - 25);
-    return Math.max(0, ir.G * cosT * PANEL_A * PANEL_ETA * tCoeff);
+    return pvPowerAt(st, ir.G, ir.sun);
+  }
+
+  // лучший наклон/азимут для текущего солнца — с кэшем по (час, день, облачность)
+  let bestCache = { key: '', G: 0, sun: null, best: 0, tilt: 0, az: 0 };
+  function bestPanel(st, G, sun) {
+    const key = st.hour.toFixed(3) + '|' + st.day + '|' + st.cloud;
+    if (bestCache.key === key) return bestCache;
+    let best = 0, bestTilt = 0, bestAz = 0;
+    if (G > 0 && sun.elev > 0) {
+      for (let tilt = 0; tilt <= 90; tilt += 2) {
+        for (let az = -90; az <= 90; az += 5) {
+          const p = pvPowerAt({ tilt: tilt, azimuth: az }, G, sun);
+          if (p > best) { best = p; bestTilt = tilt; bestAz = az; }
+          else if (p === best) { /* первое попадание оставляем */ }
+        }
+      }
+    }
+    bestCache = { key: key, G: G, sun: sun, best: best, tilt: bestTilt, az: bestAz };
+    return bestCache;
   }
 
   function windPower(st) {
@@ -166,8 +195,26 @@
     return out;
   }
 
-  function dayEnergy(st) {
+  // кэш суточных расчётов: пока не поменялись настройки и час, профиль не пересчитываем
+  let dayCache = { key: '', prof: null, energy: null, sim: null };
+  function dayKey(st) {
+    return [st.day, st.cloud, st.tilt, st.azimuth, st.blades, st.controller,
+      st.wind, st.capacity, Math.round(st.soc * 200),
+      Object.keys(st.loads).filter(function (k) { return st.loads[k]; }).join(',')].join('|');
+  }
+  function dayData(st) {
+    const key = dayKey(st);
+    if (dayCache.key === key) return dayCache;
     const prof = dayProfile(st);
+    dayCache = { key: key, prof: prof, energy: dayEnergyCalc(st, prof), sim: null };
+    return dayCache;
+  }
+
+  function dayEnergy(st) {
+    return dayData(st).energy;
+  }
+
+  function dayEnergyCalc(st, prof) {
     let pvGen = 0, wtGen = 0, use = 0;
     for (let i = 1; i < prof.length; i++) {
       const dh = prof[i].h - prof[i - 1].h;
@@ -181,7 +228,9 @@
 
   // сутки с учётом накопителя: возвращает минимум SoC
   function simulateDay(st) {
-    const prof = dayProfile(st);
+    const c = dayData(st);
+    if (c.sim) return c.sim;
+    const prof = c.prof;
     let soc = st.soc, min = soc;
     for (let i = 1; i < prof.length; i++) {
       const dh = prof[i].h - prof[i - 1].h;
@@ -190,32 +239,27 @@
       else soc = Math.max(0, soc + net * dh / 0.95 / st.capacity);
       min = Math.min(min, soc);
     }
-    return { socEnd: soc, socMin: min };
+    c.sim = { socEnd: soc, socMin: min };
+    return c.sim;
   }
 
   /* ---------- факты для заданий ---------- */
 
   function facts(st) {
     const ir = irradiance(st);
-    // максимально возможная мощность при текущем солнце (перебором наклона/азимута)
-    let best = 0, bestTilt = 0, bestAz = 0;
-    for (let tilt = 0; tilt <= 90; tilt += 2) {
-      for (let az = -90; az <= 90; az += 5) {
-        const tmp = Object.assign({}, st, { tilt: tilt, azimuth: az });
-        const p = pvPower(tmp);
-        if (p > best) { best = p; bestTilt = tilt; bestAz = az; }
-      }
-    }
+    // максимально возможная мощность при текущем солнце — из кэша (перебор идёт раз в час, а не каждый кадр)
+    const bp = bestPanel(st, ir.G, ir.sun);
+    const best = bp.best, bestTilt = bp.tilt, bestAz = bp.az;
     const f = {
       hour: st.hour,
       G: ir.G,
       elevDeg: ir.sun.elev * 180 / Math.PI,
-      pv: pvPower(st),
+      pv: pvPowerAt(st, ir.G, ir.sun),
       wt: windPower(st),
       load: loadPower(st),
       soc: st.soc,
       pvMax: best,
-      pvRatio: best > 0.5 ? pvPower(st) / best : 0,
+      pvRatio: best > 0.5 ? pvPowerAt(st, ir.G, ir.sun) / best : 0,
       bestTilt: bestTilt,
       bestAz: bestAz,
       energyGen: st.energyGen,

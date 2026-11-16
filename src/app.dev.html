@@ -16,6 +16,9 @@
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
+  /* неактивные стенды не участвуют в пересчёте стилей и вёрстке страницы:
+     переключение стенда стоило ~200 мс и упиралось именно в это */
+  [data-bench-id]{contain:layout style}
   html,body{height:100%}
   body{
     margin:0;background:var(--bg);color:var(--ink);
@@ -133,8 +136,8 @@
     content:"Перетащите детали сюда слева  ·  затем соедините клеммы проводом";
     position:absolute;inset:0;display:grid;place-items:center;color:#9aabb8;font-size:13px;pointer-events:none
   }
-  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-  .part{position:absolute;width:76px;height:56px;user-select:none;touch-action:none;cursor:grab}
+  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;contain:layout style}
+  .part{position:absolute;width:76px;height:56px;user-select:none;touch-action:none;cursor:grab;contain:layout style}
   .part.dragging{cursor:grabbing;z-index:5}
   .part svg{width:76px;height:56px;display:block;overflow:visible}
   .part .lbl{
@@ -897,13 +900,12 @@
       p.x = Math.max(-8, Math.min(stage.clientWidth - PART_W + 8, ev.clientX - r.left - dx));
       p.y = Math.max(-8, Math.min(stage.clientHeight - PART_H + 8, ev.clientY - r.top - dy));
       el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
-      syncTerms(); renderWires();
+      syncTerms(); drawWires();
     }
     function onUp() {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
-      el.classList.remove('dragging');
-      if (moved) { el.dataset.dragged = '1'; renderWires(); }
+      if (moved) { el.dataset.dragged = '1'; drawWires(); }
     }
     el.classList.add('dragging');
     document.addEventListener('pointermove', onMove);
@@ -969,7 +971,8 @@
   function termDir(idx) { return idx === 0 ? -1 : 1; }
 
   var wireSig = '', wireRaf = 0;
-  function renderWires(force) {
+  // рисует провода; вызывать, когда разметка деталей пересобрана (обработчики живут в renderParts)
+  function drawWires(force) {
     var sig = world.wires.map(function (w) {
       return w.id + ':' + (w._I > 0.02 ? 1 : 0) + ':' + Math.round(w._I * 100);
     }).join('|') + '#' + world.wires.map(function (w) { return w.a + w.b; }).join(',') +
@@ -1001,6 +1004,9 @@
     UI.html(wires, svg);
   }
 
+  // совместимое имя: просто перерисовывает провода
+  function renderWires(force) { drawWires(force); }
+
   function parseTerm(t) {
     var m = /^(p\d+):(\d+)$/.exec(t || '');
     return m ? { id: m[1], idx: +m[2] } : null;
@@ -1011,7 +1017,7 @@
     if (!p) return;
     Lab.removeWire(world, p.dataset.wid);
     log('warn', 'Провод удалён');
-    renderWires();
+    drawWires();
   });
 
   /* ---------- соединение клемм ---------- */
@@ -1052,11 +1058,11 @@
     var s = termPos(p, pendingTerm.idx);
     var d = roundPath(routePoints(s, termDir(pendingTerm.idx), { x: mouse.x, y: mouse.y }, mouse.x >= s.x ? -1 : 1, 0), 9);
     rubber = '<path d="' + d + '" fill="none" stroke="#f07d20" stroke-width="2.2" stroke-dasharray="5 5"/>';
-    renderWires();
+    drawWires();
   }
   function onRubberUp() {
     // остаёмся в режиме «выбрана клемма» — ждём клика по второй
-    if (rubber) { rubber = null; renderWires(); }
+    if (rubber) { rubber = null; drawWires(); }
   }
 
   function connect(a, b) {
@@ -1561,7 +1567,9 @@
     if (running) {
       acc += dtReal * speed;
       var steps = 0;
-      while (acc > 1 / 240 && steps < 60) {
+      // при ×12 и просевшем кадре не догоняем физику ценой новых пропущенных кадров
+      var budget = Math.min(60, Math.max(6, Math.round(dtReal * 240 * 1.5)));
+      while (acc > 1 / 240 && steps < budget) {
         var res = Lab.step(world, 1 / 240);
         acc -= 1 / 240;
         steps++;
@@ -1601,7 +1609,7 @@
       drawSparks();
       UI.text($('clock'), fmt(world.t, 1));
     }
-    renderWires();
+    drawWires();
     if (mode === 'task') {
       taskTick = (taskTick || 0) + dtReal;
       if (taskTick > 0.25) { taskTick = 0; checkTask(false); }
@@ -1847,6 +1855,8 @@
       if (rc) rc.scrollTop = 0;
       window.scrollTo(0, 0);
     }
+    // скрытые стенды не должны крутить свои кадры: rAF работает и для скрытых элементов
+    window.__benchVisible = name;
     window.dispatchEvent(new Event('resize'));
   }
   [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {

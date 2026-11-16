@@ -640,7 +640,7 @@
   function frame(now) {
     var dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
     lastTick = now;
-    if (window.__bench === 'renew') {
+    if (window.__bench === 'renew' && (window.__benchVisible === undefined || window.__benchVisible === 'renew')) {
       if (run.playing && dt > 0) R.step(st, dt, run.speed);
       else R.step(st, 0, 0);
       lastFacts = R.facts(st);

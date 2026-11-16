@@ -615,7 +615,7 @@
   function frame(ts) {
     var dt = lastFrame ? Math.min(0.05, (ts - lastFrame) / 1000) : 0.016;
     lastFrame = ts;
-    if (window.__bench === 'mech' && playing) {
+    if (window.__bench === 'mech' && window.__benchVisible === 'mech' && playing) {
       var steps = Math.min(40, Math.round((dt * speed) / M.DT));
       for (var i = 0; i < steps; i++) {
         if (scene === 'skate' && sk) M.stepSkater(sk, M.DT);

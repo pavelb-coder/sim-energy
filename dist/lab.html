@@ -16,6 +16,9 @@
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
+  /* неактивные стенды не участвуют в пересчёте стилей и вёрстке страницы:
+     переключение стенда стоило ~200 мс и упиралось именно в это */
+  [data-bench-id]{contain:layout style}
   html,body{height:100%}
   body{
     margin:0;background:var(--bg);color:var(--ink);
@@ -133,8 +136,8 @@
     content:"Перетащите детали сюда слева  ·  затем соедините клеммы проводом";
     position:absolute;inset:0;display:grid;place-items:center;color:#9aabb8;font-size:13px;pointer-events:none
   }
-  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-  .part{position:absolute;width:76px;height:56px;user-select:none;touch-action:none;cursor:grab}
+  #wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;contain:layout style}
+  .part{position:absolute;width:76px;height:56px;user-select:none;touch-action:none;cursor:grab;contain:layout style}
   .part.dragging{cursor:grabbing;z-index:5}
   .part svg{width:76px;height:56px;display:block;overflow:visible}
   .part .lbl{
@@ -1212,11 +1215,40 @@
     return 25 + (ir.G / 800) * 28;   // нагрев модуля: до +28 °C при полном солнце
   }
 
+  // быстрый вариант: солнце считается один раз на вызов (было три раза)
+  function pvPowerAt(st, G, sun) {
+    if (G <= 0 || sun.elev <= 0) return 0;
+    const beta = st.tilt * Math.PI / 180;
+    const alpha = st.azimuth * Math.PI / 180;
+    const cosT = Math.sin(sun.elev) * Math.cos(beta) +
+      Math.cos(sun.elev) * Math.sin(beta) * Math.cos(sun.azim - alpha);
+    if (cosT <= 0) return 0;
+    const tCoeff = 1 - 0.004 * ((G / 800) * 28);
+    return Math.max(0, G * cosT * PANEL_A * PANEL_ETA * tCoeff);
+  }
+
   function pvPower(st) {
     const ir = irradiance(st);
-    const cosT = incidenceCos(st);
-    const tCoeff = 1 - 0.004 * (panelTemp(st) - 25);
-    return Math.max(0, ir.G * cosT * PANEL_A * PANEL_ETA * tCoeff);
+    return pvPowerAt(st, ir.G, ir.sun);
+  }
+
+  // лучший наклон/азимут для текущего солнца — с кэшем по (час, день, облачность)
+  let bestCache = { key: '', G: 0, sun: null, best: 0, tilt: 0, az: 0 };
+  function bestPanel(st, G, sun) {
+    const key = st.hour.toFixed(3) + '|' + st.day + '|' + st.cloud;
+    if (bestCache.key === key) return bestCache;
+    let best = 0, bestTilt = 0, bestAz = 0;
+    if (G > 0 && sun.elev > 0) {
+      for (let tilt = 0; tilt <= 90; tilt += 2) {
+        for (let az = -90; az <= 90; az += 5) {
+          const p = pvPowerAt({ tilt: tilt, azimuth: az }, G, sun);
+          if (p > best) { best = p; bestTilt = tilt; bestAz = az; }
+          else if (p === best) { /* первое попадание оставляем */ }
+        }
+      }
+    }
+    bestCache = { key: key, G: G, sun: sun, best: best, tilt: bestTilt, az: bestAz };
+    return bestCache;
   }
 
   function windPower(st) {
@@ -1288,8 +1320,26 @@
     return out;
   }
 
-  function dayEnergy(st) {
+  // кэш суточных расчётов: пока не поменялись настройки и час, профиль не пересчитываем
+  let dayCache = { key: '', prof: null, energy: null, sim: null };
+  function dayKey(st) {
+    return [st.day, st.cloud, st.tilt, st.azimuth, st.blades, st.controller,
+      st.wind, st.capacity, Math.round(st.soc * 200),
+      Object.keys(st.loads).filter(function (k) { return st.loads[k]; }).join(',')].join('|');
+  }
+  function dayData(st) {
+    const key = dayKey(st);
+    if (dayCache.key === key) return dayCache;
     const prof = dayProfile(st);
+    dayCache = { key: key, prof: prof, energy: dayEnergyCalc(st, prof), sim: null };
+    return dayCache;
+  }
+
+  function dayEnergy(st) {
+    return dayData(st).energy;
+  }
+
+  function dayEnergyCalc(st, prof) {
     let pvGen = 0, wtGen = 0, use = 0;
     for (let i = 1; i < prof.length; i++) {
       const dh = prof[i].h - prof[i - 1].h;
@@ -1303,7 +1353,9 @@
 
   // сутки с учётом накопителя: возвращает минимум SoC
   function simulateDay(st) {
-    const prof = dayProfile(st);
+    const c = dayData(st);
+    if (c.sim) return c.sim;
+    const prof = c.prof;
     let soc = st.soc, min = soc;
     for (let i = 1; i < prof.length; i++) {
       const dh = prof[i].h - prof[i - 1].h;
@@ -1312,32 +1364,27 @@
       else soc = Math.max(0, soc + net * dh / 0.95 / st.capacity);
       min = Math.min(min, soc);
     }
-    return { socEnd: soc, socMin: min };
+    c.sim = { socEnd: soc, socMin: min };
+    return c.sim;
   }
 
   /* ---------- факты для заданий ---------- */
 
   function facts(st) {
     const ir = irradiance(st);
-    // максимально возможная мощность при текущем солнце (перебором наклона/азимута)
-    let best = 0, bestTilt = 0, bestAz = 0;
-    for (let tilt = 0; tilt <= 90; tilt += 2) {
-      for (let az = -90; az <= 90; az += 5) {
-        const tmp = Object.assign({}, st, { tilt: tilt, azimuth: az });
-        const p = pvPower(tmp);
-        if (p > best) { best = p; bestTilt = tilt; bestAz = az; }
-      }
-    }
+    // максимально возможная мощность при текущем солнце — из кэша (перебор идёт раз в час, а не каждый кадр)
+    const bp = bestPanel(st, ir.G, ir.sun);
+    const best = bp.best, bestTilt = bp.tilt, bestAz = bp.az;
     const f = {
       hour: st.hour,
       G: ir.G,
       elevDeg: ir.sun.elev * 180 / Math.PI,
-      pv: pvPower(st),
+      pv: pvPowerAt(st, ir.G, ir.sun),
       wt: windPower(st),
       load: loadPower(st),
       soc: st.soc,
       pvMax: best,
-      pvRatio: best > 0.5 ? pvPower(st) / best : 0,
+      pvRatio: best > 0.5 ? pvPowerAt(st, ir.G, ir.sun) / best : 0,
       bestTilt: bestTilt,
       bestAz: bestAz,
       energyGen: st.energyGen,
@@ -2211,7 +2258,7 @@
   function frame(now) {
     var dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
     lastTick = now;
-    if (window.__bench === 'renew') {
+    if (window.__bench === 'renew' && (window.__benchVisible === undefined || window.__benchVisible === 'renew')) {
       if (run.playing && dt > 0) R.step(st, dt, run.speed);
       else R.step(st, 0, 0);
       lastFacts = R.facts(st);
@@ -3967,7 +4014,7 @@
   function frame(now) {
     var dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
     lastTick = now;
-    if (window.__bench === 'efficiency') {
+    if (window.__bench === 'efficiency' && window.__benchVisible === 'efficiency') {
       if (playing && dt > 0) E.step(st, dt, speed);
       lastFacts = E.facts(st);
       drawScene(lastFacts);
@@ -5192,7 +5239,7 @@
     if (!lastTick) lastTick = ts;
     var dtReal = Math.min(0.1, (ts - lastTick) / 1000);
     lastTick = ts;
-    if (window.__bench === 'hydrogen') {
+    if (window.__bench === 'hydrogen' && window.__benchVisible === 'hydrogen') {
       var dt = playing ? dtReal * speed : 0;
       if (dt > 0) H.step(st, dt);
       var f = H.facts(st);
@@ -5404,7 +5451,10 @@
 
   // мощность солнечной панели с учётом наклона, азимута и нагрева
   function pvPower(st) {
-    const ir = irradiance(st);
+    return pvFrom(st, irradiance(st));
+  }
+
+  function pvFrom(st, ir) {
     if (ir.G <= 1) return 0;
     const s = ir.sun;
     const tilt = st.tilt * D2R;
@@ -5466,10 +5516,13 @@
 
   // мгновенный баланс без изменения состояния
   function balance(st) {
-    const pv = pvPower(st);
-    const wind = windPower(st);
+    const ir = irradiance(st);
+    return dispatch(st, pvFrom(st, ir), windPower(st), loadPower(st), windSpeed(st), priceAt(st.hour));
+  }
+
+  // диспетчеризация при уже известных выработке и нагрузке (без повторного расчёта солнца)
+  function dispatch(st, pv, wind, load, vWind, price) {
     const gen = pv + wind;
-    const load = loadPower(st);
     const net = gen - load;
     const capKwh = Math.max(0.1, st.batteryKwh);
     const maxP = Math.max(0, st.batteryMaxP);
@@ -5496,7 +5549,8 @@
       pv: pv, wind: wind, gen: gen, load: load, net: net,
       batt: batt, gridImport: gridImport, gridExport: gridExport,
       curtail: curtail, unserved: unserved, gas: gas,
-      soc: st.soc, vWind: windSpeed(st), price: priceAt(st.hour)
+      soc: st.soc, vWind: vWind === undefined ? windSpeed(st) : vWind,
+      price: price === undefined ? priceAt(st.hour) : price
     };
   }
 
@@ -5525,7 +5579,26 @@
   }
 
   /* ---------------- сутки целиком ---------------- */
+  // кэш суточных прогонов: ключ — все настройки, влияющие на сутки.
+  // simulateDay вызывается из facts() десятки раз за кадр, считать каждый раз заново незачем.
+  const dayCache = new Map();
+  function dayKeyOf(st, startHour, stepMin) {
+    return [startHour, stepMin, st.dayOfYear, st.cloud, st.tilt, st.azimuth, st.pvKwp, st.pvTemp,
+      st.windRef, st.windHub, st.windRated, st.baseLoad, st.batteryKwh, st.batteryMaxP,
+      Math.round(st.soc * 100), st.gasOn, st.island, st.evOn, st.evStart, st.evEnd, st.evPower].join('|');
+  }
+
   function simulateDay(st, startHour, stepMin) {
+    const key = dayKeyOf(st, startHour, stepMin);
+    const hit = dayCache.get(key);
+    if (hit) return hit;
+    const out = simulateDayCalc(st, startHour, stepMin);
+    if (dayCache.size > 120) dayCache.clear();
+    dayCache.set(key, out);
+    return out;
+  }
+
+  function simulateDayCalc(st, startHour, stepMin) {
     const s = Object.assign({}, st);
     s.hour = startHour === undefined ? 0 : startHour;
     const dt = (stepMin || 15) / 60;
@@ -5538,7 +5611,9 @@
     const capKwh = Math.max(0.1, s.batteryKwh);
     for (let k = 0; k < Math.round(24 / dt); k++) {
       s.hour = (startHour === undefined ? 0 : startHour) + k * dt;
-      const b = balance(Object.assign({}, s, { soc: socc }));
+      const ir = irradiance(s);
+      s.soc = socc;
+      const b = dispatch(s, pvFrom(s, ir), windPower(s), loadPower(s), windSpeed(s), priceAt(s.hour));
       // интегрируем заряд
       if (b.batt > 0) socc = Math.min(BATTERY.maxSoc, socc + b.batt * dt * BATTERY.eff / capKwh);
       else if (b.batt < 0) socc = Math.max(0, socc + b.batt * dt / BATTERY.eff / capKwh);
@@ -6406,7 +6481,7 @@
     if (!lastTick) lastTick = ts;
     var dtReal = Math.min(0.1, (ts - lastTick) / 1000);
     lastTick = ts;
-    if (window.__bench === 'grid') {
+    if (window.__bench === 'grid' && window.__benchVisible === 'grid') {
       if (playing) G.step(st, dtReal * speed / 600);   // 1 с ≈ 1 мин модельного времени при ×1
       render(G.facts(st));
       meterTick += dtReal;
@@ -7472,7 +7547,7 @@
   function frame(ts) {
     var dt = lastFrame ? Math.min(0.05, (ts - lastFrame) / 1000) : 0.016;
     lastFrame = ts;
-    if (window.__bench === 'mech' && playing) {
+    if (window.__bench === 'mech' && window.__benchVisible === 'mech' && playing) {
       var steps = Math.min(40, Math.round((dt * speed) / M.DT));
       for (var i = 0; i < steps; i++) {
         if (scene === 'skate' && sk) M.stepSkater(sk, M.DT);
@@ -8756,13 +8831,12 @@
       p.x = Math.max(-8, Math.min(stage.clientWidth - PART_W + 8, ev.clientX - r.left - dx));
       p.y = Math.max(-8, Math.min(stage.clientHeight - PART_H + 8, ev.clientY - r.top - dy));
       el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
-      syncTerms(); renderWires();
+      syncTerms(); drawWires();
     }
     function onUp() {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
-      el.classList.remove('dragging');
-      if (moved) { el.dataset.dragged = '1'; renderWires(); }
+      if (moved) { el.dataset.dragged = '1'; drawWires(); }
     }
     el.classList.add('dragging');
     document.addEventListener('pointermove', onMove);
@@ -8828,7 +8902,8 @@
   function termDir(idx) { return idx === 0 ? -1 : 1; }
 
   var wireSig = '', wireRaf = 0;
-  function renderWires(force) {
+  // рисует провода; вызывать, когда разметка деталей пересобрана (обработчики живут в renderParts)
+  function drawWires(force) {
     var sig = world.wires.map(function (w) {
       return w.id + ':' + (w._I > 0.02 ? 1 : 0) + ':' + Math.round(w._I * 100);
     }).join('|') + '#' + world.wires.map(function (w) { return w.a + w.b; }).join(',') +
@@ -8860,6 +8935,9 @@
     UI.html(wires, svg);
   }
 
+  // совместимое имя: просто перерисовывает провода
+  function renderWires(force) { drawWires(force); }
+
   function parseTerm(t) {
     var m = /^(p\d+):(\d+)$/.exec(t || '');
     return m ? { id: m[1], idx: +m[2] } : null;
@@ -8870,7 +8948,7 @@
     if (!p) return;
     Lab.removeWire(world, p.dataset.wid);
     log('warn', 'Провод удалён');
-    renderWires();
+    drawWires();
   });
 
   /* ---------- соединение клемм ---------- */
@@ -8911,11 +8989,11 @@
     var s = termPos(p, pendingTerm.idx);
     var d = roundPath(routePoints(s, termDir(pendingTerm.idx), { x: mouse.x, y: mouse.y }, mouse.x >= s.x ? -1 : 1, 0), 9);
     rubber = '<path d="' + d + '" fill="none" stroke="#f07d20" stroke-width="2.2" stroke-dasharray="5 5"/>';
-    renderWires();
+    drawWires();
   }
   function onRubberUp() {
     // остаёмся в режиме «выбрана клемма» — ждём клика по второй
-    if (rubber) { rubber = null; renderWires(); }
+    if (rubber) { rubber = null; drawWires(); }
   }
 
   function connect(a, b) {
@@ -9420,7 +9498,9 @@
     if (running) {
       acc += dtReal * speed;
       var steps = 0;
-      while (acc > 1 / 240 && steps < 60) {
+      // при ×12 и просевшем кадре не догоняем физику ценой новых пропущенных кадров
+      var budget = Math.min(60, Math.max(6, Math.round(dtReal * 240 * 1.5)));
+      while (acc > 1 / 240 && steps < budget) {
         var res = Lab.step(world, 1 / 240);
         acc -= 1 / 240;
         steps++;
@@ -9460,7 +9540,7 @@
       drawSparks();
       UI.text($('clock'), fmt(world.t, 1));
     }
-    renderWires();
+    drawWires();
     if (mode === 'task') {
       taskTick = (taskTick || 0) + dtReal;
       if (taskTick > 0.25) { taskTick = 0; checkTask(false); }
@@ -9706,6 +9786,8 @@
       if (rc) rc.scrollTop = 0;
       window.scrollTo(0, 0);
     }
+    // скрытые стенды не должны крутить свои кадры: rAF работает и для скрытых элементов
+    window.__benchVisible = name;
     window.dispatchEvent(new Event('resize'));
   }
   [].forEach.call(document.querySelectorAll('.benchnav button[data-bench]'), function (b) {

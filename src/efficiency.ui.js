@@ -452,7 +452,7 @@
   function frame(now) {
     var dt = lastTick ? Math.min(0.25, (now - lastTick) / 1000) : 0;
     lastTick = now;
-    if (window.__bench === 'efficiency') {
+    if (window.__bench === 'efficiency' && window.__benchVisible === 'efficiency') {
       if (playing && dt > 0) E.step(st, dt, speed);
       lastFacts = E.facts(st);
       drawScene(lastFacts);

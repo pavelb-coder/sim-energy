@@ -94,7 +94,10 @@
 
   // мощность солнечной панели с учётом наклона, азимута и нагрева
   function pvPower(st) {
-    const ir = irradiance(st);
+    return pvFrom(st, irradiance(st));
+  }
+
+  function pvFrom(st, ir) {
     if (ir.G <= 1) return 0;
     const s = ir.sun;
     const tilt = st.tilt * D2R;
@@ -156,10 +159,13 @@
 
   // мгновенный баланс без изменения состояния
   function balance(st) {
-    const pv = pvPower(st);
-    const wind = windPower(st);
+    const ir = irradiance(st);
+    return dispatch(st, pvFrom(st, ir), windPower(st), loadPower(st), windSpeed(st), priceAt(st.hour));
+  }
+
+  // диспетчеризация при уже известных выработке и нагрузке (без повторного расчёта солнца)
+  function dispatch(st, pv, wind, load, vWind, price) {
     const gen = pv + wind;
-    const load = loadPower(st);
     const net = gen - load;
     const capKwh = Math.max(0.1, st.batteryKwh);
     const maxP = Math.max(0, st.batteryMaxP);
@@ -186,7 +192,8 @@
       pv: pv, wind: wind, gen: gen, load: load, net: net,
       batt: batt, gridImport: gridImport, gridExport: gridExport,
       curtail: curtail, unserved: unserved, gas: gas,
-      soc: st.soc, vWind: windSpeed(st), price: priceAt(st.hour)
+      soc: st.soc, vWind: vWind === undefined ? windSpeed(st) : vWind,
+      price: price === undefined ? priceAt(st.hour) : price
     };
   }
 
@@ -215,7 +222,26 @@
   }
 
   /* ---------------- сутки целиком ---------------- */
+  // кэш суточных прогонов: ключ — все настройки, влияющие на сутки.
+  // simulateDay вызывается из facts() десятки раз за кадр, считать каждый раз заново незачем.
+  const dayCache = new Map();
+  function dayKeyOf(st, startHour, stepMin) {
+    return [startHour, stepMin, st.dayOfYear, st.cloud, st.tilt, st.azimuth, st.pvKwp, st.pvTemp,
+      st.windRef, st.windHub, st.windRated, st.baseLoad, st.batteryKwh, st.batteryMaxP,
+      Math.round(st.soc * 100), st.gasOn, st.island, st.evOn, st.evStart, st.evEnd, st.evPower].join('|');
+  }
+
   function simulateDay(st, startHour, stepMin) {
+    const key = dayKeyOf(st, startHour, stepMin);
+    const hit = dayCache.get(key);
+    if (hit) return hit;
+    const out = simulateDayCalc(st, startHour, stepMin);
+    if (dayCache.size > 120) dayCache.clear();
+    dayCache.set(key, out);
+    return out;
+  }
+
+  function simulateDayCalc(st, startHour, stepMin) {
     const s = Object.assign({}, st);
     s.hour = startHour === undefined ? 0 : startHour;
     const dt = (stepMin || 15) / 60;
@@ -228,7 +254,9 @@
     const capKwh = Math.max(0.1, s.batteryKwh);
     for (let k = 0; k < Math.round(24 / dt); k++) {
       s.hour = (startHour === undefined ? 0 : startHour) + k * dt;
-      const b = balance(Object.assign({}, s, { soc: socc }));
+      const ir = irradiance(s);
+      s.soc = socc;
+      const b = dispatch(s, pvFrom(s, ir), windPower(s), loadPower(s), windSpeed(s), priceAt(s.hour));
       // интегрируем заряд
       if (b.batt > 0) socc = Math.min(BATTERY.maxSoc, socc + b.batt * dt * BATTERY.eff / capKwh);
       else if (b.batt < 0) socc = Math.max(0, socc + b.batt * dt / BATTERY.eff / capKwh);

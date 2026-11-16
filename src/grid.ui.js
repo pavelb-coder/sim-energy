@@ -637,7 +637,7 @@
     if (!lastTick) lastTick = ts;
     var dtReal = Math.min(0.1, (ts - lastTick) / 1000);
     lastTick = ts;
-    if (window.__bench === 'grid') {
+    if (window.__bench === 'grid' && window.__benchVisible === 'grid') {
       if (playing) G.step(st, dtReal * speed / 600);   // 1 с ≈ 1 мин модельного времени при ×1
       render(G.facts(st));
       meterTick += dtReal;
