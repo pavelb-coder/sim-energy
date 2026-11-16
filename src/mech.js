@@ -192,9 +192,12 @@
   function springPeriod(k, mass) { return 2 * Math.PI * Math.sqrt(mass / k); }
 
   function springEnergy(s) {
+    // y — смещение от положения равновесия (вниз положительно), поэтому
+    // энергия колебаний считается без постоянной составляющей mg·y:
+    // иначе в нижней точке E обнулялась, хотя груз движется
     const ke = 0.5 * s.mass * s.v * s.v;
     const ep = 0.5 * s.k * s.y * s.y;
-    return { y: s.y, Ekin: ke, Epot: ep, total: ke + ep, speed: Math.abs(s.v) };
+    return { y: s.y, Ekin: ke, Epot: ep, total: ke + ep, speed: Math.abs(s.v), spring: true };
   }
 
   // статическое удлинение под весом груза

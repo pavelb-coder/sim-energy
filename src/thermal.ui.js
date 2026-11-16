@@ -42,6 +42,9 @@
   .therm .tgrid .k{font-size:9.5px;letter-spacing:.4px;color:var(--muted);text-transform:uppercase}
   .therm .tgrid .v{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
   .therm .tgrid .v small{font-size:10px;color:var(--muted)}
+  .therm .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
+  .therm .row b{font-variant-numeric:tabular-nums}
+  .therm .tiny{font-size:11px;line-height:1.45}
   @media (max-width:1180px){.therm main{grid-template-columns:226px minmax(360px,1fr) 296px}}
   @media (max-width:980px){.therm main{grid-template-columns:1fr}.tstage{min-height:360px}}
   @media (max-height:860px){.tstage{min-height:260px}}
