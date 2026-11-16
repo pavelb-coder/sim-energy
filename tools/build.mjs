@@ -31,6 +31,8 @@ for (const [marker, file] of [
   ['/*__MECH_UI__*/', 'src/mech.ui.js'],
   ['/*__THERMAL__*/', 'src/thermal.js'],
   ['/*__THERMAL_UI__*/', 'src/thermal.ui.js'],
+  ['/*__OPTICS__*/', 'src/optics.js'],
+  ['/*__OPTICS_UI__*/', 'src/optics.ui.js'],
 ]) {
   if (!out.includes(marker)) {
     console.error(`Нет метки ${marker} в src/app.dev.html`);

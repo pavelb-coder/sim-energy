@@ -14,6 +14,9 @@ function mod_energy_bench_list(): array {
         'efficiency' => get_string('bench_efficiency', 'mod_energy'),
         'hydrogen'   => get_string('bench_hydrogen', 'mod_energy'),
         'grid'       => get_string('bench_grid', 'mod_energy'),
+        'mech'       => get_string('bench_mech', 'mod_energy'),
+        'thermal'    => get_string('bench_thermal', 'mod_energy'),
+        'optics'     => get_string('bench_optics', 'mod_energy'),
     ];
 }
 
@@ -214,7 +217,7 @@ function mod_energy_is_open(stdClass $energy): bool {
  */
 function mod_energy_total_tasks(?stdClass $energy = null): int {
     if ($energy === null) {
-        return 48;
+        return 72;
     }
     return 8 * count(mod_energy_enabled_benches($energy));
 }
