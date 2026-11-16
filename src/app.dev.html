@@ -396,6 +396,8 @@
       <button data-bench="efficiency">Эффективность</button>
       <button data-bench="hydrogen">Водородный контур</button>
       <button data-bench="grid">Микросеть</button>
+      <button data-bench="mech">Механика</button>
+      <button data-bench="thermal">Тепло и газы</button>
     </nav>
     <div class="grow"></div>
     <div class="modes" role="tablist" aria-label="Режим работы">
@@ -528,6 +530,8 @@
 <main id="benchEfficiency" data-bench-id="efficiency" hidden></main>
 <main id="benchHydrogen" data-bench-id="hydrogen" hidden></main>
 <main id="benchGrid" data-bench-id="grid" hidden></main>
+<main id="benchMech" data-bench-id="mech" hidden></main>
+<main id="benchThermal" data-bench-id="thermal" hidden></main>
 
 <div class="modal" id="help">
   <div class="sheet">
@@ -570,7 +574,7 @@
         <li>Нить лампы нелинейна: R(T) = R₂₀·(1 + α·ΔT), температура — из баланса мощности и теплоотдачи.</li>
         <li>Модель упрощённая и предназначена для обучения, а не для инженерных расчётов.</li>
       </ul>
-      <p class="tiny muted" style="margin-top:14px">Версия v1.2 · шесть стендов: электрические цепи, возобновляемая энергетика, накопители, энергоэффективность, водородный контур, микросеть.</p>
+      <p class="tiny muted" style="margin-top:14px">Версия v1.3 · восемь стендов: электрические цепи, возобновляемая энергетика, накопители, энергоэффективность, водородный контур, микросеть, механика, тепло и газы.</p>
     </div>
   </div>
 </div>
@@ -589,6 +593,10 @@
 <script>/*__HYDROGEN_UI__*/</script>
 <script>/*__GRID__*/</script>
 <script>/*__GRID_UI__*/</script>
+<script>/*__MECH__*/</script>
+<script>/*__MECH_UI__*/</script>
+<script>/*__THERMAL__*/</script>
+<script>/*__THERMAL_UI__*/</script>
 <script>
 (function () {
   'use strict';
@@ -1818,8 +1826,8 @@
   /* ================= переключение стендов ================= */
   var bench = 'circuits';
   window.__bench = 'circuits';
-  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd', grid: 'grid' };
-  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen', grid: 'benchGrid' };
+  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd', grid: 'grid', mech: 'mech', thermal: 'therm' };
+  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen', grid: 'benchGrid', mech: 'benchMech', thermal: 'benchThermal' };
   function setBench(name) {
     bench = name;
     window.__bench = name;

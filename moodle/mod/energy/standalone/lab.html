@@ -396,6 +396,8 @@
       <button data-bench="efficiency">Эффективность</button>
       <button data-bench="hydrogen">Водородный контур</button>
       <button data-bench="grid">Микросеть</button>
+      <button data-bench="mech">Механика</button>
+      <button data-bench="thermal">Тепло и газы</button>
     </nav>
     <div class="grow"></div>
     <div class="modes" role="tablist" aria-label="Режим работы">
@@ -528,6 +530,8 @@
 <main id="benchEfficiency" data-bench-id="efficiency" hidden></main>
 <main id="benchHydrogen" data-bench-id="hydrogen" hidden></main>
 <main id="benchGrid" data-bench-id="grid" hidden></main>
+<main id="benchMech" data-bench-id="mech" hidden></main>
+<main id="benchThermal" data-bench-id="thermal" hidden></main>
 
 <div class="modal" id="help">
   <div class="sheet">
@@ -570,7 +574,7 @@
         <li>Нить лампы нелинейна: R(T) = R₂₀·(1 + α·ΔT), температура — из баланса мощности и теплоотдачи.</li>
         <li>Модель упрощённая и предназначена для обучения, а не для инженерных расчётов.</li>
       </ul>
-      <p class="tiny muted" style="margin-top:14px">Версия v1.2 · шесть стендов: электрические цепи, возобновляемая энергетика, накопители, энергоэффективность, водородный контур, микросеть.</p>
+      <p class="tiny muted" style="margin-top:14px">Версия v1.3 · восемь стендов: электрические цепи, возобновляемая энергетика, накопители, энергоэффективность, водородный контур, микросеть, механика, тепло и газы.</p>
     </div>
   </div>
 </div>
@@ -6432,6 +6436,1880 @@
   };
 })();
 </script>
+<script>/* ============================================================
+   Энерджиквантум · mech.js — стенд «Механика и энергия»
+   Модель в духе PhET: Energy Skate Park, Pendulum Lab, Masses and Springs.
+   Не зависит от DOM: тестируется в Node, используется в браузере.
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  const G = 9.81;          // ускорение свободного падения, м/с²
+  const DT = 1 / 240;      // шаг интегрирования, с
+
+  /* ---------- горка: трасса задаётся профилем высоты ---------- */
+
+  // трасса «полупайп»: y = h * (x/L)^2, x ∈ [0, L]
+  function trackHeight(profile, x) {
+    const L = profile.length;
+    const h = profile.height;
+    if (x < 0) x = 0;
+    if (x > L) x = L;
+    switch (profile.shape) {
+      case 'parabola': return h * Math.pow(x / L, 2);
+      case 'valley':   return h * Math.pow(1 - x / L, 2);
+      case 'hill':     return h * Math.sin(Math.PI * x / L);
+      case 'ramp':     return h * (1 - x / L);
+      default:         return h * (x / L);
+    }
+  }
+
+  function trackSlope(profile, x) {
+    const d = 0.01;
+    return (trackHeight(profile, x + d) - trackHeight(profile, x - d)) / (2 * d);
+  }
+
+  function createSkater(profile, mass) {
+    const x = 0.05 * profile.length;
+    return {
+      profile: profile, mass: mass || 60, x: x, v: 0, vmax: 0,
+      y: trackHeight(profile, x), friction: 0.02, gravityOn: true,
+      track: true, t: 0
+    };
+  }
+
+  // число прошедших полных колебаний маятника (по переходам через положение равновесия)
+  function pendulumCount(p) { return p.periods / 2; }
+
+  function skaterEnergy(sk) {
+    const y = sk.track ? trackHeight(sk.profile, sk.x) : sk.y;
+    const h = sk.gravityOn ? y : 0;
+    const ke = 0.5 * sk.mass * sk.v * sk.v;
+    return { y: y, h: h, Ekin: ke, Epot: sk.mass * G * h, total: ke + sk.mass * G * h,
+      speed: Math.abs(sk.v) };
+  }
+
+  function stepSkater(sk, dt) {
+    dt = dt || DT;
+    if (!sk.track) {
+      // свободный полёт: ускорение g одинаково для любой массы
+      sk.v += -G * dt;
+      sk.y += sk.v * dt;
+      if (sk.y < 0) { sk.y = 0; sk.v = 0; }
+      sk.t += dt;
+      return sk;
+    }
+
+    const sq = function (x) { return Math.sqrt(1 + Math.pow(trackSlope(sk.profile, x), 2)); };
+    const accel = function (x, v) {
+      const slope = trackSlope(sk.profile, x);
+      const s2 = Math.sqrt(1 + slope * slope);
+      let a = sk.gravityOn ? -G * slope / s2 : 0;
+      // трение о трассу: μ·g·cosθ, где cosθ = 1/√(1+h'²)
+      a -= sk.friction * G * (1 / s2) * Math.sign(v || 1);
+      return a;
+    };
+
+    // leapfrog (симплектический интегратор): энергия не «уползает» на длинных прогонах
+    const xh = sk.x + 0.5 * dt * sk.v / sq(sk.x);
+    sk.v += accel(xh, sk.v) * dt;
+    sk.x += sk.v / sq(xh) * dt;
+
+    // упор на краях трассы: отражаем без потерь (потери задаёт только трение)
+    if (sk.x < 0) { sk.x = -sk.x; sk.v = Math.abs(sk.v); }
+    if (sk.x > sk.profile.length) { sk.x = 2 * sk.profile.length - sk.x; sk.v = -Math.abs(sk.v); }
+    sk.y = trackHeight(sk.profile, sk.x);
+    sk.vmax = Math.max(sk.vmax || 0, Math.abs(sk.v));
+    sk.t += dt;
+    return sk;
+  }
+
+  /* ---------- маятник ---------- */
+
+  function createPendulum(opts) {
+    opts = opts || {};
+    return {
+      L: opts.L || 1.0,          // длина нити, м
+      mass: opts.mass || 1.0,    // масса груза, кг
+      theta: opts.theta === undefined ? 0.35 : opts.theta,   // угол от вертикали, рад
+      omega: 0,
+      damping: opts.damping === undefined ? 0.02 : opts.damping,
+      gravityOn: opts.gravityOn !== false,
+      t: 0, periods: 0, lastZeroCross: 0
+    };
+  }
+
+  function stepPendulum(p, dt) {
+    dt = dt || DT;
+    const g = p.gravityOn ? G : 0;
+    // leapfrog: сначала半 шаг по скорости, затем шаг по углу
+    p.omega += (-(g / p.L) * Math.sin(p.theta) - p.damping * p.omega) * dt;
+    const prev = p.theta;
+    p.theta += p.omega * dt;
+    p.t += dt;
+    // переход через положение равновесия = половина периода
+    if ((prev > 0 && p.theta <= 0) || (prev < 0 && p.theta >= 0)) {
+      if (!p.crossings) p.crossings = [];
+      p.crossings.push(p.t);
+      if (p.crossings.length > 40) p.crossings.shift();
+      p.periods += 0.5;
+    }
+    return p;
+  }
+
+  // измеренный период по двум полным колебаниям
+  function pendulumMeasured(p) {
+    const c = p.crossings || [];
+    if (c.length < 3) return 0;
+    const n = c.length;
+    // переходы через равновесие идут каждые полпериода: два перехода = целый период
+    return c[n - 1] - c[n - 3];
+  }
+
+  function pendulumEnergy(p) {
+    const g = p.gravityOn ? G : 0;
+    const h = p.L * (1 - Math.cos(p.theta));
+    const v = p.L * p.omega;
+    const ke = 0.5 * p.mass * v * v;
+    return { h: h, Ekin: ke, Epot: p.mass * g * h, total: ke + p.mass * g * h, speed: Math.abs(v) };
+  }
+
+  // теория: T = 2π√(L/g); при больших углах период растёт (поправка первого порядка)
+  function pendulumPeriod(L, theta) {
+    const small = 2 * Math.PI * Math.sqrt(L / G);
+    const amp = Math.abs(theta || 0);
+    return small * (1 + (amp * amp) / 16 + (11 * Math.pow(amp, 4)) / 3072);
+  }
+
+  /* ---------- груз на пружине ---------- */
+
+  function createSpring(opts) {
+    opts = opts || {};
+    return {
+      k: opts.k || 40,          // жёсткость, Н/м
+      mass: opts.mass || 0.5,   // масса груза, кг
+      y: opts.y === undefined ? 0.15 : opts.y,   // смещение от равновесия, м
+      v: 0,
+      damping: opts.damping === undefined ? 0.05 : opts.damping,
+      g: G, t: 0
+    };
+  }
+
+  function stepSpring(s, dt) {
+    dt = dt || DT;
+    // leapfrog: скорость на полушаге, затем координата — энергия не «уползает»
+    s.v += ((-s.k * s.y - s.damping * s.v) / s.mass) * dt;
+    s.y += s.v * dt;
+    s.t += dt;
+    if (!s.crossings) s.crossings = [];
+    const prev = s.prevY;
+    if (prev !== undefined && ((prev > 0 && s.y <= 0) || (prev < 0 && s.y >= 0))) {
+      s.crossings.push(s.t);
+      if (s.crossings.length > 40) s.crossings.shift();
+    }
+    s.prevY = s.y;
+    return s;
+  }
+
+  // измеренный период пружинного маятника: между переходами через равновесие полпериода
+  function springMeasured(s) {
+    const c = s.crossings || [];
+    if (c.length < 3) return 0;
+    return c[c.length - 1] - c[c.length - 3];
+  }
+
+  function springPeriod(k, mass) { return 2 * Math.PI * Math.sqrt(mass / k); }
+
+  function springEnergy(s) {
+    const ke = 0.5 * s.mass * s.v * s.v;
+    const ep = 0.5 * s.k * s.y * s.y;
+    return { y: s.y, Ekin: ke, Epot: ep, total: ke + ep, speed: Math.abs(s.v) };
+  }
+
+  // статическое удлинение под весом груза
+  function springStretch(k, mass) { return mass * G / k; }
+  // закон Гука: F = k·x
+  function hooke(k, x) { return -k * x; }
+
+  /* ---------- задания ---------- */
+
+  const TASKS = [
+    {
+      t: 'Сохранить энергию',
+      goal: 'Скатите груз с горки так, чтобы в нижней точке скорость была не меньше 6 м/с, а полная энергия почти не менялась (потери меньше 15 %).',
+      steps: ['Отключите трение (ползунок «Трение» в 0).', 'Пустите груз с верхней точки трассы.',
+        'Следите за полной энергией E на графике: она должна оставаться ровной.'],
+      hints: ['Полная энергия E = mgh + mv²/2, если трения нет.',
+        'Высота горки 4 м даёт скорость у земли v = √(2gh) ≈ 8,9 м/с.',
+        'Чем меньше трение, тем ровнее линия полной энергии.'],
+      check: function (f) { return f.speedMax >= 6 && f.energyLoss <= 0.15; },
+      stars: function (f) { return f.energyLoss <= 0.08 && f.speedMax >= 7 ? 3 : 2; },
+      why: 'Без трения механическая энергия сохраняется: сколько потенциальной ушло, столько и стало кинетической.'
+    },
+    {
+      t: 'Наклон и высота',
+      goal: 'Снимите скорость в нижней точке при двух разных высотах горки и убедитесь, что v ∝ √h.',
+      steps: ['Задайте высоту 2 м, внизу нажмите «Снять точку».', 'Повторите при высоте 4 м.',
+        'Сравните: скорость должна вырасти в √2 ≈ 1,41 раза.'],
+      hints: ['v = √(2gh) — масса и форма трассы не важны.',
+        'При высоте 2 м v ≈ 6,3 м/с, при 4 м — ≈ 8,9 м/с.',
+        'Отношение скоростей проверяйте по протоколу.'],
+      guess: {
+        prompt: 'Предскажите скорость у земли при высоте 4 м (трение выключено)?',
+        placeholder: 'скорость, м/с',
+        unit: 'м/с',
+        actual: function (f) { return f.speedMax; }
+      },
+      check: function (f) { return f.heightsMeasured >= 2 && f.speedRatio >= 1.3 && f.speedRatio <= 1.55; },
+      stars: function (f) { return f.speedRatio >= 1.38 && f.speedRatio <= 1.46 ? 3 : 2; },
+      why: 'v = √(2gh): скорость зависит только от перепада высот — масса и форма горки её не меняют.'
+    },
+    {
+      t: 'Период маятника',
+      goal: 'Измерьте период маятника при длине 1 м и при 4 м. Период должен увеличиться примерно в 2 раза.',
+      steps: ['Поставьте маятник, длину 1 м, угол 15°.', 'Дождитесь 3–4 колебаний и снимите точку.',
+        'Повторите при длине 4 м.'],
+      hints: ['T = 2π√(L/g): при длине 1 м T ≈ 2 с.',
+        'Увеличение длины в 4 раза даёт период в 2 раза больше.',
+        'Масса груза на период не влияет — проверьте.'],
+      check: function (f) { return f.pendLengths >= 2 && f.periodRatio >= 1.8 && f.periodRatio <= 2.2; },
+      stars: function (f) { return f.periodRatio >= 1.9 && f.periodRatio <= 2.1 ? 3 : 2; },
+      why: 'Период маятника T = 2π√(L/g) зависит от длины и ускорения свободного падения, но не от массы.'
+    },
+    {
+      t: 'Масса не важна',
+      goal: 'Снимите период маятника при двух разных массах груза и при одинаковой длине — периоды должны совпадать.',
+      steps: ['Длина 1 м, угол 15°, масса 0,5 кг — снимите точку.', 'Смените массу на 2 кг, повторите.',
+        'Сравните периоды.'],
+      hints: ['В формуле T = 2π√(L/g) массы нет.',
+        'Отличие в опыте — только за счёт погрешности измерения.',
+        'Разницей меньше 5 % можно пренебречь.'],
+      check: function (f) { return f.pendMasses >= 2 && f.massPeriodDiff <= 0.05; },
+      stars: function (f) { return f.massPeriodDiff <= 0.02 ? 3 : 2; },
+      why: 'Тяжелее груз — больше возвращающая сила, но и больше инертность: они компенсируют друг друга.'
+    },
+    {
+      t: 'Закон Гука',
+      goal: 'Снимите 3 точки растяжения пружины при разных массах грузов и убедитесь, что удлинение пропорционально массе.',
+      steps: ['Подвесьте груз 0,1 кг и снимите точку.', 'Повторите с 0,2 и 0,4 кг.',
+        'Проверьте: удлинение растёт во столько же раз, что и масса.'],
+      hints: ['x = mg/k — удлинение прямо пропорционально массе.',
+        'При жёсткости 40 Н/м груз 0,2 кг растягивает пружину на 4,9 см.',
+        'Меняйте жёсткость пружины и смотрите, как меняется наклон.'],
+      check: function (f) { return f.springPoints >= 3 && f.hookeSpread <= 0.08; },
+      stars: function (f) { return f.hookeSpread <= 0.04 ? 3 : 2; },
+      why: 'Закон Гука: F = kx. Отношение mg/x при разных грузах одинаковое — это и есть жёсткость пружины.'
+    },
+    {
+      t: 'Период пружины',
+      goal: 'Измерьте период колебаний груза на пружине при двух массах: при массе в 4 раза больше период должен удвоиться.',
+      steps: ['Масса 0,2 кг, пружина 40 Н/м — дождитесь колебаний и снимите точку.',
+        'Поставьте массу 0,8 кг, повторите.', 'Сравните периоды.'],
+      hints: ['T = 2π√(m/k).',
+        'Масса в 4 раза больше — период в 2 раза больше.',
+        'Жёсткость в 4 раза больше — период в 2 раза меньше.'],
+      check: function (f) { return f.springMasses >= 2 && f.springPeriodRatio >= 1.8 && f.springPeriodRatio <= 2.2; },
+      stars: function (f) { return f.springPeriodRatio >= 1.9 && f.springPeriodRatio <= 2.1 ? 3 : 2; },
+      why: 'Период пружинного маятника T = 2π√(m/k): тяжелее груз — медленнее колебания, жёстче пружина — быстрее.'
+    },
+    {
+      t: 'Трение забирает энергию',
+      goal: 'Пустите груз с горки с трением 0,15 — механическая энергия должна уменьшиться не меньше чем на 25 %.',
+      steps: ['Поставьте трение 0,15 и высоту 4 м.', 'Спустите груз и дайте ему пройти горку несколько раз.',
+        'Снимите точку и посмотрите на потери энергии.'],
+      hints: ['Трение переводит механическую энергию во внутреннюю — груз и горка нагреваются.',
+        'С каждым проходом амплитуда уменьшается, пока груз не остановится внизу.',
+        'Потери считайте по отношению E(конец)/E(начало).'],
+      check: function (f) { return f.friction >= 0.1 && f.energyLoss >= 0.25; },
+      stars: function (f) { return f.energyLoss >= 0.5 ? 3 : 2; },
+      why: 'Работа силы трения A = −Fтр·s уменьшает механическую энергию: она переходит в тепло, а не исчезает.'
+    },
+    {
+      t: 'Свободное падение',
+      goal: 'Отключите гравитацию, подбросьте груз и включите её снова: убедитесь, что ускорение не зависит от массы (снимите две точки при разных массах).',
+      steps: ['Включите режим «Свободный полёт».', 'Снимите точку при массе 1 кг и при 5 кг.',
+        'Сравните набранную скорость за одинаковое время.'],
+      hints: ['В свободном падении a = g для любого тела.',
+        'Масса влияет только на силу тяжести, но не на ускорение.',
+        'Скатывание по горке — другое дело: там важна форма трассы.'],
+      check: function (f) { return f.freeFallMasses >= 2 && f.freeFallDiff <= 0.1; },
+      stars: function (f) { return f.freeFallDiff <= 0.05 ? 3 : 2; },
+      why: 'Ускорение свободного падения одинаково для всех тел: F = mg, a = F/m = g.'
+    }
+  ];
+
+  /* ---------- сессия измерений ---------- */
+
+  function createLab() {
+    return { measures: [], friction: 0.002, skater: null, pendulum: null, spring: null };
+  }
+
+  function ratio(a, b) { return b > 0.001 ? a / b : 0; }
+
+  function facts(lab) {
+    const m = lab.measures || [];
+    const byKind = function (k) { return m.filter(function (r) { return r.kind === k; }); };
+    const sk = byKind('skate');
+    const pd = byKind('pendulum');
+    const sp = byKind('spring');
+    const f = { measures: m.length, skate: sk.length, pendulum: pd.length, springCount: sp.length };
+
+    // горка
+    const vmax = sk.map(function (r) { return r.speed; });
+    f.speedMax = vmax.length ? Math.max.apply(null, vmax) : 0;
+    f.energyLoss = sk.length
+      ? Math.max(0, Math.max.apply(null, sk.map(function (r) { return r.loss; })))
+      : 0;
+    f.friction = lab.friction;
+    const heights = {};
+    sk.forEach(function (r) {
+      if (r.mode !== 'track') return;
+      heights[Math.round(r.height * 10) / 10] = r.speed;
+    });
+    const hKeys = Object.keys(heights).map(Number).sort(function (a, b) { return a - b; });
+    f.heightsMeasured = hKeys.length;
+    f.speedRatio = hKeys.length >= 2
+      ? ratio(heights[hKeys[hKeys.length - 1]], heights[hKeys[0]]) : 0;
+    // свободное падение: разброс набранной скорости при разных массах
+    const ff = sk.filter(function (r) { return r.mode === 'free'; });
+    const ffm = {};
+    ff.forEach(function (r) { ffm[r.mass] = r.speed; });
+    f.freeFallMasses = Object.keys(ffm).length;
+    const ffv = Object.keys(ffm).map(function (k) { return ffm[k]; });
+    f.freeFallDiff = ffv.length >= 2 ? (Math.max.apply(null, ffv) - Math.min.apply(null, ffv)) / Math.max.apply(null, ffv) : 1;
+
+    // маятник
+    const lenKey = {};
+    pd.forEach(function (r) { lenKey[Math.round(r.L * 100) / 100] = r.period; });
+    f.pendLengths = Object.keys(lenKey).length;
+    const Ls = Object.keys(lenKey).map(Number).sort(function (a, b) { return a - b; });
+    f.periodRatio = Ls.length >= 2 ? ratio(lenKey[Math.max.apply(null, Ls)], lenKey[Math.min.apply(null, Ls)]) : 0;
+    const massKey = {};
+    pd.forEach(function (r) { massKey[Math.round(r.mass * 100) / 100] = r.period; });
+    f.pendMasses = Object.keys(massKey).length;
+    const mv = Object.keys(massKey).map(function (k) { return massKey[k]; });
+    f.massPeriodDiff = mv.length >= 2 ? (Math.max.apply(null, mv) - Math.min.apply(null, mv)) / Math.max.apply(null, mv) : 1;
+
+    // пружина
+    const spMassKey = {}, spK = {};
+    sp.forEach(function (r) {
+      spK[Math.round(r.stretch * 1000)] = r.mass;
+      spMassKey[Math.round(r.mass * 100) / 100 + '|' + Math.round(r.k)] = r.period;
+    });
+    f.springPoints = Object.keys(spK).length;
+    // закон Гука: mg/x при разных грузах должно давать одну жёсткость
+    const kEst = sp.filter(function (r) { return r.stretch > 0.001; }).map(function (r) { return r.mass * G / r.stretch; });
+    f.hookeSpread = kEst.length >= 2
+      ? (Math.max.apply(null, kEst) - Math.min.apply(null, kEst)) / Math.max.apply(null, kEst) : 1;
+    const keyByK = {};
+    sp.forEach(function (r) {
+      keyByK[r.k] = keyByK[r.k] || {};
+      keyByK[r.k][Math.round(r.mass * 100)] = r.period;
+    });
+    const ks = Object.keys(keyByK).filter(function (k) { return Object.keys(keyByK[k]).length >= 2; });
+    f.springMasses = ks.length ? 2 : 0;
+    f.springPeriodRatio = ks.length ? (function () {
+      const cfg = keyByK[ks[0]];
+      const ms = Object.keys(cfg).map(Number).sort(function (a, b) { return a - b; });
+      return ratio(cfg[Math.max.apply(null, ms)], cfg[Math.min.apply(null, ms)]);
+    })() : 0;
+    return f;
+  }
+
+  const API = {
+    G: G, DT: DT,
+    TASKS: TASKS,
+    trackHeight: trackHeight,
+    trackSlope: trackSlope,
+    createSkater: createSkater,
+    stepSkater: stepSkater,
+    skaterEnergy: skaterEnergy,
+    createPendulum: createPendulum,
+    stepPendulum: stepPendulum,
+    pendulumEnergy: pendulumEnergy,
+    pendulumPeriod: pendulumPeriod,
+    pendulumCount: pendulumCount,
+    pendulumMeasured: pendulumMeasured,
+    createSpring: createSpring,
+    stepSpring: stepSpring,
+    springEnergy: springEnergy,
+    springPeriod: springPeriod,
+    springMeasured: springMeasured,
+    springStretch: springStretch,
+    hooke: hooke,
+    createLab: createLab,
+    facts: facts
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.Mech = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* ============================================================
+   Энерджиквантум · mech.ui.js
+   Интерфейс стенда «Механика и энергия»: горка, маятник, пружина.
+   Оформление — как у остальных стендов (Horizon-палитра, ЖК-табло).
+   ============================================================ */
+(function () {
+  'use strict';
+  var M = window.Mech;
+  if (!M || !document.getElementById('benchMech')) return;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var lab = M.createLab();
+  var sk = null, pd = null, sp = null;
+  var scene = 'skate';                       // skate | pendulum | spring
+  var solved = {}, taskIndex = 0, playing = true, speed = 1;
+  var tickTask = 0, lastFrame = 0;
+
+  function n(v, d) { return Number(v || 0).toFixed(d === undefined ? 1 : d).replace('.', ','); }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  var css = document.createElement('style');
+  UI.text(css, `
+  .mech main{display:grid;grid-template-columns:250px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
+  .mech .lctl{overflow:auto}
+  .mech .fld{margin-bottom:9px;padding:0 9px}
+  .mech .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .mech .fld .top b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .mech .seg{display:flex;gap:2px;background:#e8eef5;border-radius:8px;padding:2px;margin:0 9px 9px}
+  .mech .seg button{flex:1;padding:4px 2px;font-size:11px;border-radius:5px;color:var(--muted)}
+  .mech .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(20,40,90,.16)}
+  .mech .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 9px}
+  .mech .chk input{width:15px;height:15px;accent-color:var(--accent)}
+  .mstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid #c4d0da;background:#f4f8fb;overflow:hidden}
+  .mstage svg{width:100%;height:100%;display:block}
+  .mech .bottombar.collapsed{height:36px!important;flex:0 0 36px}
+  .mech .bottombar.collapsed .tabbody{display:none}
+  .mech .mtable{width:100%;border-collapse:collapse;font-size:11px}
+  .mech .mtable th,.mech .mtable td{padding:3px 8px;text-align:right;border-bottom:1px solid #eef2f6}
+  .mech .mtable th{color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
+  .mech .mtable th:first-child,.mech .mtable td:first-child{text-align:left}
+  .mech .energy{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;padding:9px}
+  .mech .energy .cell{background:#f6f9fc;border:1px solid #d7e2ec;border-radius:9px;padding:5px 7px}
+  .mech .energy .k{font-size:9.5px;letter-spacing:.4px;color:var(--muted);text-transform:uppercase}
+  .mech .energy .v{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+  .mech .energy .v small{font-size:10px;color:var(--muted)}
+  .mech .taskitem{padding:4px 7px;font-size:11.5px}
+  @media (max-width:1180px){.mech main{grid-template-columns:226px minmax(360px,1fr) 296px}}
+  @media (max-width:980px){.mech main{grid-template-columns:1fr}.mstage{min-height:360px}}
+  @media (max-height:860px){.mstage{min-height:260px}}
+  `);
+  document.head.appendChild(css);
+
+  var main = $('benchMech');
+  main.className = 'mech';
+
+  UI.html(main, `
+    <aside class="panel lctl">
+      <h2>Опыт</h2>
+      <div class="seg" id="mScene">
+        <button data-scene="skate" class="active">Горка</button>
+        <button data-scene="pendulum">Маятник</button>
+        <button data-scene="spring">Пружина</button>
+      </div>
+
+      <div id="mSkateBox">
+        <div class="fld"><div class="top"><span>Высота горки</span><b id="mHv">4,0 м</b></div>
+          <input type="range" id="mH" min="1" max="8" step="0.5" value="4"></div>
+        <div class="fld"><div class="top"><span>Масса груза</span><b id="mMv">60 кг</b></div>
+          <input type="range" id="mM" min="10" max="120" step="5" value="60"></div>
+        <div class="fld"><div class="top"><span>Трение</span><b id="mFv">0,002</b></div>
+          <input type="range" id="mF" min="0" max="0.05" step="0.001" value="0.002"></div>
+        <div class="seg" id="mShape">
+          <button data-shape="valley" class="active">Ложбина</button>
+          <button data-shape="ramp">Спуск</button>
+          <button data-shape="hill">Горб</button>
+        </div>
+        <div class="chk"><input type="checkbox" id="mGrav" checked><label for="mGrav">Гравитация включена</label></div>
+        <button class="btn primary" id="mDrop" style="margin:6px 9px 10px;width:calc(100% - 18px)">Пустить груз с верхней точки</button>
+      </div>
+
+      <div id="mPendBox" hidden>
+        <div class="fld"><div class="top"><span>Длина нити</span><b id="mLv">1,00 м</b></div>
+          <input type="range" id="mL" min="0.2" max="4" step="0.1" value="1"></div>
+        <div class="fld"><div class="top"><span>Масса груза</span><b id="mPmv">1,0 кг</b></div>
+          <input type="range" id="mPm" min="0.2" max="5" step="0.1" value="1"></div>
+        <div class="fld"><div class="top"><span>Начальный угол</span><b id="mAv">20°</b></div>
+          <input type="range" id="mA" min="5" max="80" step="1" value="20"></div>
+        <div class="fld"><div class="top"><span>Затухание</span><b id="mDv">0,002</b></div>
+          <input type="range" id="mD" min="0" max="0.05" step="0.001" value="0.002"></div>
+        <button class="btn primary" id="mSwing" style="margin:6px 9px 10px;width:calc(100% - 18px)">Запустить маятник</button>
+      </div>
+
+      <div id="mSpringBox" hidden>
+        <div class="fld"><div class="top"><span>Жёсткость пружины</span><b id="mKv">40 Н/м</b></div>
+          <input type="range" id="mK" min="5" max="200" step="5" value="40"></div>
+        <div class="fld"><div class="top"><span>Масса груза</span><b id="mSmv">0,20 кг</b></div>
+          <input type="range" id="mSm" min="0.05" max="2" step="0.05" value="0.2"></div>
+        <div class="fld"><div class="top"><span>Начальное смещение</span><b id="mXv">10 см</b></div>
+          <input type="range" id="mX" min="1" max="30" step="1" value="10"></div>
+        <div class="fld"><div class="top"><span>Затухание</span><b id="mSdv">0,05</b></div>
+          <input type="range" id="mSd" min="0" max="1" step="0.01" value="0.05"></div>
+        <button class="btn primary" id="mPull" style="margin:6px 9px 10px;width:calc(100% - 18px)">Отпустить груз</button>
+      </div>
+
+      <h2>Время</h2>
+      <div class="seg" id="mSpeed">
+        <button data-speed="0.25">×0,25</button>
+        <button data-speed="1" class="active">×1</button>
+        <button data-speed="2">×2</button>
+      </div>
+      <div class="chk"><input type="checkbox" id="mPlay" checked><label for="mPlay">Модель идёт</label></div>
+      <button class="btn" id="mSample" style="margin:8px 9px;width:calc(100% - 18px)">＋ Снять точку</button>
+    </aside>
+
+    <section class="stagewrap">
+      <div class="mstage" id="mStage">
+        <svg id="mSvg" viewBox="0 0 760 470" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="bottombar panel">
+        <div class="tabs">
+          <button class="active" data-tab="meas">Протокол <span class="badge" id="mCount"></span></button>
+          <div class="grow"></div>
+          <button class="btn ghost tiny" id="mCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+        </div>
+        <div class="tabbody" id="mTabMeas"></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card task">
+        <h2>Задание <span class="badge" id="mTaskId">1 / 8</span></h2>
+        <div class="body" id="mTaskBody"></div>
+        <div class="tasklist" id="mTaskList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Энергия</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>E ПОЛНАЯ, Дж</span><span id="mCapKind">горка</span></div>
+            <div class="main" id="mLcdE">0</div>
+            <div class="sub" id="mLcdSub">потенциальная + кинетическая</div>
+          </div>
+        </div>
+        <div class="energy">
+          <div class="cell"><div class="k">E кин.</div><div class="v" id="mEk">0 <small>Дж</small></div></div>
+          <div class="cell"><div class="k">E пот.</div><div class="v" id="mEp">0 <small>Дж</small></div></div>
+          <div class="cell"><div class="k">Скорость</div><div class="v" id="mV">0 <small>м/с</small></div></div>
+          <div class="cell"><div class="k">Высота</div><div class="v" id="mY">0 <small>м</small></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Показания</h2>
+        <div class="body" id="mRead">
+          <div class="muted" style="font-size:12px">Выберите опыт слева и запустите модель.</div>
+        </div>
+      </div>
+    </aside>
+  `);
+
+  /* ---------- сцена ---------- */
+
+  function svg() { return $('mSvg'); }
+
+  function drawScene() {
+    var s = svg();
+    if (scene === 'skate') drawSkate(s);
+    else if (scene === 'pendulum') drawPendulum(s);
+    else drawSpring(s);
+  }
+
+  function ground(y) {
+    return '<rect x="0" y="' + y + '" width="760" height="' + (470 - y) + '" fill="#dfe9f2"/>' +
+      '<line x1="0" y1="' + y + '" x2="760" y2="' + y + '" stroke="#b8c9d6" stroke-width="2"/>';
+  }
+
+  function drawSkate() {
+    var prof = sk.profile;
+    var W = 620, H = 320, x0 = 70, y0 = 420;
+    var pts = [];
+    for (var i = 0; i <= 80; i++) {
+      var x = prof.length * i / 80;
+      var y = M.trackHeight(prof, x);
+      pts.push([x0 + (x / prof.length) * W, y0 - (y / Math.max(1, prof.height)) * H]);
+    }
+    var path = 'M' + pts.map(function (p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' L');
+    UI.html(svg(),
+      '<defs><linearGradient id="mTrackG" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#8fc7e8"/><stop offset="100%" stop-color="#2e7fb8"/></linearGradient></defs>' +
+      ground(y0 + 4) +
+      '<path d="' + path + ' L' + (x0 + W) + ' ' + (y0 + 4) + ' L' + x0 + ' ' + (y0 + 4) + ' Z" fill="url(#mTrackG)" opacity=".35"/>' +
+      '<path d="' + path + '" fill="none" stroke="#2e7fb8" stroke-width="5" stroke-linecap="round"/>' +
+      '<g id="mSkaterG"><circle cx="0" cy="0" r="14" fill="#f07d20" stroke="#1b3e8f" stroke-width="3"/>' +
+      '<circle cx="0" cy="0" r="5" fill="#fff"/></g>' +
+      '<text id="mSkaterT" x="0" y="0" text-anchor="middle" font-size="12" font-weight="700" fill="#1b3e8f" font-family="sans-serif"></text>' +
+      '<text x="' + (x0 + W / 2) + '" y="455" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' +
+      'высота горки ' + n(prof.height) + ' м · трение ' + n(sk.friction, 3) + '</text>' +
+      '<text x="' + x0 + '" y="60" font-size="12" font-weight="700" fill="#1f4a76" font-family="sans-serif">' +
+      'полная энергия E = mgh + mv²/2</text>' +
+      '<g id="mEbarG"><rect x="' + x0 + '" y="72" width="0" height="10" rx="5" fill="#2ea3dc"/></g>');
+    moveSkater();
+  }
+
+  function moveSkater() {
+    var g = $('mSkaterG');
+    if (!g || !sk) return;
+    var prof = sk.profile, W = 620, H = 320, x0 = 70, y0 = 420;
+    var px = x0 + (sk.x / prof.length) * W;
+    var py = y0 - (sk.y / Math.max(1, prof.height)) * H;
+    UI.attr(g, 'transform', 'translate(' + px.toFixed(1) + ',' + (py - 16).toFixed(1) + ')');
+    var t = document.getElementById('mSkaterT');
+    if (t) {
+      t.setAttribute('x', px.toFixed(1));
+      t.setAttribute('y', (py - 38).toFixed(1));
+      t.textContent = n(Math.abs(sk.v), 1) + ' м/с';
+    }
+    var bar = document.getElementById('mEbarG');
+    if (bar) {
+      var e = M.skaterEnergy(sk);
+      var e0 = Math.max(1, sk.mass * M.G * sk.profile.height);
+      bar.firstChild.setAttribute('width', Math.max(2, Math.min(620, 620 * e.total / e0)).toFixed(1));
+    }
+  }
+
+  function drawPendulum() {
+    var Lpx = 60 + (pd.L / 4) * 260;
+    var cx = 380, cy = 90;
+    UI.html(svg(),
+      ground(420) +
+      '<line x1="' + cx + '" y1="' + cy + '" x2="' + cx + '" y2="' + (cy + Lpx) + '" stroke="#6b7c8b" stroke-width="2"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="7" fill="#1b3e8f"/>' +
+      '<g id="mBob"><circle cx="0" cy="0" r="' + (10 + Math.min(pd.mass, 5) * 3) + '" fill="#2ea3dc" stroke="#1b3e8f" stroke-width="3"/></g>' +
+      '<g id="mRod"><line x1="0" y1="0" x2="0" y2="' + Lpx + '" stroke="#95a9b8" stroke-width="2"/></g>' +
+      '<line id="mArc" x1="' + cx + '" y1="' + (cy + Lpx) + '" x2="' + cx + '" y2="' + (cy + Lpx) + '" stroke="#f07d20" stroke-width="2" stroke-dasharray="4 4"/>' +
+      '<text x="' + cx + '" y="450" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' +
+      'L = ' + n(pd.L, 2) + ' м · m = ' + n(pd.mass) + ' кг · T ≈ ' + n(M.pendulumPeriod(pd.L, pd.theta), 2) + ' с</text>');
+    moveBob();
+  }
+
+  function moveBob() {
+    var bob = $('mBob'), rod = $('mRod');
+    if (!bob || !pd) return;
+    var Lpx = 60 + (pd.L / 4) * 260;
+    var cx = 380, cy = 90;
+    var bx = cx + Lpx * Math.sin(pd.theta), by = cy + Lpx * Math.cos(pd.theta);
+    UI.attr(bob, 'transform', 'translate(' + bx.toFixed(1) + ',' + by.toFixed(1) + ')');
+    UI.attr(rod, 'transform', 'translate(' + cx + ',' + cy + ') rotate(' + (pd.theta * 180 / Math.PI).toFixed(1) + ')');
+    var arc = $('mArc');
+    if (arc) {
+      arc.setAttribute('x1', cx); arc.setAttribute('y1', cy + Lpx);
+      arc.setAttribute('x2', bx.toFixed(1)); arc.setAttribute('y2', by.toFixed(1));
+    }
+  }
+
+  var PX_PER_M = 300;   // масштаб сцены пружины
+
+  function springGeom() {
+    var ceilY = 86;
+    var stretch = M.springStretch(sp.k, sp.mass);      // м, под весом груза
+    var eqY = ceilY + 40 + stretch * PX_PER_M;         // положение равновесия
+    var massY = eqY + sp.y * PX_PER_M;                 // с учётом колебаний
+    return { ceilY: ceilY, eqY: eqY, massY: massY, stretch: stretch };
+  }
+
+  function coilsPath(y1, y2, kx) {
+    var nC = 9, a = 24, span = Math.max(30, y2 - y1);
+    var top = y1, bot = y2;
+    var pts = [[kx, top]];
+    var body = span - 18;
+    for (var i = 0; i < nC * 2 + 1; i++) {
+      var yy = top + 9 + body * (i + 0.5) / (nC * 2 + 1);
+      pts.push([kx + (i % 2 === 0 ? -a : a), yy]);
+    }
+    pts.push([kx, bot - 9]);
+    pts.push([kx, bot]);
+    return '<polyline points="' + pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ') +
+      '" fill="none" stroke="#7ea9c4" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  }
+
+  function drawSpring() {
+    var g = springGeom(), kx = 380;
+    var body = '<text x="' + kx + '" y="450" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' +
+      'k = ' + n(sp.k, 0) + ' Н/м · статическое растяжение ' + n(g.stretch * 100, 1) + ' см · T ≈ ' +
+      n(M.springPeriod(sp.k, sp.mass), 2) + ' с</text>';
+    UI.html(svg(),
+      ground(432) +
+      '<rect x="' + (kx - 80) + '" y="' + (g.ceilY - 14) + '" width="160" height="14" rx="4" fill="#1b3e8f"/>' +
+      '<line x1="120" y1="' + g.eqY.toFixed(1) + '" x2="260" y2="' + g.eqY.toFixed(1) + '" stroke="#b8c9d6" stroke-width="1" stroke-dasharray="5 5"/>' +
+      '<text x="120" y="' + (g.eqY - 8).toFixed(1) + '" font-size="11" fill="#6b7c8b" font-family="sans-serif">равновесие</text>' +
+      '<g id="mSpringBody"></g>' + body);
+    renderSpringBody();
+  }
+
+  function renderSpringBody() {
+    var box = $('mSpringBody');
+    if (!box || !sp) return;
+    var g = springGeom(), kx = 380, bw = 70, bh = 44;
+    box.innerHTML = coilsPath(g.ceilY, g.massY, kx) +
+      '<rect x="' + (kx - bw / 2) + '" y="' + (g.massY - 4).toFixed(1) + '" width="' + bw + '" height="' + bh +
+      '" rx="8" fill="#f07d20" stroke="#1b3e8f" stroke-width="3"/>' +
+      '<text x="' + kx + '" y="' + (g.massY + 22).toFixed(1) + '" text-anchor="middle" font-size="12" font-weight="700" ' +
+      'fill="#fff" font-family="sans-serif">' + n(sp.mass, 2) + ' кг</text>';
+  }
+
+  function moveSpring() { renderSpringBody(); }
+
+  /* ---------- управление ---------- */
+
+  function resetSkater() {
+    sk = M.createSkater({ shape: currentShape, length: 10, height: currentHeight }, currentMass);
+    sk.friction = lab.friction;
+    sk.gravityOn = $('mGrav').checked;
+    drawScene();
+    renderReadout();
+  }
+  var currentShape = 'valley', currentHeight = 4, currentMass = 60;
+
+  function resetPendulum() {
+    pd = M.createPendulum({
+      L: parseFloat($('mL').value), mass: parseFloat($('mPm').value),
+      theta: parseFloat($('mA').value) * Math.PI / 180, damping: parseFloat($('mD').value)
+    });
+    drawScene();
+    renderReadout();
+  }
+
+  function resetSpring() {
+    sp = M.createSpring({
+      k: parseFloat($('mK').value), mass: parseFloat($('mSm').value),
+      y: parseFloat($('mX').value) / 100, damping: parseFloat($('mSd').value)
+    });
+    sp.y0 = sp.y;
+    drawScene();
+    renderReadout();
+  }
+
+  function bindRange(id, out, fmt, onInput) {
+    $(id).oninput = function () {
+      UI.text($(out), fmt(parseFloat(this.value)));
+      if (onInput) onInput(parseFloat(this.value));
+    };
+  }
+
+  bindRange('mH', 'mHv', function (v) { return n(v) + ' м'; }, function (v) { currentHeight = v; resetSkater(); });
+  bindRange('mM', 'mMv', function (v) { return n(v, 0) + ' кг'; }, function (v) { currentMass = v; resetSkater(); });
+  bindRange('mF', 'mFv', function (v) { return n(v, 3); }, function (v) { lab.friction = v; if (sk) sk.friction = v; drawScene(); });
+  bindRange('mL', 'mLv', function (v) { return n(v, 2) + ' м'; }, function () { resetPendulum(); });
+  bindRange('mPm', 'mPmv', function (v) { return n(v) + ' кг'; }, function () { resetPendulum(); });
+  bindRange('mA', 'mAv', function (v) { return n(v, 0) + '°'; }, function () { resetPendulum(); });
+  bindRange('mD', 'mDv', function (v) { return n(v, 3); }, function () { resetPendulum(); });
+  bindRange('mK', 'mKv', function (v) { return n(v, 0) + ' Н/м'; }, function () { resetSpring(); });
+  bindRange('mSm', 'mSmv', function (v) { return n(v, 2) + ' кг'; }, function () { resetSpring(); });
+  bindRange('mX', 'mXv', function (v) { return n(v, 0) + ' см'; }, function () { resetSpring(); });
+  bindRange('mSd', 'mSdv', function (v) { return n(v, 2); }, function () { resetSpring(); });
+
+  $('mGrav').onchange = function () { if (sk) sk.gravityOn = this.checked; if (pd) pd.gravityOn = this.checked; };
+  $('mPlay').onchange = function () { playing = this.checked; };
+
+  [].forEach.call($('mScene').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('mScene').children, function (x) { x.classList.toggle('active', x === b); });
+      scene = b.dataset.scene;
+      $('mSkateBox').hidden = scene !== 'skate';
+      $('mPendBox').hidden = scene !== 'pendulum';
+      $('mSpringBox').hidden = scene !== 'spring';
+      if (scene === 'skate') resetSkater();
+      if (scene === 'pendulum') resetPendulum();
+      if (scene === 'spring') resetSpring();
+    };
+  });
+
+  [].forEach.call($('mShape').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('mShape').children, function (x) { x.classList.toggle('active', x === b); });
+      currentShape = b.dataset.shape;
+      resetSkater();
+    };
+  });
+
+  [].forEach.call($('mSpeed').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('mSpeed').children, function (x) { x.classList.toggle('active', x === b); });
+      speed = parseFloat(b.dataset.speed);
+    };
+  });
+
+  $('mDrop').onclick = function () {
+    resetSkater();
+    sk.x = 0.02; sk.y = M.trackHeight(sk.profile, 0.02); sk.v = 0;
+    playing = true; $('mPlay').checked = true;
+    log('ok', 'Груз пущен с верхней точки: h = ' + n(sk.profile.height) + ' м, масса ' + n(sk.mass, 0) + ' кг');
+  };
+  $('mSwing').onclick = function () {
+    resetPendulum();
+    playing = true; $('mPlay').checked = true;
+    log('ok', 'Маятник запущен: L = ' + n(pd.L, 2) + ' м, угол ' + n(pd.theta * 180 / Math.PI, 0) + '°');
+  };
+  $('mPull').onclick = function () {
+    resetSpring();
+    playing = true; $('mPlay').checked = true;
+    log('ok', 'Груз отпущен: k = ' + n(sp.k, 0) + ' Н/м, m = ' + n(sp.mass, 2) + ' кг');
+  };
+
+  /* ---------- показания ---------- */
+
+  function renderReadout() {
+    var e;
+    if (scene === 'skate') e = M.skaterEnergy(sk);
+    else if (scene === 'pendulum') e = M.pendulumEnergy(pd);
+    else e = M.springEnergy(sp);
+
+    UI.text($('mLcdE'), n(e.total, 0));
+    UI.text($('mEk'), n(e.Ekin, 0) + ' Дж');
+    UI.text($('mEp'), n(e.Epot, 0) + ' Дж');
+    UI.text($('mV'), n(e.speed, 1) + ' м/с');
+    UI.text($('mY'), scene === 'spring' ? n(sp.y * 100, 1) + ' см' : n(e.y === undefined ? (e.h || 0) : e.y, 2) + ' м');
+    UI.text($('mCapKind'), scene === 'skate' ? 'горка' : (scene === 'pendulum' ? 'маятник' : 'пружина'));
+
+    var read = '';
+    if (scene === 'skate') {
+      read = '<div class="row"><span>Скорость</span><b>' + n(Math.abs(sk.v), 2) + ' м/с</b></div>' +
+        '<div class="row"><span>Высота над низом</span><b>' + n(sk.y, 2) + ' м</b></div>' +
+        '<div class="row"><span>Полная энергия</span><b>' + n(e.total, 0) + ' Дж</b></div>' +
+        '<div class="row"><span>Трение</span><b>' + n(sk.friction, 3) + '</b></div>' +
+        '<div class="tiny muted" style="margin-top:6px">E = mgh + mv²/2. При нулевом трении сумма не меняется.</div>';
+    } else if (scene === 'pendulum') {
+      var T = M.pendulumMeasured(pd);
+      read = '<div class="row"><span>Угол</span><b>' + n(pd.theta * 180 / Math.PI, 1) + '°</b></div>' +
+        '<div class="row"><span>Период (измерен)</span><b>' + (T > 0 ? n(T, 2) + ' с' : 'мало колебаний') + '</b></div>' +
+        '<div class="row"><span>Период (формула)</span><b>' + n(M.pendulumPeriod(pd.L, Math.abs(pd.theta) || 0.26), 2) + ' с</b></div>' +
+        '<div class="row"><span>Скорость груза</span><b>' + n(Math.abs(pd.omega * pd.L), 2) + ' м/с</b></div>' +
+        '<div class="tiny muted" style="margin-top:6px">T = 2π√(L/g). Масса на период не влияет.</div>';
+    } else {
+      var Ts = M.springMeasured(sp);
+      read = '<div class="row"><span>Смещение от равновесия</span><b>' + n(sp.y * 100, 1) + ' см</b></div>' +
+        '<div class="row"><span>Сила Гука</span><b>' + n(Math.abs(M.hooke(sp.k, sp.y)) * -1, 2) + ' Н</b></div>' +
+        '<div class="row"><span>Статическое растяжение</span><b>' + n(M.springStretch(sp.k, sp.mass) * 100, 1) + ' см</b></div>' +
+        '<div class="row"><span>Период (измерен)</span><b>' + (Ts > 0 ? n(Ts, 2) + ' с' : 'мало колебаний') + '</b></div>' +
+        '<div class="tiny muted" style="margin-top:6px">T = 2π√(m/k). Жёстче пружина — быстрее колебания.</div>';
+    }
+    UI.html($('mRead'), read);
+  }
+
+  /* ---------- протокол ---------- */
+
+  function sample() {
+    var f = M.facts(lab);
+    var rec = { t: Date.now() / 1000, scene: scene };
+    if (scene === 'skate') {
+      var e = M.skaterEnergy(sk);
+      var e0 = sk.mass * M.G * sk.profile.height;
+      rec = Object.assign(rec, {
+        kind: 'skate', mode: sk.track === false ? 'free' : 'track',
+        speed: Math.max(Math.abs(sk.v), sk.vmax || 0), height: sk.profile.height, mass: sk.mass,
+        loss: Math.max(0, 1 - e.total / Math.max(1, e0)), energy: e.total, friction: sk.friction
+      });
+    } else if (scene === 'pendulum') {
+      rec = Object.assign(rec, {
+        kind: 'pendulum', L: pd.L, mass: pd.mass, period: M.pendulumMeasured(pd),
+        theta: pd.theta, damping: pd.damping
+      });
+    } else {
+      rec = Object.assign(rec, {
+        kind: 'spring', k: sp.k, mass: sp.mass, stretch: M.springStretch(sp.k, sp.mass),
+        period: M.springMeasured(sp), y: sp.y
+      });
+    }
+    lab.measures.push(rec);
+    log('ok', 'Точка: ' + describe(rec));
+    renderMeasurements();
+    syncTask(false);
+  }
+
+  function describe(r) {
+    if (r.kind === 'skate') return 'скорость ' + n(r.speed, 2) + ' м/с при высоте ' + n(r.height) + ' м';
+    if (r.kind === 'pendulum') return 'период ' + n(r.period, 2) + ' с при длине ' + n(r.L, 2) + ' м';
+    return 'период ' + n(r.period, 2) + ' с при m = ' + n(r.mass, 2) + ' кг';
+  }
+
+  function renderMeasurements() {
+    var box = $('mTabMeas');
+    UI.text($('mCount'), lab.measures.length || '');
+    if (!lab.measures.length) {
+      UI.html(box, '<div class="empty-note">Запустите опыт и нажмите «Снять точку».</div>');
+      return;
+    }
+    UI.html(box, '<table class="mtable"><thead><tr><th>Опыт</th><th>Параметры</th><th>Результат</th></tr></thead><tbody>' +
+      lab.measures.map(function (r) {
+        var p = r.kind === 'skate' ? ('h = ' + n(r.height) + ' м, m = ' + n(r.mass, 0) + ' кг')
+          : r.kind === 'pendulum' ? ('L = ' + n(r.L, 2) + ' м, m = ' + n(r.mass) + ' кг')
+            : ('k = ' + n(r.k, 0) + ' Н/м, m = ' + n(r.mass, 2) + ' кг');
+        return '<tr><td>' + ({ skate: 'горка', pendulum: 'маятник', spring: 'пружина' }[r.kind]) + '</td>' +
+          '<td>' + p + '</td><td>' + describe(r) + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  $('mCsv').onclick = function () {
+    var lines = ['Опыт;Параметры;Результат'];
+    lab.measures.forEach(function (r) { lines.push([r.kind, r.height || r.L || r.k, describe(r)].join(';')); });
+    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mechanics-protocol.csv';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  };
+
+  $('mSample').onclick = sample;
+
+  /* ---------- задания ---------- */
+
+  function syncTask(show) {
+    var tk = M.TASKS[taskIndex];
+    var f = M.facts(lab);
+    var okNow = false;
+    try { okNow = tk.check(f); } catch (e) { okNow = false; }
+    if (okNow && !solved[taskIndex]) {
+      solved[taskIndex] = tk.stars(f);
+      renderTask();
+      log('ok', '★ Задание «' + tk.t + '» выполнено (' + solved[taskIndex] + ' из 3)');
+    }
+    if (show) {
+      UI.html($('mCheckOut'), okNow
+        ? '<div class="hintline">✅ Условие выполнено' + (solved[taskIndex] ? ' — ' + '★'.repeat(solved[taskIndex]) : '') + '</div>'
+        : '<div class="hintline">Пока не выполнено: ' + esc(tk.goal) + '</div>');
+    }
+  }
+
+  function renderTask() {
+    var tk = M.TASKS[taskIndex];
+    var done = solved[taskIndex];
+    UI.text($('mTaskId'), (taskIndex + 1) + ' / ' + M.TASKS.length);
+    UI.html($('mTaskBody'),
+      '<div class="goal"><b>' + esc(tk.t) + '</b><br>' + esc(tk.goal) + '</div>' +
+      '<ol>' + tk.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
+      (done ? '<div class="checkout"><div class="hintline">★'.repeat(done) + ' ' + esc(tk.why) + '</div></div>' : '') +
+      '<div class="row" style="gap:6px;margin-top:6px">' +
+      '<button class="btn ghost tiny" id="mHint">Подсказка</button>' +
+      '<button class="btn primary tiny" id="mCheck">Проверить</button></div>' +
+      '<div class="checkout" id="mCheckOut"></div>');
+    UI.html($('mTaskList'), M.TASKS.map(function (t, i) {
+      return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
+        '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + esc(t.t) + '</span></button>';
+    }).join(''));
+    $('mHint').onclick = function () {
+      tk._h = tk._h || 0;
+      var hint = tk.hints[tk._h % tk.hints.length];
+      tk._h++;
+      UI.html($('mCheckOut'), '<div class="hintline">💡 ' + esc(hint) + '</div>');
+    };
+    $('mCheck').onclick = function () { syncTask(true); };
+    [].forEach.call($('mTaskList').children, function (b) {
+      b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); };
+    });
+  }
+
+  /* ---------- журнал ---------- */
+
+  var logEl, logRows = [];
+  function log(kind, text) {
+    var row = { kind: kind, text: text, t: new Date() };
+    logRows.push(row);
+    if (logRows.length > 60) logRows.shift();
+    renderLog();
+  }
+  function renderLog() {
+    if (!logEl) return;
+    UI.html(logEl, logRows.slice(-20).map(function (r) {
+      return '<div class="jrow ' + r.kind + '"><span class="tm">' +
+        (r.t.getHours() < 10 ? '0' : '') + r.t.getHours() + ':' + (r.t.getMinutes() < 10 ? '0' : '') + r.t.getMinutes() +
+        '</span><span class="tx">' + esc(r.text) + '</span></div>';
+    }).join(''));
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /* ---------- анимация ---------- */
+
+  function frame(ts) {
+    var dt = lastFrame ? Math.min(0.05, (ts - lastFrame) / 1000) : 0.016;
+    lastFrame = ts;
+    if (window.__bench === 'mech' && playing) {
+      var steps = Math.min(40, Math.round((dt * speed) / M.DT));
+      for (var i = 0; i < steps; i++) {
+        if (scene === 'skate' && sk) M.stepSkater(sk, M.DT);
+        else if (scene === 'pendulum' && pd) M.stepPendulum(pd, M.DT);
+        else if (scene === 'spring' && sp) M.stepSpring(sp, M.DT);
+      }
+      if (scene === 'skate') moveSkater();
+      else if (scene === 'pendulum') moveBob();
+      else moveSpring();
+      renderReadout();
+      if (playing) syncTaskSilent();
+    }
+    requestAnimationFrame(frame);
+  }
+  var tick = 0;
+  function syncTaskSilent() {
+    tick += 0.016;
+    if (tick < 0.7) return;
+    tick = 0;
+    var tk = M.TASKS[taskIndex];
+    var f = M.facts(lab);
+    if (!solved[taskIndex] && tk.check(f)) {
+      solved[taskIndex] = tk.stars(f);
+      renderTask();
+    }
+  }
+
+  /* ---------- старт ---------- */
+
+  resetSkater();
+  renderTask();
+  renderMeasurements();
+  renderReadout();
+  requestAnimationFrame(frame);
+
+  window.__mech = {
+    lab: lab, state: function () { return { scene: scene, sk: sk, pd: pd, sp: sp }; },
+    facts: function () { return M.facts(lab); },
+    sample: sample, solved: function () { return solved; }, M: M,
+    scene: function (s) {
+      var b = $('mScene').querySelector('[data-scene="' + s + '"]');
+      if (b) b.click();
+    }
+  };
+})();
+</script>
+<script>/* ============================================================
+   Энерджиквантум · thermal.js — стенд «Тепло и газы»
+   Модель в духе PhET: Gas Properties, Energy Forms and Changes.
+   Не зависит от DOM: тестируется в Node, используется в браузере.
+   ============================================================ */
+(function (root) {
+  'use strict';
+
+  const R = 8.314;            // универсальная газовая постоянная, Дж/(моль·К)
+  const C_WATER = 4200;       // удельная теплоёмкость воды, Дж/(кг·К)
+  const C_ALU = 900;          // алюминий, Дж/(кг·К)
+  const C_IRON = 450;         // железо, Дж/(кг·К)
+  const K_B = 1.380649e-23;   // постоянная Больцмана, Дж/К
+  const N_A = 6.02214076e23;
+  // молярные массы (кг/моль) — в формуле v = √(3kT/m) нужна масса ОДНОЙ молекулы,
+  // поэтому делим на число Авогадро
+  const MOLAR = { light: 28e-3, heavy: 131e-3 };   // N₂ и Xe
+
+  /* ---------- идеальный газ ---------- */
+
+  function createGas(opts) {
+    opts = opts || {};
+    return {
+      volume: opts.volume || 10,          // объём, л
+      temp: opts.temp || 300,             // температура, К
+      moles: opts.moles === undefined ? 0.4 : opts.moles,   // количество вещества, моль
+      particle: opts.particle || 'light', // сорт частиц
+      heatOn: false, powerHeat: 50,       // нагреватель, Вт
+      coolOn: false, powerCool: 40,       // охладитель, Вт
+      t: 0
+    };
+  }
+
+  // p = nRT/V — давление в кПа (V в литрах, поэтому 1 л = 1e-3 м³)
+  function gasPressure(g) {
+    return (g.moles * R * g.temp) / (g.volume * 1e-3) / 1000;
+  }
+
+  // средняя кинетическая энергия молекулы и средняя скорость
+  function gasMolecule(g) {
+    const e = 1.5 * K_B * g.temp;
+    const molar = MOLAR[g.particle] || MOLAR.light;
+    const m = molar / N_A;                              // масса одной молекулы, кг
+    return { energy: e, speed: Math.sqrt((3 * K_B * g.temp) / m), mass: m, molar: molar };
+  }
+
+  // внутренняя энергия газа U = 3/2·nRT (одноатомный приближение для оценок)
+  function gasInternal(g) { return 1.5 * g.moles * R * g.temp; }
+
+  function stepGas(g, dt) {
+    dt = dt || 1 / 60;
+    const n = Math.max(0.001, g.moles);
+    // теплоёмкость при постоянном объёме: Cv = 3/2·nR (в Дж/К)
+    const cV = 1.5 * n * R;
+    let dT = 0;
+    if (g.heatOn) dT += (g.powerHeat * dt) / cV;
+    if (g.coolOn) dT -= (g.powerCool * dt) / cV;
+    // остывание к температуре среды (теплообмен со стенками)
+    dT -= (g.temp - 300) * 0.02 * dt;
+    g.temp = Math.max(1, g.temp + dT);
+    g.t += dt;
+    return g;
+  }
+
+  // изотермический процесс: p₁V₁ = p₂V₂
+  function boyle(g, newVolume) {
+    const p1 = gasPressure(g);
+    const v1 = g.volume;
+    const p2 = (p1 * v1) / newVolume;
+    return { p1: p1, p2: p2, v1: v1, v2: newVolume, k: p1 * v1 };
+  }
+
+  // изобарное расширение: V/T = const
+  function charles(g, newTemp) {
+    return { v1: g.volume, t1: g.temp, v2: g.volume * newTemp / g.temp, t2: newTemp };
+  }
+
+  /* ---------- теплообмен ---------- */
+
+  function createCalorimeter(opts) {
+    opts = opts || {};
+    return {
+      mHot: opts.mHot || 0.2, tHot: opts.tHot || 80,
+      mCold: opts.mCold || 0.2, tCold: opts.tCold || 20,
+      cHot: opts.cHot || C_WATER, cCold: opts.cCold || C_WATER,
+      t: 0, mixed: false, tMix: 0
+    };
+  }
+
+  // уравнение теплового баланса: c₁m₁(T − t₁) + c₂m₂(T − t₂) = 0
+  function mixTemperature(cal) {
+    const c1 = cal.cHot * cal.mHot, c2 = cal.cCold * cal.mCold;
+    if (c1 + c2 < 1e-9) return cal.tCold;
+    return (c1 * cal.tHot + c2 * cal.tCold) / (c1 + c2);
+  }
+
+  // энергия для нагрева: Q = cmΔT
+  function heatEnergy(c, m, dT) { return c * m * dT; }
+
+  /* ---------- превращения энергии (Energy Forms and Changes) ---------- */
+
+  const SOURCES = {
+    sun:      { name: 'Солнечный свет', power: 500, kind: 'light', cost: 0 },
+    battery:  { name: 'Батарея',        power: 300, kind: 'electric', cost: 0.30 },
+    burner:   { name: 'Горелка',        power: 800, kind: 'chemical', cost: 0.55 },
+    hand:     { name: 'Ручной генератор', power: 120, kind: 'mechanical', cost: 0 }
+  };
+
+  const DEVICES = {
+    heater:   { name: 'Нагреватель',    inKind: 'electric', outKind: 'thermal', eff: 0.98 },
+    lamp:     { name: 'Лампа',          inKind: 'electric', outKind: 'light',   eff: 0.95 },
+    motor:    { name: 'Мотор',          inKind: 'electric', outKind: 'mechanical', eff: 0.85 },
+    panel:    { name: 'Солнечная панель', inKind: 'light', outKind: 'electric', eff: 0.18 },
+    kettle:   { name: 'Чайник',         inKind: 'electric', outKind: 'thermal', eff: 0.90 }
+  };
+
+  function chainLosses(sourceKey, deviceKey) {
+    const src = SOURCES[sourceKey], dev = DEVICES[deviceKey];
+    if (!src || !dev) return null;
+    const compatible = src.kind === dev.inKind;
+    const pIn = compatible ? src.power : 0;
+    const pOut = pIn * dev.eff;
+    const loss = pIn - pOut;
+    return { compatible: compatible, pIn: pIn, pOut: pOut, loss: loss, eff: dev.eff,
+      // потери «рассеиваются» в тепло — их видно на схеме
+      lossKind: dev.outKind === 'thermal' ? 'нагрев среды' : 'тепло' };
+  }
+
+  // сколько времени нужно, чтобы нагреть воду: t = cmΔT / P
+  function heatTime(mass, dT, power, c) {
+    const q = (c || C_WATER) * mass * dT;
+    return power > 0 ? q / power : Infinity;
+  }
+
+  /* ---------- задания ---------- */
+
+  const TASKS = [
+    {
+      t: 'Закон Бойля — Мариотта',
+      goal: 'Снимите 3 точки давление–объём при постоянной температуре и убедитесь, что p·V постоянно (расхождение меньше 10 %).',
+      steps: ['Поставьте постоянную температуру 300 К.', 'Снимите точку при объёме 10 л.',
+        'Уменьшите объём до 5 л и до 2,5 л, снимая точки.'],
+      hints: ['При постоянной температуре p·V = const.',
+        'Уменьшили объём в 2 раза — давление выросло в 2 раза.',
+        'Клапан «постоянная температура» включает изотермический режим.'],
+      check: function (f) { return f.boylePoints >= 3 && f.boyleSpread <= 0.1; },
+      stars: function (f) { return f.boyleSpread <= 0.05 ? 3 : 2; },
+      why: 'pV = nRT: при неизменной температуре произведение давления на объём остаётся постоянным.'
+    },
+    {
+      t: 'Нагрев и давление',
+      goal: 'Нагрейте газ от 300 до 600 К при постоянном объёме и убедитесь, что давление выросло примерно в 2 раза.',
+      steps: ['Включите нагреватель.', 'Дождитесь 600 К и снимите точку.', 'Сравните давление с исходным.'],
+      hints: ['При постоянном объёме p/T = const (закон Шарля).',
+        'Удвоение температуры в кельвинах даёт удвоение давления.',
+        'Скорость нагрева зависит от мощности нагревателя.'],
+      check: function (f) { return f.charlesRatio >= 1.7 && f.charlesRatio <= 2.3; },
+      stars: function (f) { return f.charlesRatio >= 1.85 && f.charlesRatio <= 2.15 ? 3 : 2; },
+      why: 'p = nRT/V: давление пропорционально абсолютной температуре, если объём не меняется.'
+    },
+    {
+      t: 'Тяжёлые и лёгкие молекулы',
+      goal: 'Снимите среднюю скорость молекул при одной температуре для двух сортов частиц и сравните с формулой v = √(3kT/m).',
+      steps: ['Снимите точку с лёгкими частицами (N₂).', 'Переключите сорт на тяжёлые (Xe), повторите.',
+        'Сравните скорости: тяжёлые должны двигаться медленнее.'],
+      hints: ['Тяжёлая молекула при той же температуре медленнее: v ~ 1/√m.',
+        'Масса Xe ≈ 131 а.е.м., N₂ ≈ 28 а.е.м.',
+        'Отношение скоростей должно быть около √(131/28) ≈ 2,2.'],
+      check: function (f) { return f.particleKinds >= 2 && f.speedMassRatio >= 1.7; },
+      stars: function (f) { return f.speedMassRatio >= 2.0 && f.speedMassRatio <= 2.4 ? 3 : 2; },
+      why: 'Средняя кинетическая энергия зависит только от температуры, поэтому тяжёлые молекулы медленнее: v = √(3kT/m).'
+    },
+    {
+      t: 'Тепловой баланс',
+      goal: 'Смешайте 0,2 кг воды при 80 °C и 0,2 кг при 20 °C — температура смеси должна быть 50 °C (отклонение меньше 2 °C).',
+      steps: ['Задайте горячую воду 0,2 кг · 80 °C.', 'Холодную — 0,2 кг · 20 °C.',
+        'Смешайте и снимите точку.'],
+      hints: ['Тепло, отданное горячей водой, равно теплу, принятому холодной.',
+        'При равных массах и теплоёмкостях T = (t₁ + t₂)/2.',
+        'Если массы разные, средняя температура смещается к массе с большей теплоёмкостью.'],
+      check: function (f) { return f.mixPoints >= 1 && Math.abs(f.mixTemp - 50) <= 2; },
+      stars: function (f) { return Math.abs(f.mixTemp - 50) <= 0.5 ? 3 : 2; },
+      why: 'Уравнение теплового баланса: c₁m₁(T₁ − T) = c₂m₂(T − T₂). Энергия переходит, но не исчезает.'
+    },
+    {
+      t: 'Сколько энергии на чайник',
+      goal: 'Нагрейте 1 кг воды от 20 до 100 °C и проверьте, что нужно около 336 кДж энергии.',
+      steps: ['Масса воды 1 кг, начальная температура 20 °C.', 'Включите нагреватель 1000 Вт.',
+        'Снимите точку и сравните Q с расчётом.'],
+      hints: ['Q = cmΔT = 4200 · 1 · 80 ≈ 336 кДж.',
+        'Время нагрева = Q / P: при 1000 Вт это около 5,6 минуты.',
+        'Часть энергии уходит в среду — потери видны на схеме.'],
+      check: function (f) { return f.heatPoints >= 1 && Math.abs(f.heatEnergy - 336000) / 336000 <= 0.1; },
+      stars: function (f) { return Math.abs(f.heatEnergy - 336000) / 336000 <= 0.05 ? 3 : 2; },
+      why: 'Количество теплоты Q = cmΔT: чтобы нагреть литр воды на 80 градусов, нужно около 336 кДж.'
+    },
+    {
+      t: 'Цепочка превращений',
+      goal: 'Соберите цепочку «свет → электричество → тепло» с КПД не ниже 15 % и снимите точку.',
+      steps: ['Поставьте источник «Солнечный свет».', 'Подключите солнечную панель, затем нагреватель.',
+        'Снимите точку и посмотрите на итоговый КПД.'],
+      hints: ['Панель отдаёт около 18 % энергии света в виде электричества.',
+        'Нагреватель почти всю электроэнергию превращает в тепло (КПД около 98 %).',
+        'Итоговый КПД цепочки равен произведению КПД звеньев.'],
+      check: function (f) { return f.chainPoints >= 1 && f.chainEff >= 0.15; },
+      stars: function (f) { return f.chainEff >= 0.17 ? 3 : 2; },
+      why: 'Каждое звено теряет часть энергии: при последовательном соединении КПД перемножаются.'
+    },
+    {
+      t: 'Где потери',
+      goal: 'Сравните две цепочки — «батарея → лампа» и «батарея → мотор» — и найдите ту, где потерь меньше.',
+      steps: ['Соберите цепочку с лампой, снимите точку.', 'Соберите с мотором, снимите точку.',
+        'Сравните потери в ваттах.'],
+      hints: ['Лампа отдаёт 95 % энергии светом, мотор — 85 % механической работой.',
+        'Остальное превращается в тепло и рассеивается.',
+        'КПД — это отношение полезной мощности к затраченной.'],
+      check: function (f) { return f.chainPoints >= 2 && f.bestEff >= 0.94; },
+      stars: function (f) { return f.bestEff >= 0.95 ? 3 : 2; },
+      why: 'Даже у хорошего устройства часть энергии уходит в тепло: КПД всегда меньше 100 %.'
+    },
+    {
+      t: 'Изотерма на графике',
+      goal: 'Снимите 4 точки p–V при постоянной температуре — на графике должна получиться гипербола, а p·V остаться постоянным.',
+      steps: ['Температура 300 К, объём от 12 л до 3 л.', 'Снимайте точку на каждом шаге объёма.',
+        'Проверьте, что все точки лежат на одной гиперболе.'],
+      hints: ['Гипербола p = const/V.',
+        'Чем меньше объём, тем круче кривая.',
+        'Разброс p·V меньше 5 % — отличный результат.'],
+      check: function (f) { return f.boylePoints >= 4 && f.boyleSpread <= 0.05; },
+      stars: function (f) { return f.boylePoints >= 5 && f.boyleSpread <= 0.03 ? 3 : 2; },
+      why: 'Изотерма идеального газа в координатах p–V — гипербола: pV = nRT = const.'
+    }
+  ];
+
+  /* ---------- сессия измерений ---------- */
+
+  function createLab() {
+    return { measures: [], gas: createGas(), cal: createCalorimeter(), source: 'battery', device: 'heater' };
+  }
+
+  function facts(lab) {
+    const m = lab.measures || [];
+    const byKind = function (k) { return m.filter(function (r) { return r.kind === k; }); };
+    const gas = byKind('gas');
+    const mix = byKind('mix');
+    const heat = byKind('heat');
+    const chain = byKind('chain');
+    const part = byKind('particle');
+    const f = { measures: m.length, gasPoints: gas.length, mixPoints: mix.length };
+
+    // Бойль — Мариотт
+    const pv = gas.map(function (r) { return r.p * r.v; });
+    f.boylePoints = pv.length;
+    f.boyleSpread = pv.length >= 2
+      ? (Math.max.apply(null, pv) - Math.min.apply(null, pv)) / Math.max.apply(null, pv) : 1;
+
+    // Шарль: отношение давлений при нагреве
+    f.charlesRatio = 0;
+    if (gas.length >= 2) {
+      const cold = gas.reduce(function (a, b) { return b.t < a.t ? b : a; }, gas[0]);
+      const hot = gas.reduce(function (a, b) { return b.t > a.t ? b : a; }, gas[0]);
+      // привод к одной температуре: p/T должно быть постоянным, поэтому
+      // ожидаемое отношение давлений = отношение температур
+      f.charlesRatio = cold.t > 1 ? (hot.p / cold.p) * (cold.t / hot.t) * (hot.t / cold.t) : 0;
+      f.charlesRatio = cold.t > 1 ? (hot.p / cold.p) / (hot.t / cold.t) * (hot.t / cold.t) : 0;
+      f.charlesRatio = cold.t > 1 ? hot.p / cold.p : 0;
+    }
+
+    // молекулы
+    f.particleKinds = Object.keys((function () {
+      const o = {}; part.forEach(function (r) { o[r.particle] = r.speed; }); return o;
+    })()).length;
+    const sp = {};
+    part.forEach(function (r) { sp[r.particle] = r.speed; });
+    const spv = Object.keys(sp).map(function (k) { return sp[k]; });
+    f.speedMassRatio = spv.length >= 2 ? Math.max.apply(null, spv) / Math.min.apply(null, spv) : 0;
+
+    // тепловой баланс
+    f.mixTemp = mix.length ? mix[mix.length - 1].tMix : 0;
+
+    // нагрев воды
+    f.heatPoints = heat.length;
+    f.heatEnergy = heat.length ? heat[heat.length - 1].q : 0;
+
+    // цепочки превращений
+    f.chainPoints = chain.length;
+    f.chainEff = chain.length ? chain[chain.length - 1].eff : 0;
+    f.bestEff = chain.length ? Math.max.apply(null, chain.map(function (r) { return r.eff; })) : 0;
+    return f;
+  }
+
+  const API = {
+    R: R, N_A: N_A, K_B: K_B, C_WATER: C_WATER, C_ALU: C_ALU, C_IRON: C_IRON,
+    SOURCES: SOURCES, DEVICES: DEVICES, TASKS: TASKS, MOLAR: MOLAR,
+    createGas: createGas,
+    gasPressure: gasPressure,
+    gasMolecule: gasMolecule,
+    gasInternal: gasInternal,
+    stepGas: stepGas,
+    boyle: boyle,
+    charles: charles,
+    createCalorimeter: createCalorimeter,
+    mixTemperature: mixTemperature,
+    heatEnergy: heatEnergy,
+    heatTime: heatTime,
+    chainLosses: chainLosses,
+    createLab: createLab,
+    facts: facts
+  };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.Thermal = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* ============================================================
+   Энерджиквантум · thermal.ui.js
+   Интерфейс стенда «Тепло и газы»: газ (p–V–T), калориметр, цепочки превращений.
+   ============================================================ */
+(function () {
+  'use strict';
+  var T = window.Thermal;
+  if (!T || !document.getElementById('benchThermal')) return;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var lab = T.createLab();
+  var gas = lab.gas, cal = lab.cal;
+  var mode = 'gas';                       // gas | mix | chain
+  var solved = {}, taskIndex = 0, playing = true;
+  var lastFrame = 0, tick = 0;
+
+  function n(v, d) { return Number(v || 0).toFixed(d === undefined ? 1 : d).replace('.', ','); }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  var css = document.createElement('style');
+  UI.text(css, `
+  .therm main{display:grid;grid-template-columns:250px minmax(420px,1fr) 320px;gap:10px;padding:10px;min-height:0}
+  .therm .lctl{overflow:auto}
+  .therm .fld{margin-bottom:9px;padding:0 9px}
+  .therm .fld .top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .therm .fld .top b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .therm .seg{display:flex;gap:2px;background:#e8eef5;border-radius:8px;padding:2px;margin:0 9px 9px}
+  .therm .seg button{flex:1;padding:4px 2px;font-size:11px;border-radius:5px;color:var(--muted)}
+  .therm .seg button.active{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(20,40,90,.16)}
+  .therm .chk{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 9px}
+  .therm .chk input{width:15px;height:15px;accent-color:var(--accent)}
+  .tstage{position:relative;flex:1;min-height:0;border-radius:var(--r);border:1px solid #c4d0da;background:#f4f8fb;overflow:hidden}
+  .tstage svg{width:100%;height:100%;display:block}
+  .therm .bottombar.collapsed{height:36px!important;flex:0 0 36px}
+  .therm .bottombar.collapsed .tabbody{display:none}
+  .therm .ttable{width:100%;border-collapse:collapse;font-size:11px}
+  .therm .ttable th,.therm .ttable td{padding:3px 8px;text-align:right;border-bottom:1px solid #eef2f6}
+  .therm .ttable th{color:var(--muted);font-weight:600;position:sticky;top:0;background:#fff}
+  .therm .ttable th:first-child,.therm .ttable td:first-child{text-align:left}
+  .therm .tgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:9px}
+  .therm .tgrid .cell{background:#f6f9fc;border:1px solid #d7e2ec;border-radius:9px;padding:5px 7px}
+  .therm .tgrid .k{font-size:9.5px;letter-spacing:.4px;color:var(--muted);text-transform:uppercase}
+  .therm .tgrid .v{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+  .therm .tgrid .v small{font-size:10px;color:var(--muted)}
+  @media (max-width:1180px){.therm main{grid-template-columns:226px minmax(360px,1fr) 296px}}
+  @media (max-width:980px){.therm main{grid-template-columns:1fr}.tstage{min-height:360px}}
+  @media (max-height:860px){.tstage{min-height:260px}}
+  `);
+  document.head.appendChild(css);
+
+  var main = $('benchThermal');
+  main.className = 'therm';
+
+  UI.html(main, `
+    <aside class="panel lctl">
+      <h2>Опыт</h2>
+      <div class="seg" id="tMode">
+        <button data-mode="gas" class="active">Газ</button>
+        <button data-mode="mix">Смешивание</button>
+        <button data-mode="chain">Цепочки</button>
+      </div>
+
+      <div id="tGasBox">
+        <div class="fld"><div class="top"><span>Объём</span><b id="tVv">10,0 л</b></div>
+          <input type="range" id="tV" min="1" max="20" step="0.5" value="10"></div>
+        <div class="fld"><div class="top"><span>Температура</span><b id="tTv">300 К</b></div>
+          <input type="range" id="tT" min="100" max="900" step="10" value="300"></div>
+        <div class="fld"><div class="top"><span>Количество газа</span><b id="tNv">0,40 моль</b></div>
+          <input type="range" id="tN" min="0.05" max="1.5" step="0.05" value="0.4"></div>
+        <div class="seg" id="tKind">
+          <button data-kind="light" class="active">Лёгкие (N₂)</button>
+          <button data-kind="heavy">Тяжёлые (Xe)</button>
+        </div>
+        <div class="chk"><input type="checkbox" id="tHeat"><label for="tHeat">Нагреватель 50 Вт</label></div>
+        <div class="chk"><input type="checkbox" id="tCool"><label for="tCool">Охладитель 40 Вт</label></div>
+      </div>
+
+      <div id="tMixBox" hidden>
+        <div class="fld"><div class="top"><span>Масса горячей воды</span><b id="tHmv">0,20 кг</b></div>
+          <input type="range" id="tHm" min="0.05" max="1" step="0.05" value="0.2"></div>
+        <div class="fld"><div class="top"><span>Температура горячей</span><b id="tHtv">80 °C</b></div>
+          <input type="range" id="tHt" min="40" max="100" step="1" value="80"></div>
+        <div class="fld"><div class="top"><span>Масса холодной воды</span><b id="tCmv">0,20 кг</b></div>
+          <input type="range" id="tCm" min="0.05" max="1" step="0.05" value="0.2"></div>
+        <div class="fld"><div class="top"><span>Температура холодной</span><b id="tCtv">20 °C</b></div>
+          <input type="range" id="tCt" min="0" max="40" step="1" value="20"></div>
+        <div class="seg" id="tMat">
+          <button data-mat="water" class="active">Вода</button>
+          <button data-mat="alu">Алюминий</button>
+          <button data-mat="iron">Железо</button>
+        </div>
+        <button class="btn primary" id="tMixGo" style="margin:6px 9px 10px;width:calc(100% - 18px)">Смешать</button>
+      </div>
+
+      <div id="tChainBox" hidden>
+        <div class="fld"><div class="top"><span>Источник</span></div>
+          <div class="seg" id="tSrc" style="margin:0 0 6px">
+            <button data-src="sun" class="active">Свет</button>
+            <button data-src="battery">Батарея</button>
+            <button data-src="burner">Горелка</button>
+          </div></div>
+        <div class="fld"><div class="top"><span>Устройство</span></div>
+          <div class="seg" id="tDev" style="margin:0 0 6px">
+            <button data-dev="panel" class="active">Панель</button>
+            <button data-dev="heater">Нагреватель</button>
+            <button data-dev="lamp">Лампа</button>
+            <button data-dev="motor">Мотор</button>
+          </div></div>
+        <button class="btn primary" id="tChainGo" style="margin:6px 9px 10px;width:calc(100% - 18px)">Собрать цепочку</button>
+      </div>
+
+      <h2>Время</h2>
+      <div class="chk"><input type="checkbox" id="tPlay" checked><label for="tPlay">Модель идёт</label></div>
+      <button class="btn" id="tSample" style="margin:8px 9px;width:calc(100% - 18px)">＋ Снять точку</button>
+    </aside>
+
+    <section class="stagewrap">
+      <div class="tstage" id="tStage"><svg id="tSvg" viewBox="0 0 760 470" preserveAspectRatio="xMidYMid meet"></svg></div>
+      <div class="bottombar panel">
+        <div class="tabs">
+          <button class="active" data-tab="meas">Протокол <span class="badge" id="tCount"></span></button>
+          <div class="grow"></div>
+          <button class="btn ghost tiny" id="tCsv" style="margin:4px 6px 4px 0">Экспорт CSV</button>
+        </div>
+        <div class="tabbody" id="tTabMeas"></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="card task">
+        <h2>Задание <span class="badge" id="tTaskId">1 / 8</span></h2>
+        <div class="body" id="tTaskBody"></div>
+        <div class="tasklist" id="tTaskList"></div>
+      </div>
+
+      <div class="card">
+        <h2>Показания</h2>
+        <div style="padding:9px 9px 0">
+          <div class="lcd" style="text-align:center">
+            <div class="cap"><span>ДАВЛЕНИЕ, кПа</span><span id="tCapKind">газ</span></div>
+            <div class="main" id="tLcdP">99,8</div>
+            <div class="sub" id="tLcdSub">p = nRT/V</div>
+          </div>
+        </div>
+        <div class="tgrid">
+          <div class="cell"><div class="k">Температура</div><div class="v" id="tTemp">300 <small>К</small></div></div>
+          <div class="cell"><div class="k">Объём</div><div class="v" id="tVol">10,0 <small>л</small></div></div>
+          <div class="cell"><div class="k">p·V</div><div class="v" id="tPV">998 <small>Дж</small></div></div>
+          <div class="cell"><div class="k">Скорость молекул</div><div class="v" id="tSpd">517 <small>м/с</small></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Что происходит</h2>
+        <div class="body" id="tRead"><div class="muted" style="font-size:12px">Выберите опыт слева.</div></div>
+      </div>
+    </aside>
+  `);
+
+  /* ---------- сцена ---------- */
+
+  function svg() { return $('tSvg'); }
+
+  function drawGas() {
+    // размер «сосуда» зависит от объёма, число молекул — от количества вещества
+    var w = 150 + (gas.volume / 20) * 330;
+    var h = 170 + (gas.volume / 20) * 190;
+    var x0 = (760 - w) / 2, y0 = 110;
+    var count = Math.max(6, Math.min(60, Math.round(gas.moles * 40)));
+    var mols = '';
+    var seed = 1;
+    function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+    for (var i = 0; i < count; i++) {
+      var mx = x0 + 12 + rnd() * (w - 24);
+      var my = y0 + h - 12 - rnd() * (h - 24);
+      var heavy = gas.particle === 'heavy';
+      mols += '<circle cx="' + mx.toFixed(1) + '" cy="' + my.toFixed(1) + '" r="' + (heavy ? 7 : 4.5) + '" fill="' +
+        (heavy ? '#7a5cc4' : '#2ea3dc') + '" opacity=".85"/>';
+    }
+    var hot = (gas.temp - 100) / 800;
+    UI.html(svg(),
+      '<rect x="' + x0 + '" y="' + (y0 + h - 0) + '" width="' + w + '" height="30" fill="#dfe9f2"/>' +
+      '<rect x="' + x0 + '" y="' + y0 + '" width="' + w + '" height="' + h + '" rx="10" fill="#eaf3fa" stroke="#8fb4cc" stroke-width="4"/>' +
+      mols +
+      '<rect x="' + (x0 + w / 2 - 40) + '" y="' + (y0 - 22) + '" width="80" height="22" rx="6" fill="' +
+      (gas.heatOn ? '#f07d20' : '#c6d3dd') + '"/>' +
+      '<text x="' + (x0 + w / 2) + '" y="' + (y0 - 6) + '" text-anchor="middle" font-size="11" fill="#fff" font-family="sans-serif">нагрев</text>' +
+      '<rect x="' + (x0 + 6) + '" y="' + (y0 + h + 6) + '" width="' + (w - 12) * hot + '" height="8" rx="4" fill="#f07d20" opacity=".7"/>' +
+      '<text x="' + x0 + '" y="' + (y0 + h + 34) + '" font-size="12" fill="#1f4a76" font-family="sans-serif">' +
+      'T = ' + n(gas.temp, 0) + ' К · V = ' + n(gas.volume, 1) + ' л · p = ' + n(T.gasPressure(gas), 0) + ' кПа</text>' +
+      '<text x="' + x0 + '" y="' + (y0 - 40) + '" font-size="13" font-weight="700" fill="#1b3e8f" font-family="sans-serif">' +
+      (gas.particle === 'heavy' ? 'Тяжёлые молекулы (Xe)' : 'Лёгкие молекулы (N₂)') + '</text>');
+  }
+
+  function drawMix() {
+    var tMix = T.mixTemperature(cal);
+    var hHot = 150, y0 = 170;
+    var yHot = y0 + 40 * (1 - (cal.tHot - 0) / 100);
+    var yCold = y0 + 40 * (1 - (cal.tCold - 0) / 100);
+    UI.html(svg(),
+      '<text x="60" y="60" font-size="13" font-weight="700" fill="#1b3e8f" font-family="sans-serif">Уравнение теплового баланса</text>' +
+      '<rect x="70" y="' + (y0 - 70) + '" width="120" height="150" rx="8" fill="#fde3d0" stroke="#f07d20" stroke-width="3"/>' +
+      '<text x="130" y="' + (y0 + 10) + '" text-anchor="middle" font-size="13" fill="#a35c00" font-family="sans-serif">' +
+      n(cal.tHot, 0) + ' °C</text>' +
+      '<text x="130" y="' + (y0 + 30) + '" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' +
+      n(cal.mHot, 2) + ' кг</text>' +
+      '<text x="215" y="' + (y0) + '" font-size="22" fill="#6b7c8b" font-family="sans-serif">+</text>' +
+      '<rect x="245" y="' + (y0 - 70) + '" width="120" height="150" rx="8" fill="#dceaf6" stroke="#2ea3dc" stroke-width="3"/>' +
+      '<text x="305" y="' + (y0 + 10) + '" text-anchor="middle" font-size="13" fill="#1f4a76" font-family="sans-serif">' +
+      n(cal.tCold, 0) + ' °C</text>' +
+      '<text x="305" y="' + (y0 + 30) + '" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' +
+      n(cal.mCold, 2) + ' кг</text>' +
+      '<text x="390" y="' + (y0) + '" font-size="22" fill="#6b7c8b" font-family="sans-serif">=</text>' +
+      '<rect x="420" y="' + (y0 - 70) + '" width="150" height="150" rx="8" fill="#eaf3e6" stroke="#1f9d6b" stroke-width="3"/>' +
+      '<text x="495" y="' + (y0 + 6) + '" text-anchor="middle" font-size="26" font-weight="700" fill="#1f9d6b" font-family="sans-serif">' +
+      n(tMix, 1) + ' °C</text>' +
+      '<text x="495" y="' + (y0 + 30) + '" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">смесь</text>' +
+      '<text x="70" y="380" font-size="12" fill="#6b7c8b" font-family="sans-serif">c₁m₁(T − t₁) + c₂m₂(T − t₂) = 0</text>');
+  }
+
+  function drawChain() {
+    var r = T.chainLosses(chosenSrc, chosenDev);
+    var src = T.SOURCES[chosenSrc], dev = T.DEVICES[chosenDev];
+    var boxes = '';
+    if (!r.compatible) {
+      boxes = '<text x="380" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#d64545" font-family="sans-serif">' +
+        'Несовместимо: ' + esc(src.name) + ' → ' + esc(dev.name) + '</text>' +
+        '<text x="380" y="230" text-anchor="middle" font-size="12" fill="#6b7c8b" font-family="sans-serif">' +
+        'устройство рассчитано на ' + esc(dev.inKind) + '</text>';
+    } else {
+      boxes =
+        '<rect x="60" y="170" width="150" height="90" rx="10" fill="#e8eef5" stroke="#1b3e8f" stroke-width="3"/>' +
+        '<text x="135" y="205" text-anchor="middle" font-size="12" font-weight="700" fill="#1b3e8f" font-family="sans-serif">' + esc(src.name) + '</text>' +
+        '<text x="135" y="228" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' + n(r.pIn, 0) + ' Вт</text>' +
+        '<path d="M215 215 L275 215" stroke="#2ea3dc" stroke-width="4" marker-end="url(#tArrow)"/>' +
+        '<rect x="285" y="170" width="170" height="90" rx="10" fill="#eaf3fa" stroke="#2ea3dc" stroke-width="3"/>' +
+        '<text x="370" y="205" text-anchor="middle" font-size="12" font-weight="700" fill="#1f4a76" font-family="sans-serif">' + esc(dev.name) + '</text>' +
+        '<text x="370" y="228" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">КПД ' + n(r.eff * 100, 0) + ' %</text>' +
+        '<path d="M460 215 L520 215" stroke="#2ea3dc" stroke-width="4" marker-end="url(#tArrow)"/>' +
+        '<rect x="530" y="170" width="160" height="90" rx="10" fill="#eaf3e6" stroke="#1f9d6b" stroke-width="3"/>' +
+        '<text x="610" y="205" text-anchor="middle" font-size="12" font-weight="700" fill="#1f9d6b" font-family="sans-serif">' +
+        esc(sourceOutLabel(r)) + '</text>' +
+        '<text x="610" y="228" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' + n(r.pOut, 0) + ' Вт</text>' +
+        '<text x="380" y="320" text-anchor="middle" font-size="12" fill="#a35c00" font-family="sans-serif">' +
+        'Потери: ' + n(r.loss, 0) + ' Вт (' + n((1 - r.eff) * 100, 0) + ' %) — уходят в ' + esc(r.lossKind) + '</text>';
+    }
+    UI.html(svg(),
+      '<defs><marker id="tArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">' +
+      '<path d="M0 0 L10 5 L0 10 z" fill="#2ea3dc"/></marker></defs>' + boxes);
+  }
+
+  function sourceOutLabel(r) { return r.pOut > 0 ? 'полезная работа' : '—'; }
+
+  function draw() {
+    if (mode === 'gas') drawGas();
+    else if (mode === 'mix') drawMix();
+    else drawChain();
+    renderReadout();
+  }
+
+  /* ---------- управление ---------- */
+
+  var chosenSrc = 'sun', chosenDev = 'panel';
+  var matC = { water: T.C_WATER, alu: T.C_ALU, iron: T.C_IRON };
+
+  function bindRange(id, out, fmt, fn) {
+    $(id).oninput = function () {
+      UI.text($(out), fmt(parseFloat(this.value)));
+      if (fn) fn(parseFloat(this.value));
+      draw();
+    };
+  }
+  bindRange('tV', 'tVv', function (v) { return n(v) + ' л'; }, function (v) { gas.volume = v; });
+  bindRange('tT', 'tTv', function (v) { return n(v, 0) + ' К'; }, function (v) { gas.temp = v; });
+  bindRange('tN', 'tNv', function (v) { return n(v, 2) + ' моль'; }, function (v) { gas.moles = v; });
+  bindRange('tHm', 'tHmv', function (v) { return n(v, 2) + ' кг'; }, function (v) { cal.mHot = v; });
+  bindRange('tHt', 'tHtv', function (v) { return n(v, 0) + ' °C'; }, function (v) { cal.tHot = v; });
+  bindRange('tCm', 'tCmv', function (v) { return n(v, 2) + ' кг'; }, function (v) { cal.mCold = v; });
+  bindRange('tCt', 'tCtv', function (v) { return n(v, 0) + ' °C'; }, function (v) { cal.tCold = v; });
+
+  $('tHeat').onchange = function () { gas.heatOn = this.checked; draw(); };
+  $('tCool').onchange = function () { gas.coolOn = this.checked; draw(); };
+  $('tPlay').onchange = function () { playing = this.checked; };
+
+  [].forEach.call($('tKind').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('tKind').children, function (x) { x.classList.toggle('active', x === b); });
+      gas.particle = b.dataset.kind;
+      draw();
+    };
+  });
+
+  [].forEach.call($('tMat').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('tMat').children, function (x) { x.classList.toggle('active', x === b); });
+      cal.cHot = matC[b.dataset.mat];
+      draw();
+    };
+  });
+
+  [].forEach.call($('tSrc').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('tSrc').children, function (x) { x.classList.toggle('active', x === b); });
+      chosenSrc = b.dataset.src;
+      draw();
+    };
+  });
+  [].forEach.call($('tDev').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('tDev').children, function (x) { x.classList.toggle('active', x === b); });
+      chosenDev = b.dataset.dev;
+      draw();
+    };
+  });
+
+  [].forEach.call($('tMode').children, function (b) {
+    b.onclick = function () {
+      [].forEach.call($('tMode').children, function (x) { x.classList.toggle('active', x === b); });
+      mode = b.dataset.mode;
+      $('tGasBox').hidden = mode !== 'gas';
+      $('tMixBox').hidden = mode !== 'mix';
+      $('tChainBox').hidden = mode !== 'chain';
+      draw();
+    };
+  });
+
+  /* ---------- показания ---------- */
+
+  function renderReadout() {
+    if (mode === 'gas') {
+      var p = T.gasPressure(gas), mol = T.gasMolecule(gas);
+      UI.text($('tLcdP'), n(p, 1));
+      UI.text($('tCapKind'), 'газ');
+      UI.text($('tLcdSub'), 'p = nRT/V');
+      UI.text($('tTemp'), n(gas.temp, 0) + ' К');
+      UI.text($('tVol'), n(gas.volume, 1) + ' л');
+      UI.text($('tPV'), n(p * gas.volume, 0) + ' Дж');
+      UI.text($('tSpd'), n(mol.speed, 0) + ' м/с');
+      UI.html($('tRead'),
+        '<div class="row"><span>Давление</span><b>' + n(p, 1) + ' кПа</b></div>' +
+        '<div class="row"><span>Внутренняя энергия</span><b>' + n(T.gasInternal(gas), 0) + ' Дж</b></div>' +
+        '<div class="row"><span>Молекул в сосуде</span><b>' + n(gas.moles * T.N_A / 1e22, 2) + '·10²²</b></div>' +
+        '<div class="tiny muted" style="margin-top:6px">При постоянной температуре p·V = const (Бойль — Мариотт).</div>');
+    } else if (mode === 'mix') {
+      var tMix = T.mixTemperature(cal);
+      UI.text($('tLcdP'), n(tMix, 1));
+      UI.text($('tCapKind'), 'смесь, °C');
+      UI.text($('tLcdSub'), 'баланс энергии');
+      UI.text($('tTemp'), n(cal.tHot, 0) + ' °C');
+      UI.text($('tVol'), n(cal.mHot + cal.mCold, 2) + ' кг');
+      UI.text($('tPV'), n(T.heatEnergy(cal.cHot, cal.mHot, cal.tHot - tMix), 0) + ' Дж');
+      UI.text($('tSpd'), n(tMix, 1) + ' °C');
+      UI.html($('tRead'),
+        '<div class="row"><span>Температура смеси</span><b>' + n(tMix, 1) + ' °C</b></div>' +
+        '<div class="row"><span>Отдала горячая</span><b>' + n(T.heatEnergy(cal.cHot, cal.mHot, cal.tHot - tMix), 0) + ' Дж</b></div>' +
+        '<div class="row"><span>Приняла холодная</span><b>' + n(T.heatEnergy(cal.cCold, cal.mCold, tMix - cal.tCold), 0) + ' Дж</b></div>' +
+        '<div class="tiny muted" style="margin-top:6px">Сколько энергии отдано, столько и принято.</div>');
+    } else {
+      var r = T.chainLosses(chosenSrc, chosenDev);
+      UI.text($('tLcdP'), r.compatible ? n(r.pOut, 0) : '—');
+      UI.text($('tCapKind'), 'полезная, Вт');
+      UI.text($('tLcdSub'), 'КПД ' + (r.compatible ? n(r.eff * 100, 0) + ' %' : 'несовместимо'));
+      UI.text($('tTemp'), r.compatible ? n(r.pIn, 0) + ' Вт' : '—');
+      UI.text($('tVol'), r.compatible ? n(r.loss, 0) + ' Вт' : '—');
+      UI.text($('tPV'), r.compatible ? n(r.eff * 100, 0) + ' %' : '—');
+      UI.text($('tSpd'), r.compatible ? esc(r.lossKind) : '—');
+      UI.html($('tRead'), r.compatible
+        ? '<div class="row"><span>На входе</span><b>' + n(r.pIn, 0) + ' Вт</b></div>' +
+          '<div class="row"><span>Полезная мощность</span><b>' + n(r.pOut, 0) + ' Вт</b></div>' +
+          '<div class="row"><span>Потери</span><b>' + n(r.loss, 0) + ' Вт</b></div>' +
+          '<div class="tiny muted" style="margin-top:6px">КПД = полезная / затраченная. Остальное уходит в тепло.</div>'
+        : '<div class="muted" style="font-size:12px">Источник и устройство несовместимы по виду энергии.</div>');
+    }
+  }
+
+  /* ---------- протокол ---------- */
+
+  function sample() {
+    var rec;
+    if (mode === 'gas') {
+      var mol = T.gasMolecule(gas);
+      rec = { kind: 'gas', v: gas.volume, p: T.gasPressure(gas), t: gas.temp, moles: gas.moles };
+      lab.measures.push(rec);
+      lab.measures.push({ kind: 'particle', particle: gas.particle, speed: mol.speed, t: gas.temp });
+      log('ok', 'Газ: V = ' + n(gas.volume) + ' л, T = ' + n(gas.temp, 0) + ' К → p = ' + n(rec.p, 1) + ' кПа');
+    } else if (mode === 'mix') {
+      var tMix = T.mixTemperature(cal);
+      lab.measures.push({ kind: 'mix', tMix: tMix, mHot: cal.mHot, tHot: cal.tHot, mCold: cal.mCold, tCold: cal.tCold });
+      log('ok', 'Смесь: ' + n(tMix, 1) + ' °C');
+    } else {
+      var r = T.chainLosses(chosenSrc, chosenDev);
+      if (!r.compatible) { log('warn', 'Цепочка несовместима — точка не снята'); return; }
+      var eff = r.eff * (chosenSrc === 'sun' ? T.DEVICES.panel.eff / T.DEVICES.panel.eff : 1);
+      var total = chosenSrc === 'sun' ? r.eff * T.DEVICES.heater.eff * (chosenDev === 'panel' ? 1 : 1) : r.eff;
+      lab.measures.push({ kind: 'chain', src: chosenSrc, dev: chosenDev, eff: r.eff, pIn: r.pIn, pOut: r.pOut });
+      log('ok', 'Цепочка ' + T.SOURCES[chosenSrc].name + ' → ' + T.DEVICES[chosenDev].name + ': КПД ' + n(r.eff * 100, 0) + ' %');
+    }
+    renderMeasurements();
+    syncTask(false);
+  }
+
+  function renderMeasurements() {
+    var box = $('tTabMeas');
+    UI.text($('tCount'), lab.measures.length || '');
+    if (!lab.measures.length) {
+      UI.html(box, '<div class="empty-note">Настройте опыт и нажмите «Снять точку».</div>');
+      return;
+    }
+    var kinds = { gas: 'газ', particle: 'молекулы', mix: 'смесь', chain: 'цепочка', heat: 'нагрев' };
+    UI.html(box, '<table class="ttable"><thead><tr><th>Опыт</th><th>Параметры</th><th>Результат</th></tr></thead><tbody>' +
+      lab.measures.map(function (r) {
+        var p = '', res = '';
+        if (r.kind === 'gas') { p = 'V = ' + n(r.v) + ' л, T = ' + n(r.t, 0) + ' К'; res = 'p = ' + n(r.p, 1) + ' кПа, pV = ' + n(r.p * r.v, 0); }
+        if (r.kind === 'particle') { p = r.particle === 'heavy' ? 'Xe, 300 К' : 'N₂, 300 К'; res = 'v = ' + n(r.speed, 0) + ' м/с'; }
+        if (r.kind === 'mix') { p = n(r.mHot, 2) + ' кг · ' + n(r.tHot, 0) + ' °C + ' + n(r.mCold, 2) + ' кг · ' + n(r.tCold, 0) + ' °C'; res = n(r.tMix, 1) + ' °C'; }
+        if (r.kind === 'chain') { p = esc(T.SOURCES[r.src].name) + ' → ' + esc(T.DEVICES[r.dev].name); res = 'КПД ' + n(r.eff * 100, 0) + ' %, ' + n(r.pOut, 0) + ' Вт'; }
+        return '<tr><td>' + (kinds[r.kind] || r.kind) + '</td><td>' + p + '</td><td>' + res + '</td></tr>';
+      }).join('') + '</tbody></table>');
+  }
+
+  $('tCsv').onclick = function () {
+    var lines = ['Опыт;Параметры;Результат'];
+    lab.measures.forEach(function (r) {
+      lines.push([r.kind, r.v || r.mHot || r.src || '', r.p || r.tMix || r.eff || r.speed || ''].join(';'));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'thermal-protocol.csv';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  };
+  $('tSample').onclick = sample;
+  $('tMixGo').onclick = function () { sample(); };
+  $('tChainGo').onclick = function () { sample(); };
+
+  /* ---------- задания ---------- */
+
+  function syncTask(show) {
+    var tk = T.TASKS[taskIndex];
+    var f = T.facts(lab);
+    var okNow = false;
+    try { okNow = tk.check(f); } catch (e) { okNow = false; }
+    if (okNow && !solved[taskIndex]) {
+      solved[taskIndex] = tk.stars(f);
+      renderTask();
+      log('ok', '★ Задание «' + tk.t + '» выполнено (' + solved[taskIndex] + ' из 3)');
+    }
+    if (show) {
+      UI.html($('tCheckOut'), okNow
+        ? '<div class="hintline">✅ Условие выполнено' + (solved[taskIndex] ? ' — ' + '★'.repeat(solved[taskIndex]) : '') + '</div>'
+        : '<div class="hintline">Пока не выполнено: ' + esc(tk.goal) + '</div>');
+    }
+  }
+
+  function renderTask() {
+    var tk = T.TASKS[taskIndex];
+    var done = solved[taskIndex];
+    UI.text($('tTaskId'), (taskIndex + 1) + ' / ' + T.TASKS.length);
+    UI.html($('tTaskBody'),
+      '<div class="goal"><b>' + esc(tk.t) + '</b><br>' + esc(tk.goal) + '</div>' +
+      '<ol>' + tk.steps.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ol>' +
+      (done ? '<div class="checkout"><div class="hintline">' + '★'.repeat(done) + ' ' + esc(tk.why) + '</div></div>' : '') +
+      '<div class="row" style="gap:6px;margin-top:6px">' +
+      '<button class="btn ghost tiny" id="tHint">Подсказка</button>' +
+      '<button class="btn primary tiny" id="tCheck">Проверить</button></div>' +
+      '<div class="checkout" id="tCheckOut"></div>');
+    UI.html($('tTaskList'), T.TASKS.map(function (t, i) {
+      return '<button data-i="' + i + '" class="' + (i === taskIndex ? 'active ' : '') + (solved[i] ? 'done' : '') + '">' +
+        '<span class="num">' + (solved[i] ? '★' : (i + 1)) + '</span><span>' + esc(t.t) + '</span></button>';
+    }).join(''));
+    $('tHint').onclick = function () {
+      tk._h = tk._h || 0;
+      var hint = tk.hints[tk._h % tk.hints.length];
+      tk._h++;
+      UI.html($('tCheckOut'), '<div class="hintline">💡 ' + esc(hint) + '</div>');
+    };
+    $('tCheck').onclick = function () { syncTask(true); };
+    [].forEach.call($('tTaskList').children, function (b) {
+      b.onclick = function () { taskIndex = +b.dataset.i; renderTask(); };
+    });
+  }
+
+  /* ---------- журнал (в консоль стенда, чтобы не занимать сцену) ---------- */
+
+  var logRows = [];
+  function log(kind, text) {
+    logRows.push({ kind: kind, text: text, d: new Date() });
+    if (logRows.length > 60) logRows.shift();
+    var el = $('tLcdSub');
+    if (el && kind === 'ok') UI.text(el, text.length > 42 ? text.slice(0, 42) + '…' : text);
+  }
+
+  /* ---------- анимация ---------- */
+
+  function frame(ts) {
+    var dt = lastFrame ? Math.min(0.05, (ts - lastFrame) / 1000) : 0.016;
+    lastFrame = ts;
+    if (window.__bench === 'thermal' && playing && mode === 'gas') {
+      if (gas.heatOn || gas.coolOn || Math.abs(gas.temp - 300) > 0.5) {
+        T.stepGas(gas, dt * 8);       // ускоренное время: 1 с ≈ 8 с опыта
+        drawGas();
+        renderReadout();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- старт ---------- */
+
+  draw();
+  renderTask();
+  renderMeasurements();
+  requestAnimationFrame(frame);
+
+  window.__thermal = {
+    lab: lab, gas: function () { return gas; }, cal: function () { return cal; },
+    facts: function () { return T.facts(lab); }, sample: sample,
+    solved: function () { return solved; }, T: T,
+    mode: function (m) { var b = $('tMode').querySelector('[data-mode="' + m + '"]'); if (b) b.click(); }
+  };
+})();
+</script>
 <script>
 (function () {
   'use strict';
@@ -7661,8 +9539,8 @@
   /* ================= переключение стендов ================= */
   var bench = 'circuits';
   window.__bench = 'circuits';
-  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd', grid: 'grid' };
-  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen', grid: 'benchGrid' };
+  var BENCH_CLASS = { circuits: '', renew: 'renew', storage: 'stor', efficiency: 'eff', hydrogen: 'hyd', grid: 'grid', mech: 'mech', thermal: 'therm' };
+  var BENCH_EL = { circuits: 'benchCircuits', renew: 'benchRenew', storage: 'benchStorage', efficiency: 'benchEfficiency', hydrogen: 'benchHydrogen', grid: 'benchGrid', mech: 'benchMech', thermal: 'benchThermal' };
   function setBench(name) {
     bench = name;
     window.__bench = name;
