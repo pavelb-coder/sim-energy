@@ -39,6 +39,36 @@ async def main():
         assert 'выполнено' in (await pg.inner_text('#mCheckOut'))
         print('механика: свободное падение — задание 8 выполнено')
 
+        # маятник: тяга и шар поворачиваются от одного центра (раньше тяга уходила в другую сторону)
+        await pg.uncheck('#mFree'); await pg.wait_for_timeout(200)
+        for bt in await (await pg.query_selector('#mScene')).query_selector_all('button'):
+            if (await bt.get_attribute('data-scene')) == 'pendulum':
+                await bt.click(); break
+        await pg.evaluate("()=>{const e=document.getElementById('mA'); e.value=50;"
+                          "e.dispatchEvent(new Event('input',{bubbles:true}));}")
+        await pg.click('#mSwing'); await pg.wait_for_timeout(900)
+        gap = await pg.evaluate("""() => {
+          const rod = document.querySelector('#mRod'), line = rod.querySelector('line');
+          const svg = rod.ownerSVGElement, pt = svg.createSVGPoint();
+          pt.x = +line.getAttribute('x2'); pt.y = +line.getAttribute('y2');
+          const end = pt.matrixTransform(rod.getScreenCTM());
+          const zero = svg.createSVGPoint();                       // центр шара — это (0,0) в его координатах
+          const bob = zero.matrixTransform(document.querySelector('#mBob').getScreenCTM());
+          return Math.hypot(end.x - bob.x, end.y - bob.y);
+        }""")
+        assert gap < 3, f'тяга не совпадает с шаром: {gap:.1f} px'
+        print('механика: маятник — тяга и шар на одной линии, расхождение', round(gap, 1), 'px')
+
+        # пружина: энергия не нулевая при движении
+        for bt in await (await pg.query_selector('#mScene')).query_selector_all('button'):
+            if (await bt.get_attribute('data-scene')) == 'spring':
+                await bt.click(); break
+        await pg.click('#mPull'); await pg.wait_for_timeout(700)
+        f = await pg.evaluate("() => window.__mech.facts()")
+        e = await pg.inner_text('#mLcdE')
+        assert e.replace(',', '.') and float(e.replace(',', '.')) > 0, e
+        print('механика: пружина — полная энергия', e, 'Дж')
+
         await pg.click('button[data-bench="thermal"]'); await pg.wait_for_timeout(800)
         for v in ['10', '5', '2.5']:
             await pg.evaluate("(x)=>{const e=document.getElementById('tV');e.value=x;"

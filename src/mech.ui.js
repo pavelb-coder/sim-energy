@@ -254,7 +254,9 @@
     var cx = 380, cy = 90;
     UI.html(svg(),
       ground(420) +
-      '<line x1="' + cx + '" y1="' + cy + '" x2="' + cx + '" y2="' + (cy + Lpx) + '" stroke="#6b7c8b" stroke-width="2"/>' +
+      // вертикаль — только бледный пунктир положения равновесия;
+      // раньше это была сплошная линия и читалась как вторая тяга, уходящая в другую сторону
+      '<line x1="' + cx + '" y1="' + cy + '" x2="' + cx + '" y2="' + (cy + Lpx + 14) + '" stroke="#b8c9d6" stroke-width="1.4" stroke-dasharray="4 6"/>' +
       '<circle cx="' + cx + '" cy="' + cy + '" r="7" fill="#1b3e8f"/>' +
       '<g id="mBob"><circle cx="0" cy="0" r="' + (10 + Math.min(pd.mass, 5) * 3) + '" fill="#2ea3dc" stroke="#1b3e8f" stroke-width="3"/></g>' +
       '<g id="mRod"><line x1="0" y1="0" x2="0" y2="' + Lpx + '" stroke="#95a9b8" stroke-width="2"/></g>' +
@@ -271,7 +273,9 @@
     var cx = 380, cy = 90;
     var bx = cx + Lpx * Math.sin(pd.theta), by = cy + Lpx * Math.cos(pd.theta);
     UI.attr(bob, 'transform', 'translate(' + bx.toFixed(1) + ',' + by.toFixed(1) + ')');
-    UI.attr(rod, 'transform', 'translate(' + cx + ',' + cy + ') rotate(' + (pd.theta * 180 / Math.PI).toFixed(1) + ')');
+    // SVG поворачивает по часовой стрелке, а угол маятника отсчитывается от вертикали
+    // в сторону +x — поэтому знак у стержня обратный, иначе тяга уходит от шара в другую сторону
+    UI.attr(rod, 'transform', 'translate(' + cx + ',' + cy + ') rotate(' + (-pd.theta * 180 / Math.PI).toFixed(1) + ')');
     var arc = $('mArc');
     if (arc) {
       arc.setAttribute('x1', cx); arc.setAttribute('y1', cy + Lpx);
