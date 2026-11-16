@@ -26,7 +26,6 @@ $string['bench_hydrogen'] = 'Hydrogen loop (FCJJ-40)';
 $string['bench_grid'] = 'Microgrid and EV charging';
 $string['bench_mech'] = 'Mechanics and energy';
 $string['bench_thermal'] = 'Heat and gases';
-$string['bench_optics'] = 'Light and waves';
 
 $string['gradetarget'] = 'Tasks for the full grade';
 $string['gradetarget_help'] = 'How many tasks a student must complete to get the maximum grade.';

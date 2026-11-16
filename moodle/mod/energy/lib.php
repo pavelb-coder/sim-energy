@@ -16,7 +16,6 @@ function mod_energy_bench_list(): array {
         'grid'       => get_string('bench_grid', 'mod_energy'),
         'mech'       => get_string('bench_mech', 'mod_energy'),
         'thermal'    => get_string('bench_thermal', 'mod_energy'),
-        'optics'     => get_string('bench_optics', 'mod_energy'),
     ];
 }
 
@@ -217,7 +216,7 @@ function mod_energy_is_open(stdClass $energy): bool {
  */
 function mod_energy_total_tasks(?stdClass $energy = null): int {
     if ($energy === null) {
-        return 72;
+        return 64;
     }
     return 8 * count(mod_energy_enabled_benches($energy));
 }
