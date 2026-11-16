@@ -102,7 +102,7 @@
   .partitem .nm i{display:block;font-style:normal;font-size:10.5px;color:var(--muted)}
   .hintline{padding:8px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.3}
   /* если окно низкое, подсказка отдаёт место списку оборудования */
-  @media (max-height:860px){.palette .hintline{display:none}}
+  @media (max-height:860px){#benchCircuits .palette .hintline{display:none}}
 
   /* ---------- stage ---------- */
   .stagewrap{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
@@ -191,12 +191,14 @@
   /* ---------- right column ---------- */
   .right{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto;overscroll-behavior:contain}
   .right>.card{flex:0 0 auto}
-  /* карточка задания занимает свободное место, а список работ прокручивается внутри:
-     приборы при этом остаются на виду и никуда не уезжают */
-  .card.task{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
-  .card.task .body{overflow:auto;min-height:96px;flex:0 1 auto}
-  .card.task .tasklist{overflow:auto;min-height:88px;flex:1 1 auto;border-top:1px solid var(--line)}
-  .right>.card.inspector{flex:0 0 auto}
+  /* карточка задания стенда «Цепи» занимает свободное место, а список работ
+     прокручивается внутри: приборы остаются на виду и никуда не уезжают */
+  #benchCircuits .card.task{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+  #benchCircuits .card.task .body{overflow:auto;min-height:96px;flex:0 1 auto}
+  #benchCircuits .card.task .tasklist{overflow:auto;min-height:88px;flex:1 1 auto;border-top:1px solid var(--line)}
+  #benchCircuits .right>.card.inspector{flex:0 0 auto}
+  /* карточка задания просит не больше половины колонки: сцена и приборы важнее */
+  #benchCircuits #taskCard{max-height:52%}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
   .card h2{margin:0;padding:9px 11px;font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;
     color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
@@ -293,15 +295,14 @@
   /* компактные приборы в режиме задания: сцена и задание важнее, приборы — рядом.
      Карточка задания занимает всё, что осталось над приборами, поэтому приборы
      всегда остаются на экране, а не уезжают вниз. */
-  .mode-task #taskCard{flex:1 1 auto;min-height:0}
-  .mode-task .right>.card:not(.task){flex:0 0 auto}
-  .mode-task .right>.card.inspector{display:none}
-  .mode-task #mLamp,.mode-task .right .card .aux{display:none!important}
-  .mode-task .right .meters{gap:4px;padding:6px}
-  .mode-task .right>.card>h2{padding:7px 10px}
-  .mode-task #taskBody{padding:8px 10px}
-  .mode-task .right .meter .v{font-size:16px}
-  .mode-task .right .lcd .main{font-size:17px}
+  .mode-task #benchCircuits #taskCard{flex:1 1 auto;min-height:0}
+  .mode-task #benchCircuits .right>.card:not(.task){flex:0 0 auto}
+  .mode-task #benchCircuits #mLamp{display:none!important}
+  .mode-task #benchCircuits .right .meters{gap:4px;padding:6px}
+  .mode-task #benchCircuits .right>.card>h2{padding:7px 10px}
+  .mode-task #benchCircuits #taskBody{padding:8px 10px}
+  .mode-task #benchCircuits .right .meter .v{font-size:16px}
+  .mode-task #benchCircuits .right .lcd .main{font-size:17px}
   @media (max-height:860px){
     /* раньше вся страница уезжала вниз при переключении режима.
        Теперь страница остаётся на месте, прокручиваются только панели. */
@@ -311,22 +312,22 @@
     .bottombar{height:128px}
     /* карточка задания не сжимается до обрезков: колонка прокручивается,
        но приборы больше не утаскивают окно вниз */
-    .mode-task #taskCard{flex:0 1 auto;min-height:0}
-    .mode-task #taskCard .body{flex:1 1 auto;min-height:120px;overflow:auto}
-    .mode-task #taskCard .tasklist{flex:0 1 auto;max-height:118px;overflow:auto}
+    .mode-task #benchCircuits #taskCard{flex:0 1 auto;min-height:0}
+    .mode-task #benchCircuits #taskCard .body{flex:1 1 auto;min-height:120px;overflow:auto}
+    .mode-task #benchCircuits #taskCard .tasklist{flex:0 1 auto;max-height:118px;overflow:auto}
     /* список работ — в две колонки: все восемь видны, а текст задания не обрезается */
-    .mode-task #taskList{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:5px}
-    .mode-task #taskList button{padding:4px 6px;font-size:11px;gap:5px}
-    .mode-task #taskList .num{width:14px;flex:0 0 14px}
-    .mode-task .right{overflow:auto}
+    .mode-task #benchCircuits #taskList{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:5px}
+    .mode-task #benchCircuits #taskList button{padding:4px 6px;font-size:11px;gap:5px}
+    .mode-task #benchCircuits #taskList .num{width:14px;flex:0 0 14px}
+    .mode-task #benchCircuits .right{overflow:auto}
   }
   @media (max-width:980px){
     body{overflow:auto}
     .app{height:auto;min-height:100vh}
     #benchCircuits{flex:none}
     /* одна колонка: палитра не раздувается на весь экран */
-    .palette{max-height:300px}
-    .palette .parts{overflow:auto;flex:1 1 auto}
+    #benchCircuits .palette{max-height:300px}
+    #benchCircuits .palette .parts{overflow:auto;flex:1 1 auto}
     #benchCircuits>main{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto;overflow:visible}
     .stagewrap{min-height:440px}
     .right{overflow:visible}

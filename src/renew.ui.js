@@ -130,7 +130,7 @@
             <linearGradient id="panelFace" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stop-color="#122a4a"/><stop offset="55%" stop-color="#1f4a76"/><stop offset="100%" stop-color="#122a4a"/>
             </linearGradient>
-            <linearGradient id="battFillG" x1="0" y1="1" x2="0" y2="0">
+            <linearGradient id="rBattFillG" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stop-color="#7ed0a8"/><stop offset="100%" stop-color="#1f9d6b"/>
             </linearGradient>
           </defs>
@@ -179,7 +179,7 @@
           <g id="rBatt" transform="translate(560,392)">
             <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#b9c8d4" stroke-width="2"/>
             <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#b9c8d4"/>
-            <rect id="battFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#battFillG)"/>
+            <rect id="rBattFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#rBattFillG)"/>
             <text id="battTxt" x="0" y="30" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">АКБ 35 %</text>
           </g>
 
@@ -586,8 +586,8 @@
     UI.attr($('win'), 'fill', lampOn ? '#ffe9a8' : '#cfe3ee');;
     // батарея
     var battW = 60 * st.soc;
-    UI.attr($('battFill'), 'width', Math.round(Math.max(0, battW || 0)));
-    UI.attr($('battFill'), 'fill', st.soc < 0.2 ? '#e8850c' : (st.soc > 0.8 ? '#1f9d6b' : 'url(#battFillG)'));;
+    UI.attr($('rBattFill'), 'width', Math.round(Math.max(0, battW || 0)));
+    UI.attr($('rBattFill'), 'fill', st.soc < 0.2 ? '#e8850c' : (st.soc > 0.8 ? '#1f9d6b' : 'url(#rBattFillG)'));;
     var socPct = isFinite(st.soc) ? Math.round(st.soc * 100) : 0;
     UI.text($('battTxt'), 'АКБ ' + socPct + ' %');
     // потоки энергии

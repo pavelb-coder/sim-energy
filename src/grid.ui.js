@@ -128,7 +128,7 @@
             <radialGradient id="gSunGlow">
               <stop offset="0%" stop-color="#fff3c4" stop-opacity=".95"/><stop offset="100%" stop-color="#ffd166" stop-opacity="0"/>
             </radialGradient>
-            <linearGradient id="gBattFill" x1="0" y1="1" x2="0" y2="0">
+            <linearGradient id="gBattFillG" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stop-color="#2ea3dc"/><stop offset="100%" stop-color="#1b3e8f"/>
             </linearGradient>
             <pattern id="gGridP" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -188,7 +188,7 @@
           <g id="gGridBatt" transform="translate(520,236)">
             <rect x="-34" y="0" width="68" height="78" rx="8" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
             <rect x="-12" y="-8" width="24" height="10" rx="3" fill="#dbe6ee" stroke="#c6d3dd" stroke-width="1.6"/>
-            <rect id="gBattFill" x="-28" y="70" width="56" height="0" rx="6" fill="url(#gBattFill)" style="transition:height .2s,y .2s"/>
+            <rect id="gBattFill" x="-28" y="70" width="56" height="0" rx="6" fill="url(#gBattFillG)" style="transition:height .2s,y .2s"/>
             <text id="gSocTxt" x="0" y="-16" text-anchor="middle" font-size="11" font-weight="700" fill="#1b3e8f" font-family="sans-serif">50 %</text>
             <text id="gBattP" x="0" y="98" text-anchor="middle" font-size="11" font-weight="700" fill="#22303c" font-family="sans-serif">0,0 кВт</text>
             <text x="0" y="114" text-anchor="middle" font-size="9.5" fill="#6b7c8b" font-family="sans-serif">накопитель</text>

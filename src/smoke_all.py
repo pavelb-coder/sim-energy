@@ -63,7 +63,7 @@ async def main():
         print('дубликаты id:', dups or 'нет')
         batt = await pg.evaluate("""async()=>{
           const st=window.__renew.state();
-          const el=()=>document.querySelector('rect#battFill');
+          const el=()=>document.querySelector('rect#rBattFill');
           st.soc=1; await new Promise(r=>setTimeout(r,350));
           const full=[el().getAttribute('width'), el().getAttribute('fill')];
           st.soc=0.05; await new Promise(r=>setTimeout(r,350));
@@ -77,7 +77,7 @@ async def main():
         # --- сцены не обрезаются на невысоких окнах (ноутбук 1366x600 и т.п.) ---
         for vw, vh in [(1366, 600), (1280, 720), (1024, 768), (1600, 760)]:
             await pg.set_viewport_size({'width': vw, 'height': vh})
-            for bench, key in [('renew', 'gBatt'), ('storage', 'gCell'), ('efficiency', 'roomLab')]:
+            for bench, key in [('renew', 'rBatt'), ('storage', 'gCell'), ('efficiency', 'roomLab')]:
                 await pg.click(f'.benchnav button[data-bench="{bench}"]')
                 await pg.wait_for_timeout(450)
                 r = await pg.evaluate("""([bench,key])=>{

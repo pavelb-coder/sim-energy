@@ -102,7 +102,7 @@
   .partitem .nm i{display:block;font-style:normal;font-size:10.5px;color:var(--muted)}
   .hintline{padding:8px 9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.3}
   /* если окно низкое, подсказка отдаёт место списку оборудования */
-  @media (max-height:860px){.palette .hintline{display:none}}
+  @media (max-height:860px){#benchCircuits .palette .hintline{display:none}}
 
   /* ---------- stage ---------- */
   .stagewrap{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0}
@@ -191,12 +191,14 @@
   /* ---------- right column ---------- */
   .right{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto;overscroll-behavior:contain}
   .right>.card{flex:0 0 auto}
-  /* карточка задания занимает свободное место, а список работ прокручивается внутри:
-     приборы при этом остаются на виду и никуда не уезжают */
-  .card.task{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
-  .card.task .body{overflow:auto;min-height:96px;flex:0 1 auto}
-  .card.task .tasklist{overflow:auto;min-height:88px;flex:1 1 auto;border-top:1px solid var(--line)}
-  .right>.card.inspector{flex:0 0 auto}
+  /* карточка задания стенда «Цепи» занимает свободное место, а список работ
+     прокручивается внутри: приборы остаются на виду и никуда не уезжают */
+  #benchCircuits .card.task{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+  #benchCircuits .card.task .body{overflow:auto;min-height:96px;flex:0 1 auto}
+  #benchCircuits .card.task .tasklist{overflow:auto;min-height:88px;flex:1 1 auto;border-top:1px solid var(--line)}
+  #benchCircuits .right>.card.inspector{flex:0 0 auto}
+  /* карточка задания просит не больше половины колонки: сцена и приборы важнее */
+  #benchCircuits #taskCard{max-height:52%}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
   .card h2{margin:0;padding:9px 11px;font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;
     color:var(--muted);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px}
@@ -293,15 +295,14 @@
   /* компактные приборы в режиме задания: сцена и задание важнее, приборы — рядом.
      Карточка задания занимает всё, что осталось над приборами, поэтому приборы
      всегда остаются на экране, а не уезжают вниз. */
-  .mode-task #taskCard{flex:1 1 auto;min-height:0}
-  .mode-task .right>.card:not(.task){flex:0 0 auto}
-  .mode-task .right>.card.inspector{display:none}
-  .mode-task #mLamp,.mode-task .right .card .aux{display:none!important}
-  .mode-task .right .meters{gap:4px;padding:6px}
-  .mode-task .right>.card>h2{padding:7px 10px}
-  .mode-task #taskBody{padding:8px 10px}
-  .mode-task .right .meter .v{font-size:16px}
-  .mode-task .right .lcd .main{font-size:17px}
+  .mode-task #benchCircuits #taskCard{flex:1 1 auto;min-height:0}
+  .mode-task #benchCircuits .right>.card:not(.task){flex:0 0 auto}
+  .mode-task #benchCircuits #mLamp{display:none!important}
+  .mode-task #benchCircuits .right .meters{gap:4px;padding:6px}
+  .mode-task #benchCircuits .right>.card>h2{padding:7px 10px}
+  .mode-task #benchCircuits #taskBody{padding:8px 10px}
+  .mode-task #benchCircuits .right .meter .v{font-size:16px}
+  .mode-task #benchCircuits .right .lcd .main{font-size:17px}
   @media (max-height:860px){
     /* раньше вся страница уезжала вниз при переключении режима.
        Теперь страница остаётся на месте, прокручиваются только панели. */
@@ -311,22 +312,22 @@
     .bottombar{height:128px}
     /* карточка задания не сжимается до обрезков: колонка прокручивается,
        но приборы больше не утаскивают окно вниз */
-    .mode-task #taskCard{flex:0 1 auto;min-height:0}
-    .mode-task #taskCard .body{flex:1 1 auto;min-height:120px;overflow:auto}
-    .mode-task #taskCard .tasklist{flex:0 1 auto;max-height:118px;overflow:auto}
+    .mode-task #benchCircuits #taskCard{flex:0 1 auto;min-height:0}
+    .mode-task #benchCircuits #taskCard .body{flex:1 1 auto;min-height:120px;overflow:auto}
+    .mode-task #benchCircuits #taskCard .tasklist{flex:0 1 auto;max-height:118px;overflow:auto}
     /* список работ — в две колонки: все восемь видны, а текст задания не обрезается */
-    .mode-task #taskList{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:5px}
-    .mode-task #taskList button{padding:4px 6px;font-size:11px;gap:5px}
-    .mode-task #taskList .num{width:14px;flex:0 0 14px}
-    .mode-task .right{overflow:auto}
+    .mode-task #benchCircuits #taskList{display:grid;grid-template-columns:1fr 1fr;gap:2px;padding:5px}
+    .mode-task #benchCircuits #taskList button{padding:4px 6px;font-size:11px;gap:5px}
+    .mode-task #benchCircuits #taskList .num{width:14px;flex:0 0 14px}
+    .mode-task #benchCircuits .right{overflow:auto}
   }
   @media (max-width:980px){
     body{overflow:auto}
     .app{height:auto;min-height:100vh}
     #benchCircuits{flex:none}
     /* одна колонка: палитра не раздувается на весь экран */
-    .palette{max-height:300px}
-    .palette .parts{overflow:auto;flex:1 1 auto}
+    #benchCircuits .palette{max-height:300px}
+    #benchCircuits .palette .parts{overflow:auto;flex:1 1 auto}
     #benchCircuits>main{grid-template-columns:1fr;grid-template-rows:none;grid-auto-rows:auto;overflow:visible}
     .stagewrap{min-height:440px}
     .right{overflow:visible}
@@ -1689,7 +1690,7 @@
             <linearGradient id="panelFace" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stop-color="#122a4a"/><stop offset="55%" stop-color="#1f4a76"/><stop offset="100%" stop-color="#122a4a"/>
             </linearGradient>
-            <linearGradient id="battFillG" x1="0" y1="1" x2="0" y2="0">
+            <linearGradient id="rBattFillG" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stop-color="#7ed0a8"/><stop offset="100%" stop-color="#1f9d6b"/>
             </linearGradient>
           </defs>
@@ -1738,7 +1739,7 @@
           <g id="rBatt" transform="translate(560,392)">
             <rect x="-34" y="-20" width="68" height="34" rx="5" fill="#fff" stroke="#b9c8d4" stroke-width="2"/>
             <rect x="-6" y="-26" width="12" height="6" rx="2" fill="#b9c8d4"/>
-            <rect id="battFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#battFillG)"/>
+            <rect id="rBattFill" x="-30" y="-16" width="60" height="26" rx="3" fill="url(#rBattFillG)"/>
             <text id="battTxt" x="0" y="30" text-anchor="middle" font-size="11" fill="#5a6772" font-family="sans-serif">АКБ 35 %</text>
           </g>
 
@@ -2145,8 +2146,8 @@
     UI.attr($('win'), 'fill', lampOn ? '#ffe9a8' : '#cfe3ee');;
     // батарея
     var battW = 60 * st.soc;
-    UI.attr($('battFill'), 'width', Math.round(Math.max(0, battW || 0)));
-    UI.attr($('battFill'), 'fill', st.soc < 0.2 ? '#e8850c' : (st.soc > 0.8 ? '#1f9d6b' : 'url(#battFillG)'));;
+    UI.attr($('rBattFill'), 'width', Math.round(Math.max(0, battW || 0)));
+    UI.attr($('rBattFill'), 'fill', st.soc < 0.2 ? '#e8850c' : (st.soc > 0.8 ? '#1f9d6b' : 'url(#rBattFillG)'));;
     var socPct = isFinite(st.soc) ? Math.round(st.soc * 100) : 0;
     UI.text($('battTxt'), 'АКБ ' + socPct + ' %');
     // потоки энергии
@@ -5885,7 +5886,7 @@
             <radialGradient id="gSunGlow">
               <stop offset="0%" stop-color="#fff3c4" stop-opacity=".95"/><stop offset="100%" stop-color="#ffd166" stop-opacity="0"/>
             </radialGradient>
-            <linearGradient id="gBattFill" x1="0" y1="1" x2="0" y2="0">
+            <linearGradient id="gBattFillG" x1="0" y1="1" x2="0" y2="0">
               <stop offset="0%" stop-color="#2ea3dc"/><stop offset="100%" stop-color="#1b3e8f"/>
             </linearGradient>
             <pattern id="gGridP" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -5945,7 +5946,7 @@
           <g id="gGridBatt" transform="translate(520,236)">
             <rect x="-34" y="0" width="68" height="78" rx="8" fill="#fff" stroke="#c6d3dd" stroke-width="2"/>
             <rect x="-12" y="-8" width="24" height="10" rx="3" fill="#dbe6ee" stroke="#c6d3dd" stroke-width="1.6"/>
-            <rect id="gBattFill" x="-28" y="70" width="56" height="0" rx="6" fill="url(#gBattFill)" style="transition:height .2s,y .2s"/>
+            <rect id="gBattFill" x="-28" y="70" width="56" height="0" rx="6" fill="url(#gBattFillG)" style="transition:height .2s,y .2s"/>
             <text id="gSocTxt" x="0" y="-16" text-anchor="middle" font-size="11" font-weight="700" fill="#1b3e8f" font-family="sans-serif">50 %</text>
             <text id="gBattP" x="0" y="98" text-anchor="middle" font-size="11" font-weight="700" fill="#22303c" font-family="sans-serif">0,0 кВт</text>
             <text x="0" y="114" text-anchor="middle" font-size="9.5" fill="#6b7c8b" font-family="sans-serif">накопитель</text>
