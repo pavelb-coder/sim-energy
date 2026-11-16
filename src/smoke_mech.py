@@ -27,6 +27,18 @@ async def main():
         assert 'выполнено' in (await pg.inner_text('#mCheckOut'))
         print('механика: 8 заданий, v ∝ √h —', round(f['speedRatio'], 2))
 
+        # свободное падение: две массы → задание 8
+        await pg.click('#mFree'); await pg.wait_for_timeout(300)
+        for m in ['10', '100']:
+            await pg.evaluate("(v)=>{const e=document.getElementById('mM');e.value=v;"
+                              "e.dispatchEvent(new Event('input',{bubbles:true}));}", m)
+            await pg.click('#mDrop'); await pg.wait_for_timeout(900)
+            await pg.click('#mSample'); await pg.wait_for_timeout(200)
+        await pg.click('#mTaskList button:nth-child(8)'); await pg.wait_for_timeout(250)
+        await pg.click('#mCheck'); await pg.wait_for_timeout(350)
+        assert 'выполнено' in (await pg.inner_text('#mCheckOut'))
+        print('механика: свободное падение — задание 8 выполнено')
+
         await pg.click('button[data-bench="thermal"]'); await pg.wait_for_timeout(800)
         for v in ['10', '5', '2.5']:
             await pg.evaluate("(x)=>{const e=document.getElementById('tV');e.value=x;"
@@ -35,6 +47,14 @@ async def main():
         await pg.click('#tTaskList button:nth-child(1)'); await pg.wait_for_timeout(300)
         await pg.click('#tCheck'); await pg.wait_for_timeout(400)
         assert 'выполнено' in (await pg.inner_text('#tCheckOut'))
+        # нагрев воды → задание 5
+        await pg.click('#tMode button[data-mode="heat"]'); await pg.wait_for_timeout(250)
+        await pg.click('#tHeatGo'); await pg.wait_for_timeout(300)
+        await pg.click('#tTaskList button:nth-child(5)'); await pg.wait_for_timeout(250)
+        await pg.click('#tCheck'); await pg.wait_for_timeout(350)
+        assert 'выполнено' in (await pg.inner_text('#tCheckOut'))
+        print('тепло: нагрев воды — задание 5 выполнено')
+
         await pg.click('#tMode button[data-mode="mix"]'); await pg.wait_for_timeout(250)
         await pg.click('#tMixGo'); await pg.wait_for_timeout(250)
         await pg.click('#tMode button[data-mode="chain"]'); await pg.wait_for_timeout(250)

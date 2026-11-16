@@ -75,7 +75,8 @@
           <button data-shape="hill">Горб</button>
         </div>
         <div class="chk"><input type="checkbox" id="mGrav" checked><label for="mGrav">Гравитация включена</label></div>
-        <button class="btn primary" id="mDrop" style="margin:6px 9px 10px;width:calc(100% - 18px)">Пустить груз с верхней точки</button>
+        <div class="chk"><input type="checkbox" id="mFree"><label for="mFree">Свободное падение с высоты 20 м</label></div>
+        <button class="btn primary" id="mDrop" style="margin:6px 9px 10px;width:calc(100% - 18px)">Пустить груз</button>
       </div>
 
       <div id="mPendBox" hidden>
@@ -163,9 +164,31 @@
 
   function svg() { return $('mSvg'); }
 
+  function drawFreeFall() {
+    var yTop = 90, yGround = 420;
+    var y = yTop + (1 - sk.y / 20) * (yGround - yTop);
+    UI.html(svg(),
+      ground(yGround) +
+      '<line x1="120" y1="' + yTop + '" x2="660" y2="' + yTop + '" stroke="#b8c9d6" stroke-dasharray="6 6"/>' +
+      '<text x="120" y="' + (yTop - 8) + '" font-size="11" fill="#6b7c8b" font-family="sans-serif">20 м</text>' +
+      '<g id="mSkaterG"><circle cx="0" cy="0" r="15" fill="#f07d20" stroke="#1b3e8f" stroke-width="3"/>' +
+      '<circle cx="0" cy="0" r="5" fill="#fff"/></g>' +
+      '<text id="mSkaterT" x="0" y="0" text-anchor="middle" font-size="12" font-weight="700" fill="#1b3e8f" font-family="sans-serif"></text>' +
+      '<text x="380" y="450" text-anchor="middle" font-size="11" fill="#6b7c8b" font-family="sans-serif">' +
+      'свободное падение: a = g, масса не важна</text>');
+    var g = $('mSkaterG');
+    if (g) UI.attr(g, 'transform', 'translate(390,' + (y - 16).toFixed(1) + ')');
+    var t = $('mSkaterT');
+    if (t) {
+      t.setAttribute('x', '390'); t.setAttribute('y', (y - 38).toFixed(1));
+      t.textContent = n(Math.abs(sk.v), 1) + ' м/с · ' + n(sk.y, 1) + ' м';
+    }
+  }
+
   function drawScene() {
-    var s = svg();
-    if (scene === 'skate') drawSkate(s);
+    var free = $('mFree') && $('mFree').checked;
+    if (scene === 'skate' && free) { drawFreeFall(); return; }
+    if (scene === 'skate') drawSkate(svg());
     else if (scene === 'pendulum') drawPendulum(s);
     else drawSpring(s);
   }
@@ -311,6 +334,11 @@
     sk = M.createSkater({ shape: currentShape, length: 10, height: currentHeight }, currentMass);
     sk.friction = lab.friction;
     sk.gravityOn = $('mGrav').checked;
+    if ($('mFree') && $('mFree').checked) {
+      // свободное падение: груз не на трассе, стартует с высоты 20 м
+      sk.track = false; sk.freeFall = true;
+      sk.y = 20; sk.v = 0; sk.x = 0;
+    }
     drawScene();
     renderReadout();
   }
@@ -355,6 +383,7 @@
   bindRange('mSd', 'mSdv', function (v) { return n(v, 2); }, function () { resetSpring(); });
 
   $('mGrav').onchange = function () { if (sk) sk.gravityOn = this.checked; if (pd) pd.gravityOn = this.checked; };
+  $('mFree').onchange = function () { resetSkater(); log('info', this.checked ? 'Режим свободного падения: высота 20 м' : 'Режим горки'); };
   $('mPlay').onchange = function () { playing = this.checked; };
 
   [].forEach.call($('mScene').children, function (b) {
@@ -387,9 +416,14 @@
 
   $('mDrop').onclick = function () {
     resetSkater();
-    sk.x = 0.02; sk.y = M.trackHeight(sk.profile, 0.02); sk.v = 0;
+    if (!sk.track) {
+      sk.y = 20; sk.v = 0;
+      log('ok', 'Свободное падение с 20 м, масса ' + n(sk.mass, 0) + ' кг');
+    } else {
+      sk.x = 0.02; sk.y = M.trackHeight(sk.profile, 0.02); sk.v = 0;
+      log('ok', 'Груз пущен с верхней точки: h = ' + n(sk.profile.height) + ' м, масса ' + n(sk.mass, 0) + ' кг');
+    }
     playing = true; $('mPlay').checked = true;
-    log('ok', 'Груз пущен с верхней точки: h = ' + n(sk.profile.height) + ' м, масса ' + n(sk.mass, 0) + ' кг');
   };
   $('mSwing').onclick = function () {
     resetPendulum();
@@ -415,7 +449,9 @@
     UI.text($('mEp'), n(e.Epot, 0) + ' Дж');
     UI.text($('mV'), n(e.speed, 1) + ' м/с');
     UI.text($('mY'), scene === 'spring' ? n(sp.y * 100, 1) + ' см' : n(e.y === undefined ? (e.h || 0) : e.y, 2) + ' м');
-    UI.text($('mCapKind'), scene === 'skate' ? 'горка' : (scene === 'pendulum' ? 'маятник' : 'пружина'));
+    UI.text($('mCapKind'), scene === 'skate'
+      ? (sk.freeFall ? 'свободное падение' : 'горка')
+      : (scene === 'pendulum' ? 'маятник' : 'пружина'));
 
     var read = '';
     if (scene === 'skate') {
@@ -451,7 +487,7 @@
       var e = M.skaterEnergy(sk);
       var e0 = sk.mass * M.G * sk.profile.height;
       rec = Object.assign(rec, {
-        kind: 'skate', mode: sk.track === false ? 'free' : 'track',
+        kind: 'skate', mode: sk.track === false ? 'free' : 'track', freeFall: sk.track === false,
         speed: Math.max(Math.abs(sk.v), sk.vmax || 0), height: sk.profile.height, mass: sk.mass,
         loss: Math.max(0, 1 - e.total / Math.max(1, e0)), energy: e.total, friction: sk.friction
       });
@@ -586,18 +622,20 @@
         else if (scene === 'pendulum' && pd) M.stepPendulum(pd, M.DT);
         else if (scene === 'spring' && sp) M.stepSpring(sp, M.DT);
       }
-      if (scene === 'skate') moveSkater();
+      if (scene === 'skate' && sk && sk.track === false) drawFreeFall();
+      else if (scene === 'skate') moveSkater();
       else if (scene === 'pendulum') moveBob();
       else moveSpring();
-      renderReadout();
-      if (playing) syncTaskSilent();
+      // показания и проверка задания — 6 раз в секунду (раньше каждый кадр)
+      readTick += dt;
+      if (readTick > 0.16) { readTick = 0; renderReadout(); if (playing) syncTaskSilent(); }
     }
     requestAnimationFrame(frame);
   }
-  var tick = 0;
+  var tick = 0, readTick = 0;
   function syncTaskSilent() {
-    tick += 0.016;
-    if (tick < 0.7) return;
+    tick += 1;
+    if (tick < 5) return;     // раз в ~0,8 с при вызове 6 раз в секунду
     tick = 0;
     var tk = M.TASKS[taskIndex];
     var f = M.facts(lab);

@@ -139,5 +139,26 @@ function near(a, b, tol) { return Math.abs(a - b) <= (tol === undefined ? 0.05 :
   ok('«Сохранить энергию» срабатывает', T[0].check(saved), 'потери ' + saved.energyLoss.toFixed(2));
 }
 
+/* 10. Задания достижимы теми средствами, что есть в интерфейсе */
+{
+  const prof = { shape: 'ramp', length: 10, height: 4 };
+  const sk = M.createSkater(prof, 60); sk.friction = 0.03;    // максимум ползунка 0,05
+  const e0 = M.skaterEnergy(sk).total;
+  for (let i = 0; i < 240 * 20; i++) M.stepSkater(sk, 1 / 240);
+  const loss = 1 - M.skaterEnergy(sk).total / e0;
+  const f = M.facts({ measures: [{ kind: 'skate', mode: 'track', speed: 6, height: 4, mass: 60, loss: loss }], friction: 0.03 });
+  ok('«Трение забирает энергию» достижимо при трении 0,03', M.TASKS[6].check(f), 'потери ' + loss.toFixed(2));
+
+  const ff = M.facts({ measures: [
+    { kind: 'skate', mode: 'free', freeFall: true, speed: 12.4, mass: 10, height: 20, loss: 0 },
+    { kind: 'skate', mode: 'free', freeFall: true, speed: 12.6, mass: 100, height: 20, loss: 0 }
+  ] });
+  ok('«Свободное падение» видит две массы', ff.freeFallMasses === 2, String(ff.freeFallMasses));
+  ok('«Свободное падение» срабатывает', M.TASKS[7].check(ff), 'diff ' + ff.freeFallDiff.toFixed(3));
+
+  const lab = M.createLab();
+  ok('факты считаются на пустой лаборатории без ошибок', typeof M.facts(lab).speedRatio === 'number');
+}
+
 console.log(fail ? '\nПРОВАЛОВ: ' + fail + ', пройдено ' + pass + '.' : 'Все проверки пройдены (' + pass + ').');
 process.exit(fail ? 1 : 0);

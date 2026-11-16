@@ -139,5 +139,22 @@ function near(a, b, tol) { return Math.abs(a - b) <= (tol === undefined ? 0.05 :
   ok('«Изотерма» срабатывает на четырёх точках', tasks[7].check(iso), 'разброс ' + iso.boyleSpread.toFixed(3));
 }
 
+/* 9. Каскад превращений и нагрев воды (задания 5 и 6) */
+{
+  const c = T.chainCascade('sun', 'panel', 'heater');
+  ok('каскад свет → панель → нагреватель считается', !!c && c.second && c.second.compatible);
+  ok('итоговый КПД каскада ≈ 17,6 %', near(c.totalEff, 0.176, 0.002), (c.totalEff * 100).toFixed(1) + ' %');
+
+  const heat = T.facts(Object.assign(T.createLab(), {
+    measures: [{ kind: 'heat', q: T.heatEnergy(T.C_WATER, 1, 80), mass: 1, t0: 20, power: 1000 }]
+  }));
+  ok('«Сколько энергии на чайник» срабатывает на записи kind:heat', T.TASKS[4].check(heat));
+
+  const chainTask = T.facts(Object.assign(T.createLab(), {
+    measures: [{ kind: 'chain', src: 'sun', dev: 'panel', eff: 0.176, totalEff: 0.176, pIn: 500, pOut: 88 }]
+  }));
+  ok('«Цепочка превращений» засчитывает каскад 17,6 %', T.TASKS[5].check(chainTask));
+}
+
 console.log(fail ? '\nПРОВАЛОВ: ' + fail + ', пройдено ' + pass + '.' : 'Все проверки пройдены (' + pass + ').');
 process.exit(fail ? 1 : 0);

@@ -114,8 +114,18 @@
     kettle:   { name: 'Чайник',         inKind: 'electric', outKind: 'thermal', eff: 0.90 }
   };
 
+  // цепочка из двух звеньев: например, свет → панель → нагреватель
+  function chainCascade(sourceKey, midKey, finalKey) {
+    const first = chainLosses(sourceKey, midKey);
+    if (!first || !first.compatible) return null;
+    const second = chainLosses({ power: first.pOut, kind: DEVICES[midKey].outKind }, finalKey);
+    if (!second || !second.compatible) return { first: first, second: null, totalEff: first.eff };
+    return { first: first, second: second, totalEff: first.eff * second.eff, pOut: second.pOut };
+  }
+
   function chainLosses(sourceKey, deviceKey) {
-    const src = SOURCES[sourceKey], dev = DEVICES[deviceKey];
+    const src = (typeof sourceKey === 'object' && sourceKey) ? sourceKey : SOURCES[sourceKey];
+    const dev = DEVICES[deviceKey];
     if (!src || !dev) return null;
     const compatible = src.kind === dev.inKind;
     const pIn = compatible ? src.power : 0;
@@ -261,8 +271,6 @@
       const hot = gas.reduce(function (a, b) { return b.t > a.t ? b : a; }, gas[0]);
       // привод к одной температуре: p/T должно быть постоянным, поэтому
       // ожидаемое отношение давлений = отношение температур
-      f.charlesRatio = cold.t > 1 ? (hot.p / cold.p) * (cold.t / hot.t) * (hot.t / cold.t) : 0;
-      f.charlesRatio = cold.t > 1 ? (hot.p / cold.p) / (hot.t / cold.t) * (hot.t / cold.t) : 0;
       f.charlesRatio = cold.t > 1 ? hot.p / cold.p : 0;
     }
 
@@ -284,7 +292,8 @@
 
     // цепочки превращений
     f.chainPoints = chain.length;
-    f.chainEff = chain.length ? chain[chain.length - 1].eff : 0;
+    // итоговый КПД цепочки: свет → панель → нагреватель считается каскадом
+    f.chainEff = chain.length ? chain[chain.length - 1].totalEff || chain[chain.length - 1].eff : 0;
     f.bestEff = chain.length ? Math.max.apply(null, chain.map(function (r) { return r.eff; })) : 0;
     return f;
   }
@@ -304,6 +313,7 @@
     heatEnergy: heatEnergy,
     heatTime: heatTime,
     chainLosses: chainLosses,
+    chainCascade: chainCascade,
     createLab: createLab,
     facts: facts
   };
